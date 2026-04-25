@@ -110,16 +110,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .login-extras input[type=checkbox] { accent-color: var(--primary); }
     .divider { display: flex; align-items: center; gap: 12px; color: var(--text-muted); font-size: 12px; margin: 20px 0; }
     .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-    .demo-logins { display: flex; flex-direction: column; gap: 8px; }
-    .demo-btn {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 9px 14px; border-radius: var(--radius-sm);
-      border: 1px solid var(--border); background: var(--bg-muted);
-      cursor: pointer; font-size: 12.5px; color: var(--text-primary);
-      transition: var(--transition); font-family: var(--font);
-    }
-    .demo-btn:hover { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
-    .demo-btn .role-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
     .floating-orbs { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
     .orb {
       position: absolute; border-radius: 50%;
@@ -255,22 +245,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </button>
       </form>
 
-      <div class="divider">Quick Demo Login</div>
-
-      <div class="demo-logins">
-        <button class="demo-btn" onclick="fillDemo('admin@bulksms.com','Admin@1234')">
-          <span><i class="fa-solid fa-shield-halved" style="color:#9c27b0;margin-right:8px"></i>admin@bulksms.com</span>
-          <span class="role-badge" style="background:rgba(156,39,176,0.1);color:#9c27b0;">Admin</span>
-        </button>
-        <button class="demo-btn" onclick="fillDemo('reseller@bulksms.com','Reseller@1234')">
-          <span><i class="fa-solid fa-store" style="color:#00c896;margin-right:8px"></i>reseller@bulksms.com</span>
-          <span class="role-badge" style="background:rgba(0,200,150,0.1);color:#00c896;">Reseller</span>
-        </button>
-        <button class="demo-btn" onclick="fillDemo('client@bulksms.com','Client@1234')">
-          <span><i class="fa-solid fa-user" style="color:#29b6f6;margin-right:8px"></i>client@bulksms.com</span>
-          <span class="role-badge" style="background:rgba(41,182,246,0.1);color:#29b6f6;">Client</span>
-        </button>
-      </div>
 
       <div class="text-center mt-20 links" style="font-size: 14px; color: var(--text-muted);">
         Don't have an account? <a href="/register.php" style="color: var(--primary); text-decoration: none; font-weight: 600;">Create Account</a>
@@ -296,10 +270,6 @@ function togglePass() {
   }
 }
 
-function fillDemo(email, pass) {
-  document.getElementById('email').value = email;
-  document.getElementById('password').value = pass;
-}
 
 document.getElementById('loginForm').addEventListener('submit', function() {
   const btn = document.getElementById('loginBtn');

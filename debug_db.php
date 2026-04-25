@@ -30,3 +30,12 @@ try {
         echo "<i>Hint: Cannot connect to server. Try using '127.0.0.1' instead of 'localhost'.</i>";
     }
 }
+
+echo "<hr><h3>Testing DB::getInstance() class method...</h3>";
+try {
+    $instance = DB::getInstance();
+    echo "<h3 style='color:green'>Success! DB::getInstance() returned a valid PDO instance.</h3>";
+} catch (Throwable $t) {
+    echo "<h3 style='color:red'>DB::getInstance() FAILED!</h3>";
+    echo "<b>Exception:</b> " . $t->getMessage() . "<br>";
+}
