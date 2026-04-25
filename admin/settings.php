@@ -44,10 +44,22 @@ $s = fn(string $key, string $default='') => htmlspecialchars($settings[$key] ?? 
           <div class="form-group"><label class="form-label">Default Currency</label><select name="default_currency" class="form-control"><option <?=$s('default_currency','KES')==='KES'?'selected':''?>>KES</option><option <?=$s('default_currency')==='USD'?'selected':''?>>USD</option></select></div>
         <?php elseif ($activeTab==='sms'): ?>
           <div class="alert alert-info"><i class="fa-solid fa-info-circle"></i> Configure your SMS gateway API credentials. Supported: Africa's Talking, Infobip, Twilio.</div>
-          <div class="form-group"><label class="form-label">SMS Gateway</label><select name="sms_gateway" class="form-control"><option value="at" <?=$s('sms_gateway')==='at'?'selected':''?>>Africa's Talking</option><option value="infobip" <?=$s('sms_gateway')==='infobip'?'selected':''?>>Infobip</option><option value="twilio" <?=$s('sms_gateway')==='twilio'?'selected':''?>>Twilio</option></select></div>
-          <div class="form-group"><label class="form-label">API Key / Username</label><input type="text" name="sms_api_key" class="form-control" value="<?=$s('sms_api_key')?>"></div>
-          <div class="form-group"><label class="form-label">API Secret / Password</label><input type="password" name="sms_api_secret" class="form-control" placeholder="Leave blank to keep current"></div>
-          <div class="form-group"><label class="form-label">Short Code / Sender</label><input type="text" name="sms_shortcode" class="form-control" value="<?=$s('sms_shortcode')?>"></div>
+          <div class="form-group"><label class="form-label">SMS Gateway</label><select name="sms_gateway" class="form-control">
+            <option value="onfon" <?=$s('sms_gateway')==='onfon'?'selected':''?>>Onfon Media</option>
+            <option value="at" <?=$s('sms_gateway')==='at'?'selected':''?>>Africa's Talking</option>
+            <option value="infobip" <?=$s('sms_gateway')==='infobip'?'selected':''?>>Infobip</option>
+            <option value="twilio" <?=$s('sms_gateway')==='twilio'?'selected':''?>>Twilio</option>
+          </select></div>
+          <div id="onfon_fields" style="display: <?=$s('sms_gateway')==='onfon'?'block':'none'?>">
+            <div class="form-group"><label class="form-label">Onfon API Key</label><input type="text" name="onfon_api_key" class="form-control" value="<?=$s('onfon_api_key')?>"></div>
+            <div class="form-group"><label class="form-label">Onfon User ID / Client ID</label><input type="text" name="onfon_user_id" class="form-control" value="<?=$s('onfon_user_id')?>"></div>
+            <div class="form-group"><label class="form-label">Onfon Access Key (Optional)</label><input type="text" name="onfon_access_key" class="form-control" value="<?=$s('onfon_access_key')?>"></div>
+          </div>
+          <div id="other_sms_fields" style="display: <?=$s('sms_gateway')!=='onfon'?'block':'none'?>">
+            <div class="form-group"><label class="form-label">API Key / Username</label><input type="text" name="sms_api_key" class="form-control" value="<?=$s('sms_api_key')?>"></div>
+            <div class="form-group"><label class="form-label">API Secret / Password</label><input type="password" name="sms_api_secret" class="form-control" placeholder="Leave blank to keep current"></div>
+          </div>
+          <div class="form-group"><label class="form-label">Short Code / Sender ID</label><input type="text" name="sms_shortcode" class="form-control" value="<?=$s('sms_shortcode')?>"></div>
         <?php elseif ($activeTab==='billing'): ?>
           <div class="alert alert-info"><i class="fa-solid fa-credit-card"></i> Configure your Kopo Kopo M-Pesa STK Push credentials.</div>
           <div class="form-group"><label class="form-label">Kopo Kopo Base URL</label><input type="text" name="kk_base_url" class="form-control" value="<?=$s('kk_base_url','https://api.kopokopo.com')?>" placeholder="https://api.kopokopo.com or https://sandbox.kopokopo.com"></div>
@@ -78,4 +90,11 @@ $s = fn(string $key, string $default='') => htmlspecialchars($settings[$key] ?? 
     </form>
   </div>
 </div>
+<script>
+document.querySelector('select[name="sms_gateway"]').addEventListener('change', function() {
+  const isOnfon = this.value === 'onfon';
+  document.getElementById('onfon_fields').style.display = isOnfon ? 'block' : 'none';
+  document.getElementById('other_sms_fields').style.display = isOnfon ? 'none' : 'block';
+});
+</script>
 <?php include __DIR__ . '/../includes/layout-footer.php'; ?>

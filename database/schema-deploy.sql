@@ -221,6 +221,12 @@ INSERT IGNORE INTO `system_settings` (`key`, `value`) VALUES
   ('mpesa_shortcode', '174379'),
   ('smtp_host', 'smtp.gmail.com'),
   ('smtp_port', '587'),
-  ('support_email', 'support@bulksms.com');
+  ('support_email', 'support@bulksms.com'),
+  ('onfon_api_key', ''),
+  ('onfon_user_id', ''),
+  ('onfon_access_key', ''),
+  ('kk_client_id', ''),
+  ('kk_client_secret', ''),
+  ('kk_base_url', 'https://api.kopokopo.com');
 
 COMMIT;
