@@ -1,6 +1,7 @@
 # Project Specifics
 config.php
-database/
+database/*.dump
+database/*.bak
 tmp/
 *.log
 
