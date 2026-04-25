@@ -12,9 +12,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $errors = 0;
     foreach ($settings as $key => $value) {
+        if ($key === 'tab') continue;
+
+        // Special handling for secrets: don't overwrite if empty
+        if (in_array($key, ['sms_api_secret', 'kk_client_secret', 'smtp_pass']) && empty($value)) {
+            continue;
+        }
+
         $value = sanitize($value);
-        // Direct query update using backticks for the reserved word 'key'
-        $res = DB::execute("UPDATE system_settings SET value = ? WHERE `key` = ?", [$value, $key]);
+        
+        // UPSERT: Insert if new, update if exists
+        $sql = "INSERT INTO system_settings (`key`, `value`) VALUES (?, ?) 
+                ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)";
+        $res = DB::execute($sql, [$key, $value]);
+        
         if ($res === false) $errors++;
     }
 
