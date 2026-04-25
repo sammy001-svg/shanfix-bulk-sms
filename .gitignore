@@ -1,0 +1,21 @@
+# Project Specifics
+config.php
+database/
+tmp/
+*.log
+
+# Environment
+.env
+.DS_Store
+Thumbs.db
+
+# Dependencies
+vendor/
+node_modules/
+
+# OS/IDE
+.idea/
+.vscode/
+*.swp
+*.sublime-project
+*.sublime-workspace

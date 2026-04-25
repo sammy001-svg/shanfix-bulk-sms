@@ -1,0 +1,44 @@
+# Apache .htaccess — BulkSMS Pro
+# Place this file in the project root
+
+Options -Indexes
+Options -MultiViews
+
+RewriteEngine On
+
+# ── Force www (optional — uncomment if needed) ──
+# RewriteCond %{HTTP_HOST} !^www\. [NC]
+# RewriteRule ^ https://www.%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+# ── Force HTTPS (uncomment in production) ──
+# RewriteCond %{HTTPS} !=on
+# RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+# ── Block direct access to sensitive directories ──
+RewriteRule ^(includes|database|\.env|\.git)(/|$) - [F,L]
+
+# ── Pretty directory URLs (optional) ──
+# e.g. /admin → /admin/index.php
+DirectoryIndex index.php
+
+# ── PHP settings ──
+php_value upload_max_filesize 10M
+php_value post_max_size 12M
+php_value max_execution_time 120
+php_value memory_limit 128M
+
+# ── Security headers ──
+Header always set X-Content-Type-Options "nosniff"
+Header always set X-Frame-Options "SAMEORIGIN"
+Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+# ── Cache static assets ──
+<FilesMatch "\.(css|js|png|jpg|svg|ico|woff2)$">
+  Header set Cache-Control "public, max-age=2592000"
+</FilesMatch>
+
+# ── Block access to .htaccess itself ──
+<Files ".htaccess">
+  Order Allow,Deny
+  Deny from all
+</Files>
