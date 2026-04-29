@@ -17,8 +17,13 @@ class Purchase {
         $user = DB::queryOne("SELECT id, parent_id, custom_unit_price FROM users WHERE id = ?", [$userId]);
         if (!$user) return ['success' => false, 'error' => 'User not found.'];
 
-        // Determine parent account for deduction (Admin ID 1 if no parent_id)
-        $parentId = $user['parent_id'] ?: 1; 
+        // Determine parent account for deduction
+        $parentId = $user['parent_id'];
+        if (!$parentId) {
+            $admin = DB::queryOne("SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1");
+            $parentId = $admin['id'] ?? 1; // Fallback to 1 if no admin found
+        }
+        
         $parentComp = DB::queryOne("SELECT id, sms_units, role FROM users WHERE id = ?", [$parentId]);
 
         $customRate = ($user['custom_unit_price'] > 0) ? (float)$user['custom_unit_price'] : null;
@@ -67,13 +72,41 @@ class Purchase {
 
         $userId = $purchase['user_id'];
         $user = DB::queryOne("SELECT parent_id FROM users WHERE id = ?", [$userId]);
-        $parentId = $user['parent_id'] ?: 1;
-
-        // Deduct from parent and add to child
-        DB::execute("UPDATE users SET sms_units = sms_units - ? WHERE id = ?", [$purchase['units'], $parentId]);
-        DB::execute("UPDATE users SET sms_units = sms_units + ? WHERE id = ?", [$purchase['units'], $userId]);
-        DB::execute("UPDATE purchases SET status = 'completed' WHERE id = ?", [$purchaseId]);
         
-        return true;
+        $parentId = $user['parent_id'];
+        if (!$parentId) {
+            $admin = DB::queryOne("SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1");
+            $parentId = $admin['id'] ?? 1;
+        }
+
+        // DEBUG
+        error_log("Purchase::complete - ID: $purchaseId, User: $userId, Parent: $parentId, Units: {$purchase['units']}");
+
+        // Use transaction for atomic balance update
+        try {
+            DB::beginTransaction();
+            
+            // Deduct from parent
+            $deducted = DB::execute("UPDATE users SET sms_units = sms_units - ? WHERE id = ?", [$purchase['units'], $parentId]);
+            
+            // Add to child
+            $added = DB::execute("UPDATE users SET sms_units = sms_units + ? WHERE id = ?", [$purchase['units'], $userId]);
+            
+            // Mark purchase as completed
+            $marked = DB::execute("UPDATE purchases SET status = 'completed' WHERE id = ?", [$purchaseId]);
+            
+            if ($deducted && $added && $marked) {
+                DB::commit();
+                return true;
+            } else {
+                DB::rollback();
+                error_log("Purchase completion failed: Deduction=$deducted, Added=$added, Marked=$marked");
+                return false;
+            }
+        } catch (Exception $e) {
+            DB::rollback();
+            error_log("Purchase completion error: " . $e->getMessage());
+            return false;
+        }
     }
 }
