@@ -20,11 +20,11 @@ class KopoKopo {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Content-Type: application/json",
+            "Content-Type: application/x-www-form-urlencoded",
             "Accept: application/json",
-            "User-Agent: ShanfixBulkSMS/1.0"
+            "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         ]);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
             'grant_type' => 'client_credentials',
             'client_id' => $clientId,
             'client_secret' => $clientSecret
@@ -48,6 +48,7 @@ class KopoKopo {
         
         $phone = preg_replace('/^\+/', '', $phoneNumber);
         if (strpos($phone, '0') === 0) $phone = '254' . substr($phone, 1);
+        $phone = '+' . $phone;
 
         // Calculate dynamic callback URL
         $callbackUrl = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]/includes/callbacks/kopokopo.php";
@@ -65,8 +66,7 @@ class KopoKopo {
                 'currency' => 'KES',
                 'value' => number_format((float)$amount, 2, '.', '')
             ],
-            'metadata' => ['purchase_id' => $purchaseId],
-            '_links' => ['callback_url' => $callbackUrl]
+            'callback_url' => $callbackUrl
         ];
 
         $ch = curl_init("$baseUrl/api/v1/incoming_payments");
@@ -76,7 +76,7 @@ class KopoKopo {
             "Authorization: Bearer $token",
             "Content-Type: application/json",
             "Accept: application/json",
-            "User-Agent: ShanfixBulkSMS/1.0"
+            "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         ]);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
@@ -91,6 +91,10 @@ class KopoKopo {
             return ['success' => true, 'data' => $data];
         }
 
-        return ['success' => false, 'error' => $data['message'] ?? 'Failed to initiate STK push.'];
+        // Log initiation failure for debugging
+        error_log("Kopo Kopo Initiation Failure: Code=$httpCode, Response=" . $response);
+
+        $errorMsg = $data['errors'][0]['message'] ?? $data['message'] ?? 'Failed to initiate STK push.';
+        return ['success' => false, 'error' => $errorMsg . " (Response: " . $response . ")"];
     }
 }
