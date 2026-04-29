@@ -6,6 +6,12 @@ require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/actions/sms.php';
 
+$user = current_user();
+if (!$user) {
+    header('Location: /login.php');
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name        = sanitize($_POST['name'] ?? '');
     $senderId    = sanitize($_POST['sender_id'] ?? 'SHANFIX');

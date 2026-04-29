@@ -5,6 +5,12 @@
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/actions/sms.php';
 
+$user = current_user();
+if (!$user) {
+    header('Location: /login.php');
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $to       = sanitize($_POST['recipient'] ?? $_POST['to'] ?? '');
     $message  = sanitize($_POST['message'] ?? '');
@@ -18,10 +24,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $result = SMS::send($user['id'], $to, $message, $senderId);
 
     if ($result['success']) {
-        $_SESSION['flash'] = ['type' => 'success', 'message' => 'Message sent successfully! Cost: ' . $result['cost'] . ' units.'];
+        $_SESSION['flash'] = [
+            'type' => 'success', 
+            'message' => 'Message sent successfully! Cost: ' . number_format($result['cost'], 2) . ' units.'
+        ];
     } else {
-        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Failed to send: ' . $result['error']];
+        $_SESSION['flash'] = [
+            'type' => 'danger', 
+            'message' => 'Failed to send: ' . ($result['error'] ?? 'Unknown system error')
+        ];
     }
 
-    redirect($_SERVER['HTTP_REFERER']);
+    $redirectUrl = $_SERVER['HTTP_REFERER'] ?? '/';
+    header("Location: $redirectUrl");
+    exit;
 }

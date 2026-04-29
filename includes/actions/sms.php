@@ -23,12 +23,22 @@ class SMS {
                 return ['success' => false, 'error' => 'Insufficient SMS units. Need ' . $cost . ' units.'];
             }
 
+            // Validate Sender ID (Must be approved for this user)
+            // Using BINARY to ensure case-sensitive matching for the specific sender ID selected
+            $validSender = DB::queryOne("SELECT sender_id FROM sender_ids WHERE user_id = ? AND BINARY sender_id = ? AND status = 'approved'", [$userId, $senderId]);
+            if (!$validSender) {
+                return ['success' => false, 'error' => "Sender ID '$senderId' is not whitelisted or approved for your account."];
+            }
+            
+            // Use the exact casing from the database to avoid provider mismatch (Onfon is case-sensitive)
+            $senderId = $validSender['sender_id'];
+
             // Deduct units
             DB::execute("UPDATE users SET sms_units = sms_units - ? WHERE id = ?", [$cost, $userId]);
 
-            // Create message record
+            // Create message record (Status is 'queued' until provider confirms)
             $msgId = DB::insert("INSERT INTO messages (user_id, sender_id, recipient, message, units_charged, status, created_at) 
-                       VALUES (?, ?, ?, ?, ?, 'sent', NOW())", 
+                       VALUES (?, ?, ?, ?, ?, 'queued', NOW())", 
                        [$userId, $senderId, $to, $message, $cost]);
 
             // REAL PROVIDER CALL (Onfon Media)
@@ -36,14 +46,14 @@ class SMS {
             $providerResult = Onfon::sendSMS($to, $message, $senderId);
 
             if ($providerResult['success']) {
-                // Update to delivered
-                DB::execute("UPDATE messages SET status = 'delivered', gateway_msg_id = ? WHERE id = ?", [$providerResult['id'], $msgId]);
+                // Update to sent/delivered
+                DB::execute("UPDATE messages SET status = 'sent', gateway_msg_id = ?, sent_at = NOW() WHERE id = ?", [$providerResult['id'], $msgId]);
                 return ['success' => true, 'id' => $msgId, 'cost' => $cost];
             } else {
                 DB::execute("UPDATE messages SET status = 'failed' WHERE id = ?", [$msgId]);
                 // Refund units on failure
                 DB::execute("UPDATE users SET sms_units = sms_units + ? WHERE id = ?", [$cost, $userId]);
-                return ['success' => false, 'error' => $providerResult['error']];
+                return ['success' => false, 'error' => $providerResult['error'] ?? 'Provider connection failed'];
             }
 
         } catch (Exception $e) {

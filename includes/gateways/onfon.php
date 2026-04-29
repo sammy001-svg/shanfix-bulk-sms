@@ -25,7 +25,12 @@ class Onfon {
         $apiKey = $creds['onfon_api_key'] ?? '';
         $clientId = $creds['onfon_user_id'] ?? ''; // Onfon often uses UserId as ClientId
 
-        if (!$apiKey || !$clientId) return false;
+        if (!$apiKey || !$clientId) {
+            return [
+                'success' => false,
+                'error'   => 'Onfon API credentials (ApiKey/UserId) not configured in System Settings.'
+            ];
+        }
 
         $url = "https://api.onfonmedia.co.ke/v1/sms/SendBulkSMS";
 
@@ -60,10 +65,30 @@ class Onfon {
         file_put_contents(__DIR__ . '/../../tmp/onfon_debug.log', "[" . date('Y-m-d H:i:s') . "] SEND: to=$to, http=$httpCode, response=" . $response . PHP_EOL, FILE_APPEND);
 
         if ($httpCode === 200 && isset($result['ErrorCode']) && $result['ErrorCode'] === 0) {
-            return $result;
+            $msgData = $result['Data'][0] ?? null;
+            
+            // Check for specific message errors (e.g. 401 Sender ID mismatch)
+            if ($msgData && isset($msgData['MessageErrorCode']) && $msgData['MessageErrorCode'] !== 0) {
+                return [
+                    'success' => false,
+                    'error'   => $msgData['MessageErrorDescription'] ?? 'Message delivery failed at gateway.'
+                ];
+            }
+
+            return [
+                'success' => true,
+                'id'      => $msgData['MessageId'] ?? uniqid('onfon_'),
+                'data'    => $result
+            ];
         }
 
-        return false;
+        $errorMsg = $result['Description'] ?? 'Unknown Error';
+        if ($httpCode !== 200) $errorMsg = "HTTP $httpCode: " . $errorMsg;
+
+        return [
+            'success' => false,
+            'error'   => $errorMsg
+        ];
     }
 
     /**
