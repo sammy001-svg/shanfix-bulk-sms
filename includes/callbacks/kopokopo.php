@@ -15,7 +15,7 @@ if (!$data) exit;
 file_put_contents(__DIR__ . '/../../tmp/kk_callback.log', $input . PHP_EOL, FILE_APPEND);
 
 $status = $data['data']['attributes']['status'] ?? '';
-$purchaseId = $data['data']['attributes']['metadata']['purchase_id'] ?? 0;
+$purchaseId = $data['data']['attributes']['metadata']['reference'] ?? null;
 
 if ($status === 'Success' && $purchaseId) {
     Purchase::complete($purchaseId);

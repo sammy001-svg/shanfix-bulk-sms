@@ -88,7 +88,8 @@ class KopoKopo {
             ],
             'callback_url' => $callbackUrl,
             'metadata' => [
-                'purchase_id' => (string)$purchaseId
+                'reference' => (string)$purchaseId,
+                'customer_id' => 'USER' . $_SESSION['user_id']
             ]
         ];
 
@@ -101,7 +102,7 @@ class KopoKopo {
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "Authorization: Bearer $token",
             "Content-Type: application/json",
-            "Accept: application/json",
+            "Accept: application/vnd.kopokopo.v1.stk_push+json",
             "User-Agent: ShanfixBulkSMS/1.0"
         ]);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonBody);
