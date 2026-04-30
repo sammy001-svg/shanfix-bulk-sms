@@ -24,9 +24,10 @@ class Onfon {
         $creds = self::getSettings();
         $apiKey = $creds['onfon_api_key'] ?? '';
         $clientId = $creds['onfon_user_id'] ?? '';
+        $accessKey = $creds['onfon_access_key'] ?? '';
 
         if (!$apiKey || !$clientId) {
-            return ['success' => false, 'error' => 'Onfon API not configured.'];
+            return ['success' => false, 'error' => 'Onfon API not configured in system settings.'];
         }
 
         // Format number to 254XXXXXXXXX
@@ -46,7 +47,8 @@ class Onfon {
                 ['Number' => $phone, 'Text' => $message]
             ],
             'ApiKey' => $apiKey,
-            'ClientId' => $clientId
+            'ClientId' => $clientId,
+            'AccessKey' => $accessKey
         ];
 
         $ch = curl_init($url);
@@ -55,15 +57,22 @@ class Onfon {
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
 
         $response = curl_exec($ch);
+        $curlError = curl_error($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        $result = json_decode($response, true);
+        if ($response === false) {
+            return ['success' => false, 'error' => "CURL Error: $curlError"];
+        }
 
-        // Log to root for visibility
-        file_put_contents(__DIR__ . '/../../onfon_debug.log', "[".date('Y-m-d H:i:s')."] TO: $phone | SENDER: $senderId | HTTP: $httpCode | RESP: $response" . PHP_EOL, FILE_APPEND);
+        $result = json_decode($response, true);
+        
+        // Log for debugging
+        $logPath = __DIR__ . '/onfon_debug.log';
+        @file_put_contents($logPath, "[".date('Y-m-d H:i:s')."] TO: $phone | HTTP: $httpCode | RESP: $response" . PHP_EOL, FILE_APPEND);
 
         if ($httpCode === 200 && isset($result['ErrorCode']) && $result['ErrorCode'] === 0) {
             $msgData = $result['Data'][0] ?? null;
@@ -76,7 +85,8 @@ class Onfon {
             return ['success' => true, 'id' => $msgData['MessageId'] ?? uniqid()];
         }
 
-        return ['success' => false, 'error' => $result['Description'] ?? 'Onfon Connection Error'];
+        $errMsg = $result['Description'] ?? ($result['Message'] ?? "HTTP Error $httpCode");
+        return ['success' => false, 'error' => "Onfon Error: $errMsg"];
     }
 
     public static function getBalance() {
