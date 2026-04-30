@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($key === 'tab') continue;
 
         // Special handling for secrets: don't overwrite if empty
-        if (in_array($key, ['sms_api_secret', 'kk_client_secret', 'smtp_pass']) && empty($value)) {
+        if (in_array($key, ['sms_api_secret', 'kk_client_secret', 'payhero_api_password', 'smtp_pass']) && empty($value)) {
             continue;
         }
 

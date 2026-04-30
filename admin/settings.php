@@ -61,12 +61,10 @@ $s = fn(string $key, string $default='') => htmlspecialchars($settings[$key] ?? 
           </div>
           <div class="form-group"><label class="form-label">Short Code / Sender ID</label><input type="text" name="sms_shortcode" class="form-control" value="<?=$s('sms_shortcode')?>"></div>
         <?php elseif ($activeTab==='billing'): ?>
-          <div class="alert alert-info"><i class="fa-solid fa-credit-card"></i> Configure your Kopo Kopo M-Pesa STK Push credentials.</div>
-          <div class="form-group"><label class="form-label">Kopo Kopo Base URL</label><input type="text" name="kk_base_url" class="form-control" value="<?=$s('kk_base_url','https://api.kopokopo.com')?>" placeholder="https://api.kopokopo.com or https://sandbox.kopokopo.com"></div>
-          <div class="form-group"><label class="form-label">Kopo Kopo Client ID</label><input type="text" name="kk_client_id" class="form-control" value="<?=$s('kk_client_id')?>"></div>
-          <div class="form-group"><label class="form-label">Kopo Kopo Client Secret</label><input type="password" name="kk_client_secret" class="form-control" placeholder="Leave blank to keep current"></div>
-          <div class="form-group"><label class="form-label">Kopo Kopo API Key</label><input type="text" name="kk_api_key" class="form-control" value="<?=$s('kk_api_key')?>"></div>
-          <div class="form-group"><label class="form-label">Kopo Kopo Till Number (prefixed with K)</label><input type="text" name="kk_till_number" class="form-control" value="<?=$s('kk_till_number')?>" placeholder="e.g. K123456"></div>
+          <div class="alert alert-info"><i class="fa-solid fa-credit-card"></i> Configure your Payhero Kenya M-Pesa STK Push credentials.</div>
+          <div class="form-group"><label class="form-label">Payhero API Username</label><input type="text" name="payhero_api_username" class="form-control" value="<?=$s('payhero_api_username')?>" placeholder="Found in Payhero Developer section"></div>
+          <div class="form-group"><label class="form-label">Payhero API Password</label><input type="password" name="payhero_api_password" class="form-control" placeholder="Leave blank to keep current"></div>
+          <div class="form-group"><label class="form-label">Payhero Channel ID</label><input type="text" name="payhero_channel_id" class="form-control" value="<?=$s('payhero_channel_id')?>" placeholder="Found under Payment Channels"></div>
           <hr style="margin:24px 0;border-color:var(--border)">
           <div class="form-group"><label class="form-label">Default Unit Price (KES)</label><input type="number" step="0.0001" name="unit_price" class="form-control" value="<?=$s('unit_price','0.50')?>"></div>
         <?php elseif ($activeTab==='email'): ?>

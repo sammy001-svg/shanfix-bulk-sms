@@ -4,7 +4,7 @@
  * Handles the logic of verifying and applying unit purchases.
  */
 require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/../gateways/kopokopo.php';
+require_once __DIR__ . '/../gateways/payhero.php';
 
 class Purchase {
     public static function create($userId, $data) {
@@ -51,8 +51,8 @@ class Purchase {
                          [$userId, $units, $amount, $method, $ref]);
 
         if ($id) {
-            // Initiate real Kopo Kopo STK Push
-            $res = KopoKopo::initiateSTKPush($ref, $amount, $id);
+            // Initiate real Payhero STK Push
+            $res = Payhero::initiateSTKPush($ref, $amount, $id);
             
             if ($res['success']) {
                 return ['success' => true, 'id' => $id];
