@@ -75,10 +75,10 @@ class KopoKopo {
         $callbackUrl = "$protocol://$host/includes/callbacks/kopokopo.php";
 
         $body = [
-            'payment_channel' => 'm_pesa',
+            'payment_channel' => 'mpesa',
             'till_number' => $till,
             'subscriber' => [
-                'first_name' => 'Customer',
+                'first_name' => 'User',
                 'last_name' => 'Ref'.$purchaseId,
                 'phone_number' => $phone
             ],
@@ -88,8 +88,7 @@ class KopoKopo {
             ],
             'callback_url' => $callbackUrl,
             'metadata' => [
-                'reference' => (string)$purchaseId,
-                'customer_id' => 'USER' . $_SESSION['user_id']
+                'reference' => (string)$purchaseId
             ]
         ];
 
@@ -102,7 +101,7 @@ class KopoKopo {
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "Authorization: Bearer $token",
             "Content-Type: application/json",
-            "Accept: application/vnd.kopokopo.v1.stk_push+json",
+            "Accept: application/json",
             "User-Agent: ShanfixBulkSMS/1.0"
         ]);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonBody);
