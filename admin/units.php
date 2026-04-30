@@ -142,13 +142,37 @@ $totalPages = ceil($total/$perPage);
         <div style="background:var(--bg-muted);padding:12px;border-radius:var(--radius-md);margin-bottom:16px;font-size:13px">
           User: <strong id="allocUserName">—</strong> · Balance: <strong id="allocUserUnits" style="color:var(--primary)">—</strong>
         </div>
-        <div class="form-group"><label class="form-label">Units to Add <span class="required">*</span></label><input type="number" name="units" class="form-control" min="1" required></div>
-        <div class="form-group"><label class="form-label">Method</label><select name="method" class="form-control"><option value="admin_credit">Admin Credit (Free)</option><option value="mpesa">M-Pesa</option><option value="bank">Bank Transfer</option></select></div>
-        <div class="form-group"><label class="form-label">Note</label><input type="text" name="note" class="form-control" placeholder="e.g. Manual top-up"></div>
+        
+        <div class="form-group">
+          <label class="form-label">Action <span class="required">*</span></label>
+          <select name="action" class="form-control" onchange="toggleAction(this.value)">
+            <option value="add">Add Units (+)</option>
+            <option value="remove">Remove Units (-)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" id="unitsLabel">Units to Add <span class="required">*</span></label>
+          <input type="number" name="units" class="form-control" min="1" step="0.01" required>
+        </div>
+
+        <div class="form-group" id="methodGroup">
+          <label class="form-label">Method</label>
+          <select name="method" class="form-control">
+            <option value="admin_credit">Admin Credit (Free)</option>
+            <option value="mpesa">M-Pesa</option>
+            <option value="bank">Bank Transfer</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Reason / Note <span class="required">*</span></label>
+          <input type="text" name="note" class="form-control" placeholder="e.g. Correction of billing error" required>
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('allocateModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Allocate</button>
+        <button type="submit" class="btn btn-primary" id="allocSubmitBtn"><i class="fa-solid fa-check"></i> Process Adjustment</button>
       </div>
     </form>
   </div>
@@ -198,6 +222,24 @@ function openAllocate(id, name, units) {
   document.getElementById('allocUserName').textContent = name;
   document.getElementById('allocUserUnits').textContent = parseFloat(units).toLocaleString();
   openModal('allocateModal');
+}
+
+function toggleAction(val) {
+    const label = document.getElementById('unitsLabel');
+    const method = document.getElementById('methodGroup');
+    const btn = document.getElementById('allocSubmitBtn');
+    
+    if (val === 'remove') {
+        label.textContent = 'Units to Remove *';
+        method.style.display = 'none';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-danger');
+    } else {
+        label.textContent = 'Units to Add *';
+        method.style.display = 'block';
+        btn.classList.remove('btn-danger');
+        btn.classList.add('btn-primary');
+    }
 }
 </script>
 JS;
