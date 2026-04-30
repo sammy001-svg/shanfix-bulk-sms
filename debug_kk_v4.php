@@ -37,8 +37,11 @@ function testSTK($token, $baseUrl, $channel, $tillNumber) {
         'payment_channel' => $channel,
         'till_number' => $tillNumber,
         'subscriber' => ['first_name' => 'Debug', 'last_name' => 'Test', 'phone_number' => '+254700000000'],
-        'amount' => ['currency' => 'KES', 'value' => '10'],
-        'callback_url' => 'https://shanfix.com/callback'
+        'amount' => ['currency' => 'KES', 'value' => '10.00'],
+        'callback_url' => 'https://shanfix.com/callback',
+        'metadata' => [
+            'purchase_id' => '123'
+        ]
     ];
 
     $ch = curl_init("$baseUrl/api/v1/incoming_payments");
