@@ -38,6 +38,7 @@ class Onfon {
             $phone = '254' . $phone;
         }
 
+        $senderId = trim($senderId); // Keen Cleanup
         $url = "https://api.onfonmedia.co.ke/v1/sms/SendBulkSMS";
         $payload = [
             'SenderId' => $senderId,
@@ -51,16 +52,16 @@ class Onfon {
             'AccessKey' => $accessKey
         ];
 
+        $jsonPayload = json_encode($payload);
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonPayload);
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         
-        // DNS Bypass for servers with broken DNS (e.g. some cPanel hosts)
-        // Maps api.onfonmedia.co.ke directly to Cloudflare IPs
+        // DNS Bypass
         curl_setopt($ch, CURLOPT_RESOLVE, [
             "api.onfonmedia.co.ke:443:104.20.9.168",
             "api.onfonmedia.co.ke:443:104.20.8.168"
@@ -79,7 +80,7 @@ class Onfon {
         
         // Log for debugging
         $logPath = __DIR__ . '/onfon_debug.log';
-        @file_put_contents($logPath, "[".date('Y-m-d H:i:s')."] TO: $phone | HTTP: $httpCode | RESP: $response" . PHP_EOL, FILE_APPEND);
+        @file_put_contents($logPath, "[".date('Y-m-d H:i:s')."] SENDER: $senderId | TO: $phone | PAYLOAD: $jsonPayload | HTTP: $httpCode | RESP: $response" . PHP_EOL, FILE_APPEND);
 
         if ($httpCode === 200 && isset($result['ErrorCode']) && $result['ErrorCode'] === 0) {
             $msgData = $result['Data'][0] ?? null;
