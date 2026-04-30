@@ -61,16 +61,17 @@ class KopoKopo {
         $baseUrl = self::get_setting('base_url') ?: 'https://api.kopokopo.com';
         $till = self::get_setting('till_number');
         
-        $phone = preg_replace('/^\+/', '', trim($phoneNumber));
-        if (strpos($phone, '0') === 0) $phone = '254' . substr($phone, 1);
+        $phone = preg_replace('/[^0-9]/', '', $phoneNumber);
+        if (strlen($phone) == 9) $phone = '254' . $phone;
+        if (strlen($phone) == 10 && strpos($phone, '0') === 0) $phone = '254' . substr($phone, 1);
         $phone = '+' . $phone;
-        
+
         // Calculate dynamic callback URL
         $host = $_SERVER['HTTP_HOST'] ?? 'shanfix.com';
         if (strpos($host, 'localhost') !== false || strpos($host, '127.0.0.1') !== false) {
-            $host = 'shanfix.com'; // Use a public-looking domain for localhost testing to avoid WAF 403
+            $host = 'shanfix.com';
         }
-        $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
+        $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')) ? "https" : "http";
         $callbackUrl = "$protocol://$host/includes/callbacks/kopokopo.php";
 
         $body = [
@@ -78,12 +79,12 @@ class KopoKopo {
             'till_number' => $till,
             'subscriber' => [
                 'first_name' => 'Customer',
-                'last_name' => 'Purchase',
+                'last_name' => 'Ref'.$purchaseId,
                 'phone_number' => $phone
             ],
             'amount' => [
                 'currency' => 'KES',
-                'value' => number_format((float)$amount, 2, '.', '')
+                'value' => (string)round($amount)
             ],
             'callback_url' => $callbackUrl,
             'metadata' => [
