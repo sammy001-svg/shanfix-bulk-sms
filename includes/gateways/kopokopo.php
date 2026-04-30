@@ -111,6 +111,7 @@ class KopoKopo {
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
         curl_close($ch);
 
         $data = json_decode($response, true);
@@ -120,9 +121,13 @@ class KopoKopo {
         }
 
         // Log initiation failure for debugging
-        error_log("Kopo Kopo Initiation Failure: Code=$httpCode, URL=$baseUrl/api/v1/incoming_payments, Body=$jsonBody, Response=" . $response);
+        error_log("Kopo Kopo Initiation Failure: Code=$httpCode, Error=$curlError, URL=$baseUrl/api/v1/incoming_payments, Body=$jsonBody, Response=" . $response);
 
         $errorMsg = $data['errors'][0]['message'] ?? $data['message'] ?? 'Failed to initiate STK push.';
-        return ['success' => false, 'error' => $errorMsg . " (Response: " . $response . ")"];
+        $fullError = $errorMsg . " (HTTP $httpCode)";
+        if ($curlError) $fullError .= " [CURL Error: $curlError]";
+        if ($response) $fullError .= " Response: " . $response;
+        
+        return ['success' => false, 'error' => $fullError];
     }
 }
