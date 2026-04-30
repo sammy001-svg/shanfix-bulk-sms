@@ -27,10 +27,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($contacts as $c) $recipients[] = $c['phone'];
     }
     if ($rawNumbers) {
-        $nums = explode(',', $rawNumbers);
+        $nums = preg_split('/[\n,;]+/', $rawNumbers);
         foreach ($nums as $n) {
-            $n = trim($n);
-            if ($n) $recipients[] = $n;
+            $n = preg_replace('/[^0-9]/', '', $n); // Remove non-numeric
+            if (!$n) continue;
+
+            // Smart Kenyan Normalization
+            if (strlen($n) === 9 && ($n[0] === '7' || $n[0] === '1')) { // 711222333 -> 254711222333
+                $n = '254' . $n;
+            } elseif (strlen($n) === 10 && $n[0] === '0') { // 0711222333 -> 254711222333
+                $n = '254' . substr($n, 1);
+            }
+            
+            // Ensure 254 prefix and + sign
+            if (strpos($n, '254') === 0) {
+                $n = '+' . $n;
+            } elseif (strpos($n, '+') !== 0) {
+                $n = '+' . $n;
+            }
+            
+            $recipients[] = $n;
         }
     }
     // (CSV handling would be added here or in a separate step)

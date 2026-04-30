@@ -25,19 +25,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // 1. Identify all recipients
     $recipients = [];
+    
+    // Group selection
     if ($groupId) {
         $contacts = DB::query("SELECT phone FROM contacts WHERE group_id = ? AND user_id = ?", [$groupId, $user['id']]);
         foreach ($contacts as $c) $recipients[] = $c['phone'];
     }
-    if ($rawNumbers) {
-        $nums = preg_split('/[\n,;]+/', $rawNumbers);
+    
+    // Manual entry (Single or Multiple)
+    $manualInput = $_POST['numbers'] ?: ($_POST['recipient'] ?: '');
+    if ($manualInput) {
+        $nums = preg_split('/[\n,;]+/', $manualInput);
         foreach ($nums as $n) {
-            $n = trim($n);
-            if ($n) $recipients[] = $n;
+            $n = preg_replace('/[^0-9]/', '', $n); // Remove non-numeric
+            if (!$n) continue;
+
+            // Smart Kenyan Normalization
+            if (strlen($n) === 9 && ($n[0] === '7' || $n[0] === '1')) { // 711222333 -> 254711222333
+                $n = '254' . $n;
+            } elseif (strlen($n) === 10 && $n[0] === '0') { // 0711222333 -> 254711222333
+                $n = '254' . substr($n, 1);
+            }
+            
+            // Ensure 254 prefix and + sign
+            if (strpos($n, '254') === 0) {
+                $n = '+' . $n;
+            } elseif (strpos($n, '+') !== 0) {
+                $n = '+' . $n;
+            }
+            
+            $recipients[] = $n;
         }
     }
 
-    $recipients = array_unique($recipients);
+    $recipients = array_unique(array_filter($recipients));
     $count = count($recipients);
 
     if ($count === 0) {

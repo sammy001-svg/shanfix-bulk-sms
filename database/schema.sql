@@ -1,20 +1,11 @@
 -- ============================================================
--- BULK SMS SYSTEM - MySQL Database Schema
+-- Database Initialization
 -- ============================================================
--- Run this in phpMyAdmin to set up the database.
+-- Note: Create the database manually before importing.
 -- ============================================================
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
-START TRANSACTION;
 SET time_zone = "+00:00";
-
--- ============================================================
--- Database
--- ============================================================
-CREATE DATABASE IF NOT EXISTS `bulk_sms_system`
-  DEFAULT CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-USE `bulk_sms_system`;
 
 -- ============================================================
 -- Table: users
@@ -30,6 +21,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `parent_id`     INT UNSIGNED      DEFAULT NULL COMMENT 'Resellers parent=NULL; Clients parent=reseller_id',
   `company`       VARCHAR(120)      DEFAULT NULL,
   `sms_units`     DECIMAL(12,2)     NOT NULL DEFAULT 0.00,
+  `custom_unit_price` DECIMAL(10,4) DEFAULT NULL COMMENT 'Override default unit price',
   `status`        ENUM('active','suspended','pending') NOT NULL DEFAULT 'active',
   `avatar`        VARCHAR(255)      DEFAULT NULL,
   `last_login`    DATETIME          DEFAULT NULL,
