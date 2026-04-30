@@ -36,32 +36,43 @@ $history = DB::query("SELECT * FROM purchases WHERE user_id=? ORDER BY created_a
   </div>
 </div>
 
-<!-- Plans -->
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:28px">
-  <?php foreach ($plans as $p): ?>
-    <div class="card" style="text-align:center;position:relative;<?=$p['is_popular']??false?'border-color:var(--primary);':''?>">
-      <?php if ($p['is_popular']??false): ?><div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--primary);color:#111;font-size:10px;font-weight:700;padding:2px 10px;border-radius:10px">POPULAR</div><?php endif; ?>
-      <div class="card-body" style="padding:24px 16px">
-        <h3 style="font-size:16px;font-weight:700;margin-bottom:4px"><?=htmlspecialchars($p['name'])?></h3>
-        <div style="font-size:30px;font-weight:800;color:var(--primary);margin:12px 0"><?=number_format($p['units'])?><span style="font-size:14px;font-weight:500;color:var(--text-secondary)"> SMS</span></div>
-        <div style="font-size:22px;font-weight:700;margin-bottom:16px"><?=$p['currency']?> <?=number_format($p['price'],2)?></div>
-        <button class="btn btn-primary btn-full" onclick="openCheckout(<?=$p['id']?>,'<?=htmlspecialchars($p['name'])?>',<?=$p['units']?>,<?=$p['price']?>,'<?=$p['currency']?>')">
-          <i class="fa-solid fa-cart-shopping"></i> Buy Now
-        </button>
+<?php
+$unitRate = $customRate ?? 1.00; // Fallback to 1.00 if no rate is set
+?>
+
+<!-- Dynamic Buy Section -->
+<div class="card" style="max-width: 600px; margin: 0 auto 28px;">
+  <div class="card-body" style="padding: 30px 20px; text-align: center;">
+    <div style="font-size: 48px; color: var(--primary); margin-bottom: 10px;"><i class="fa-solid fa-coins"></i></div>
+    <h2 style="margin-bottom: 8px;">Buy SMS Units</h2>
+    <p class="text-muted" style="margin-bottom: 24px;">Enter the number of units you need</p>
+
+    <div style="background: var(--bg-muted); padding: 20px; border-radius: var(--radius-lg); margin-bottom: 24px;">
+      <div class="form-group" style="margin-bottom: 15px;">
+        <label class="form-label" style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em;">Number of Units</label>
+        <input type="number" id="calcUnits" class="form-control" style="text-align: center; font-size: 24px; font-weight: 700; height: 60px;" placeholder="e.g. 1000" min="50" oninput="calculateTotal(this.value)">
+      </div>
+      
+      <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 15px; border-top: 1px solid var(--border);">
+        <div style="text-align: left;">
+          <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Your Rate</div>
+          <div style="font-size: 16px; font-weight: 600;">KES <?= number_format($unitRate, 2) ?> <span style="font-size: 12px; font-weight: 400; color: var(--text-muted);">/ unit</span></div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Total Cost</div>
+          <div style="font-size: 24px; font-weight: 800; color: var(--primary);" id="totalCostDisplay">KES 0.00</div>
+        </div>
       </div>
     </div>
-  <?php endforeach; ?>
 
-  <!-- Custom -->
-  <div class="card" style="text-align:center">
-    <div class="card-body" style="padding:24px 16px">
-      <h3 style="font-size:16px;font-weight:700;margin-bottom:4px">Custom</h3>
-      <div style="font-size:24px;font-weight:700;color:var(--primary);margin:12px 0"><i class="fa-solid fa-sliders"></i></div>
-      <p class="text-muted" style="font-size:12px;margin-bottom:16px">Specify any amount</p>
-      <button class="btn btn-outline btn-full" onclick="openModal('customModal')"><i class="fa-solid fa-pen"></i> Custom Amount</button>
-    </div>
+    <button class="btn btn-primary btn-lg btn-full" style="height: 55px; font-size: 16px; font-weight: 700;" onclick="startCheckout()">
+      <i class="fa-solid fa-cart-shopping"></i> Proceed to Checkout
+    </button>
   </div>
 </div>
+
+<input type="hidden" id="userRate" value="<?= $unitRate ?>">
+
 
 <!-- Purchase History -->
 <div class="card">
@@ -86,38 +97,37 @@ $history = DB::query("SELECT * FROM purchases WHERE user_id=? ORDER BY created_a
     </table>
   </div>
 </div>
-
-<!-- Checkout Modal -->
+<!-- Checkout Modal -->
 <div class="modal-overlay" id="checkoutModal">
-  <div class="modal"><div class="modal-header"><h3 class="modal-title"><i class="fa-solid fa-cart-shopping" style="color:var(--primary)"></i> Confirm Purchase</h3><button class="modal-close" onclick="closeModal('checkoutModal')">×</button></div>
-    <form method="POST" action="/client/actions/create-purchase.php"><input type="hidden" name="csrf_token" value="<?=csrf_token()?>"><input type="hidden" name="plan_id" id="chkPlanId">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title"><i class="fa-solid fa-cart-shopping" style="color:var(--primary)"></i> Confirm Payment</h3>
+      <button class="modal-close" onclick="closeModal('checkoutModal')">×</button>
+    </div>
+    <form method="POST" action="/client/actions/create-purchase.php">
+      <?= csrf_field() ?>
+      <input type="hidden" name="custom_units" id="chkUnits">
       <div class="modal-body">
-        <div id="chkSummary" style="background:var(--bg-muted);padding:16px;border-radius:var(--radius-md);text-align:center;margin-bottom:18px"></div>
-        <input type="hidden" name="payment_method" value="mpesa">
+        <div id="chkSummary" style="background:var(--bg-muted);padding:16px;border-radius:var(--radius-md);text-align:center;margin-bottom:18px">
+            <div style="font-size:13px;color:var(--text-secondary)">Purchase Summary</div>
+            <div style="font-size:28px;font-weight:800;color:var(--primary);margin:5px 0" id="summaryUnits">0 SMS</div>
+            <div style="font-size:18px;font-weight:700" id="summaryTotal">KES 0.00</div>
+        </div>
+        
         <div class="form-group">
           <label class="form-label">M-Pesa Phone Number <span class="required">*</span></label>
           <input type="text" name="payment_ref" class="form-control" value="<?= htmlspecialchars($user['phone'] ?? '') ?>" placeholder="e.g. 254712345678" required>
-          <div class="form-hint">Ensure this phone is with you to receive the STK Push prompt.</div>
+          <div class="form-hint">Enter the number to receive the STK prompt.</div>
         </div>
-        <div class="alert alert-info" style="font-size:12px"><i class="fa-solid fa-mobile-screen-button"></i> You will receive a popup on your phone to enter your M-Pesa PIN.</div>
-      </div>
-      <div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModal('checkoutModal')">Cancel</button><button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> Send STK Push</button></div>
-    </form>
-  </div>
-</div>
-<div class="modal-overlay" id="customModal">
-  <div class="modal"><div class="modal-header"><h3 class="modal-title"><i class="fa-solid fa-sliders" style="color:var(--primary)"></i> Custom Amount</h3><button class="modal-close" onclick="closeModal('customModal')">×</button></div>
-    <form method="POST" action="/client/actions/create-purchase.php"><input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
-      <input type="hidden" name="payment_method" value="mpesa">
-      <div class="modal-body">
-        <div class="form-group"><label class="form-label">Units Needed</label><input type="number" name="custom_units" class="form-control" min="50" placeholder="e.g. 2500" required></div>
-        <div class="form-group">
-          <label class="form-label">M-Pesa Phone Number <span class="required">*</span></label>
-          <input type="text" name="payment_ref" class="form-control" value="<?= htmlspecialchars($user['phone'] ?? '') ?>" placeholder="254712345678" required>
+        
+        <div class="alert alert-info" style="font-size:12px;margin-bottom:0">
+            <i class="fa-solid fa-mobile-screen-button"></i> An M-Pesa STK push will be sent to your phone.
         </div>
-        <div class="alert alert-info" style="font-size:12px"><i class="fa-solid fa-info-circle"></i> An M-Pesa payment prompt will be sent to this number.</div>
       </div>
-      <div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModal('customModal')">Cancel</button><button type="submit" class="btn btn-primary">Proceed to Pay</button></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('checkoutModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> Pay Now</button>
+      </div>
     </form>
   </div>
 </div>
@@ -125,15 +135,29 @@ $history = DB::query("SELECT * FROM purchases WHERE user_id=? ORDER BY created_a
 <?php
 $extraScript = <<<'JS'
 <script>
-function openCheckout(planId, name, units, price, currency){
-  document.getElementById('chkPlanId').value = planId;
-  document.getElementById('chkSummary').innerHTML =
-    `<strong style="font-size:18px">${name}</strong><br>
-     <span style="font-size:28px;color:var(--primary);font-weight:800">${units.toLocaleString()}</span> SMS units<br>
-     <span style="font-size:20px;font-weight:700">${currency} ${parseFloat(price).toLocaleString(undefined,{minimumFractionDigits:2})}</span>`;
-  openModal('checkoutModal');
+function calculateTotal(units) {
+    const rate = parseFloat(document.getElementById('userRate').value);
+    const total = units * rate;
+    document.getElementById('totalCostDisplay').textContent = 'KES ' + total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function startCheckout() {
+    const units = document.getElementById('calcUnits').value;
+    if (!units || units < 50) {
+        alert('Please enter at least 50 units.');
+        return;
+    }
+    
+    const rate = parseFloat(document.getElementById('userRate').value);
+    const total = units * rate;
+    
+    document.getElementById('chkUnits').value = units;
+    document.getElementById('summaryUnits').textContent = parseInt(units).toLocaleString() + ' SMS';
+    document.getElementById('summaryTotal').textContent = 'KES ' + total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    
+    openModal('checkoutModal');
 }
 </script>
 JS;
-include __DIR__ . '/../includes/layout-footer.php';
 ?>
+<?php include __DIR__ . '/../includes/layout-footer.php'; ?>

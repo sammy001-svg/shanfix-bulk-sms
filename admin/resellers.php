@@ -48,7 +48,7 @@ $totalPages = ceil($total/$perPage);
   </div>
   <div class="table-wrapper">
     <table class="data-table">
-      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Parent</th><th>Units</th><th>Status</th><th>Joined</th><th>Last Login</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Parent</th><th>Units</th><th>Rate</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
       <tbody>
         <?php if (empty($users)): ?>
           <tr><td colspan="9" class="text-center text-muted" style="padding:30px">No users found</td></tr>
@@ -61,9 +61,9 @@ $totalPages = ceil($total/$perPage);
               <td><span class="badge <?=$u['role']==='reseller'?'badge-success':'badge-info'?>"><?=ucfirst($u['role'])?></span></td>
               <td style="font-size:12px"><?= htmlspecialchars($u['parent_name']??'—') ?></td>
               <td><strong style="color:var(--primary)"><?= number_format($u['sms_units'],2) ?></strong></td>
+              <td><span class="badge badge-outline" style="font-weight:600">KES <?=number_format($u['custom_unit_price']??1.00, 2)?></span></td>
               <td><span class="badge badge-<?=$rc?>"><?=ucfirst($u['status'])?></span></td>
               <td style="font-size:12px"><?= date('d M Y',strtotime($u['created_at'])) ?></td>
-              <td style="font-size:12px"><?= $u['last_login'] ? date('d M Y',strtotime($u['last_login'])) : '—' ?></td>
               <td>
                 <div class="btn-group">
                   <button class="btn btn-outline btn-sm btn-icon" title="Allocate Units" onclick="openAllocate(<?=$u['id']?>,'<?=htmlspecialchars($u['name'])?>',<?=$u['sms_units']?>)"><i class="fa-solid fa-coins"></i></button>

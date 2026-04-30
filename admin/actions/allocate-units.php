@@ -26,9 +26,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     DB::execute("UPDATE users SET sms_units = sms_units - ? WHERE id = ?", [$units, $adminId]);
                     DB::execute("UPDATE users SET sms_units = sms_units + ? WHERE id = ?", [$units, $toUser]);
                     
-                    DB::insert("INSERT INTO purchases (user_id, units, amount, status, payment_method, transaction_ref, created_at) 
-                               VALUES (?, ?, 0, 'completed', 'admin_allocation', ?, NOW())", 
-                               [$toUser, $units, "Credit: $note"]);
+                    // RECORD IN MYSQL (unit_allocations table)
+                    DB::insert("INSERT INTO unit_allocations (from_user, to_user, units, note, created_at) 
+                               VALUES (?, ?, ?, ?, NOW())", 
+                               [$adminId, $toUser, $units, "Credit: $note"]);
                                
                     DB::commit();
                     $_SESSION['flash'] = ['type' => 'success', 'message' => "Successfully added " . number_format($units) . " units."];
@@ -48,9 +49,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     DB::execute("UPDATE users SET sms_units = sms_units - ? WHERE id = ?", [$units, $toUser]);
                     DB::execute("UPDATE users SET sms_units = sms_units + ? WHERE id = ?", [$units, $adminId]); // Return to pool
                     
-                    DB::insert("INSERT INTO purchases (user_id, units, amount, status, payment_method, transaction_ref, created_at) 
-                               VALUES (?, ?, 0, 'completed', 'admin_debit', ?, NOW())", 
-                               [$toUser, -$units, "Debit: $note"]);
+                    // RECORD IN MYSQL (unit_allocations table)
+                    DB::insert("INSERT INTO unit_allocations (from_user, to_user, units, note, created_at) 
+                               VALUES (?, ?, ?, ?, NOW())", 
+                               [$adminId, $toUser, -$units, "Debit: $note"]);
                                
                     DB::commit();
                     $_SESSION['flash'] = ['type' => 'success', 'message' => "Successfully removed " . number_format($units) . " units."];

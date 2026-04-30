@@ -236,12 +236,22 @@ INSERT INTO `pricing_plans` (`name`, `units`, `price`, `currency`) VALUES
 -- ============================================================
 INSERT INTO `system_settings` (`key`, `value`) VALUES
   ('site_name',         'Shanfix Technology'),
+  ('site_url',          'https://sms.shanfixtechnology.com'),
   ('site_logo',         '/assets/images/logo.png'),
   ('default_currency',  'KES'),
   ('sms_cost_per_unit', '1'),
-  ('mpesa_shortcode',   '174379'),
+  ('support_email',     'support@shanfixtechnology.com'),
+  ('support_phone',     '+254712345678'),
+  -- Payhero Kenya
+  ('payhero_api_username',   ''),
+  ('payhero_api_password',   ''),
+  ('payhero_api_channel_id', '3197'),
+  -- Onfon Media
+  ('onfon_api_key',     ''),
+  ('onfon_user_id',     ''),
+  ('onfon_access_key',  ''),
+  -- SMTP Settings
   ('smtp_host',         'smtp.gmail.com'),
-  ('smtp_port',         '587'),
-  ('support_email',     'support@bulksms.com');
+  ('smtp_port',         '587');
 
 COMMIT;

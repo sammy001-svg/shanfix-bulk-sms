@@ -131,6 +131,39 @@ $totalPages = ceil($total/$perPage);
   </div>
 </div>
 
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-history" style="color:var(--primary)"></i> System Adjustments (Audit Log)</h3>
+    </div>
+    <div class="table-wrapper">
+        <?php
+        $adjustments = DB::query("SELECT a.*, u_to.name as to_name, u_from.name as from_name 
+                                FROM unit_allocations a 
+                                JOIN users u_to ON a.to_user = u_to.id 
+                                JOIN users u_from ON a.from_user = u_from.id 
+                                ORDER BY a.created_at DESC LIMIT 20");
+        ?>
+        <table class="data-table">
+            <thead><tr><th>Admin</th><th>Target User</th><th>Units</th><th>Reason</th><th>Date</th></tr></thead>
+            <tbody>
+                <?php if (empty($adjustments)): ?>
+                    <tr><td colspan="5" class="text-center text-muted">No adjustments found</td></tr>
+                <?php else: ?>
+                    <?php foreach ($adjustments as $a): ?>
+                        <tr>
+                            <td><?=htmlspecialchars($a['from_name'])?></td>
+                            <td><?=htmlspecialchars($a['to_name'])?></td>
+                            <td><strong style="color: <?=$a['units'] > 0 ? 'var(--primary)' : '#ef4444'?>"><?=number_format($a['units'], 2)?></strong></td>
+                            <td style="font-size:12px"><?=htmlspecialchars($a['note'])?></td>
+                            <td style="font-size:11px"><?=date('d M Y H:i', strtotime($a['created_at']))?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <!-- Allocate Modal -->
 <div class="modal-overlay" id="allocateModal">
   <div class="modal">

@@ -40,10 +40,10 @@ $totalPages = ceil($total/$perPage);
   </div>
   <div class="table-wrapper">
     <table class="data-table">
-      <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>SMS Units</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>SMS Units</th><th>Rate</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
       <tbody>
         <?php if (empty($clients)): ?>
-          <tr><td colspan="7"><div class="empty-state">
+          <tr><td colspan="8"><div class="empty-state">
             <div class="empty-icon">👤</div>
             <h3>No Clients Yet</h3>
             <p>Add your first client to get started.</p>
@@ -57,10 +57,14 @@ $totalPages = ceil($total/$perPage);
               <td style="font-size:13px;color:var(--text-secondary)"><?=htmlspecialchars($u['email'])?></td>
               <td style="font-size:13px"><?=htmlspecialchars($u['phone']??'—')?></td>
               <td><strong style="color:var(--primary)"><?=number_format($u['sms_units'],2)?></strong></td>
+              <td><span class="badge badge-outline" style="font-weight:600">KES <?=number_format($u['custom_unit_price']??1.00, 2)?></span></td>
               <td><span class="badge badge-<?=$rc?>"><?=ucfirst($u['status'])?></span></td>
               <td style="font-size:12px"><?=date('d M Y',strtotime($u['created_at']))?></td>
               <td>
-                <button class="btn btn-outline btn-sm" onclick="openAllocate(<?=$u['id']?>,'<?=htmlspecialchars($u['name'])?>',<?=$u['sms_units']?>)"><i class="fa-solid fa-coins"></i> Units</button>
+                <div class="btn-group">
+                    <button class="btn btn-outline btn-sm" onclick="openAllocate(<?=$u['id']?>,'<?=htmlspecialchars($u['name'])?>',<?=$u['sms_units']?>)"><i class="fa-solid fa-coins"></i> Units</button>
+                    <button class="btn btn-secondary btn-sm" onclick="openEdit(<?=htmlspecialchars(json_encode($u), ENT_QUOTES, 'UTF-8')?>)"><i class="fa-solid fa-pen"></i> Rate</button>
+                </div>
               </td>
             </tr>
           <?php endforeach; ?>
@@ -123,6 +127,32 @@ $totalPages = ceil($total/$perPage);
   </div>
 </div>
 
+<!-- Edit Client Modal -->
+<div class="modal-overlay" id="editClientModal">
+  <div class="modal">
+    <div class="modal-header"><h3 class="modal-title"><i class="fa-solid fa-user-pen" style="color:var(--primary)"></i> Edit Client Rate</h3><button class="modal-close" onclick="closeModal('editClientModal')">×</button></div>
+    <form method="POST" action="/reseller/actions/edit-client.php">
+      <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
+      <input type="hidden" name="id" id="editUserId">
+      <div class="modal-body">
+        <div class="form-group">
+            <label class="form-label">Client Name</label>
+            <input type="text" id="editName" class="form-control" readonly>
+        </div>
+        <div class="form-group">
+            <label class="form-label">SMS Rate (Per Unit) <span class="required">*</span></label>
+            <input type="number" name="custom_unit_price" id="editRate" class="form-control" step="0.01" min="0.10" required>
+            <div class="form-hint">The cost the client will pay for 1 SMS unit (e.g., 0.80)</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('editClientModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <?php
 $extraScript = <<<'JS'
 <script>
@@ -131,6 +161,13 @@ function openAllocate(id, name, units) {
   document.getElementById('allocName').textContent = name;
   document.getElementById('allocUnits').textContent = parseFloat(units).toLocaleString();
   openModal('allocateModal');
+}
+
+function openEdit(client) {
+    document.getElementById('editUserId').value = client.id;
+    document.getElementById('editName').value = client.name;
+    document.getElementById('editRate').value = client.custom_unit_price || 1.00;
+    openModal('editClientModal');
 }
 </script>
 JS;

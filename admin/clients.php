@@ -39,10 +39,10 @@ $totalPages = ceil($total/$perPage);
   </div>
   <div class="table-wrapper">
     <table class="data-table">
-      <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Reseller</th><th>SMS Units</th><th>Status</th><th>Joined</th><th>Last Login</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Reseller</th><th>SMS Units</th><th>Rate</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
       <tbody>
         <?php if (empty($clients)): ?>
-          <tr><td colspan="9" class="text-center text-muted" style="padding:30px">No clients found</td></tr>
+          <tr><td colspan="10" class="text-center text-muted" style="padding:30px">No clients found</td></tr>
         <?php else: ?>
           <?php foreach ($clients as $u): ?>
             <?php $rc=['active'=>'success','suspended'=>'danger','pending'=>'warning'][$u['status']]??'muted'; ?>
@@ -52,12 +52,13 @@ $totalPages = ceil($total/$perPage);
               <td style="font-size:13px"><?=htmlspecialchars($u['phone']??'—')?></td>
               <td><span class="badge badge-success"><?=htmlspecialchars($u['reseller_name']??'Direct')?></span></td>
               <td><strong style="color:var(--primary)"><?=number_format($u['sms_units'],2)?></strong></td>
+              <td><span class="badge badge-outline" style="font-weight:600">KES <?=number_format($u['custom_unit_price']??1.00, 2)?></span></td>
               <td><span class="badge badge-<?=$rc?>"><?=ucfirst($u['status'])?></span></td>
               <td style="font-size:12px"><?=date('d M Y',strtotime($u['created_at']))?></td>
-              <td style="font-size:12px"><?=$u['last_login']?date('d M Y',strtotime($u['last_login'])):'—'?></td>
               <td>
                 <div class="btn-group">
                   <button class="btn btn-outline btn-sm btn-icon" title="Allocate Units" onclick="openAllocate(<?=$u['id']?>,'<?=htmlspecialchars($u['name'])?>',<?=$u['sms_units']?>)"><i class="fa-solid fa-coins"></i></button>
+                  <a class="btn btn-secondary btn-sm btn-icon" title="Edit User" href="/admin/edit-user.php?id=<?=$u['id']?>"><i class="fa-solid fa-pen"></i></a>
                   <form method="POST" action="/admin/actions/toggle-status.php" style="display:inline">
                     <input type="hidden" name="id" value="<?=$u['id']?>">
                     <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
