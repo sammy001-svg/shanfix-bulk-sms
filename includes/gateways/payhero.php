@@ -29,7 +29,7 @@ class Payhero {
 
         $host = $_SERVER['HTTP_HOST'] ?? 'shanfix.com';
         $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')) ? "https" : "http";
-        $callbackUrl = "$protocol://$host/includes/callbacks/payhero.php";
+        $callbackUrl = "$protocol://$host/payhero_webhook.php";
 
         $body = [
             'amount' => (float)$amount,
