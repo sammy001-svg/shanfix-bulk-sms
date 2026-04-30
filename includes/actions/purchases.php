@@ -58,8 +58,9 @@ class Purchase {
                 return ['success' => true, 'id' => $id];
             } else {
                 // If STK push fails, we should ideally delete or mark the purchase as failed
+                error_log("STK Push Initiation Failed for Purchase #$id: " . $res['error']);
                 DB::execute("UPDATE purchases SET status = 'failed' WHERE id = ?", [$id]);
-                return ['success' => false, 'error' => 'Kopo Kopo Error: ' . $res['error']];
+                return ['success' => false, 'error' => $res['error']];
             }
         }
 
