@@ -17,20 +17,20 @@ if (!$data) {
 // Log callback for debugging
 file_put_contents(__DIR__ . '/payhero_callback.log', "[".date('Y-m-d H:i:s')."] " . $input . PHP_EOL, FILE_APPEND);
 
-$status = $data['status'] ?? ($data['success'] ? 'SUCCESSFUL' : 'FAILED');
-$purchaseId = $data['external_reference'] 
-           ?? $data['response']['external_reference'] 
+$status = $data['response']['Status'] ?? $data['status'] ?? ($data['success'] ? 'Success' : 'Failed');
+$purchaseId = $data['response']['ExternalReference'] 
+           ?? $data['ExternalReference'] 
            ?? $data['reference']
            ?? null;
 
 error_log("Payhero Webhook Received: Status=$status, ID=$purchaseId");
 
-if (in_array(strtoupper($status), ['SUCCESSFUL', 'SUCCESS']) && $purchaseId) {
+if (in_array(strtoupper((string)$status), ['SUCCESSFUL', 'SUCCESS']) && $purchaseId) {
     $completed = Purchase::complete($purchaseId);
     if ($completed) {
-        echo "OK - Units Updated";
+        echo "OK - Units Updated for Purchase #$purchaseId";
     } else {
-        echo "ERROR - Purchase::complete failed for ID $purchaseId. Check PHP error logs.";
+        echo "ERROR - Purchase::complete failed for ID $purchaseId.";
     }
 } else {
     echo "IGNORE - Status: $status, ID: $purchaseId";
