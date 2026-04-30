@@ -30,6 +30,9 @@ class KopoKopo {
             'client_secret' => $clientSecret
         ]));
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -58,7 +61,7 @@ class KopoKopo {
         $baseUrl = self::get_setting('base_url') ?: 'https://api.kopokopo.com';
         $till = self::get_setting('till_number');
         
-        $phone = preg_replace('/^\+/', '', $phoneNumber);
+        $phone = preg_replace('/^\+/', '', trim($phoneNumber));
         if (strpos($phone, '0') === 0) $phone = '254' . substr($phone, 1);
         $phone = '+' . $phone;
         
@@ -102,6 +105,9 @@ class KopoKopo {
         ]);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonBody);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
