@@ -27,7 +27,8 @@ curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_HTTPHEADER, [
     "Content-Type: application/x-www-form-urlencoded",
-    "Accept: application/json"
+    "Accept: application/json",
+    "User-Agent: ShanfixBulkSMS/1.0"
 ]);
 curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
     'grant_type' => 'client_credentials',
