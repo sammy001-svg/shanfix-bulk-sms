@@ -32,6 +32,7 @@ function auth_login(string $email, string $password): array|false {
         // Store in session (never store password_hash)
         unset($user['password_hash']);
         $_SESSION['user'] = $user;
+        $_SESSION['user_id'] = $user['id']; // Set for compatibility
         $_SESSION['last_activity'] = time();
         return $user;
     }
@@ -64,6 +65,7 @@ function auth_user(): ?array {
         if ($user) {
             unset($user['password_hash']);
             $_SESSION['user'] = $user;
+            $_SESSION['user_id'] = $user['id'];
             return $user;
         } else {
             auth_logout();
