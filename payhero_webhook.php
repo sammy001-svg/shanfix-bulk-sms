@@ -9,10 +9,15 @@ require_once __DIR__ . '/includes/actions/purchases.php';
 $input = file_get_contents('php://input');
 $data = json_decode($input, true);
 
-if (!$data) exit;
+if (!$data) {
+    echo "Payhero Webhook is Active. Waiting for POST data...";
+    exit;
+}
 
 // Log callback for debugging
-file_put_contents(__DIR__ . '/tmp/payhero_callback.log', "[".date('Y-m-d H:i:s')."] " . $input . PHP_EOL, FILE_APPEND);
+$logDir = __DIR__ . '/tmp';
+if (!is_dir($logDir)) mkdir($logDir, 0777, true);
+file_put_contents($logDir . '/payhero_callback.log', "[".date('Y-m-d H:i:s')."] " . $input . PHP_EOL, FILE_APPEND);
 
 $status = $data['status'] ?? ($data['success'] ? 'SUCCESSFUL' : 'FAILED');
 $purchaseId = $data['external_reference'] 
@@ -20,9 +25,15 @@ $purchaseId = $data['external_reference']
            ?? $data['reference']
            ?? null;
 
-if (($status === 'SUCCESSFUL' || $status === 'SUCCESS') && $purchaseId) {
-    Purchase::complete($purchaseId);
-    echo "OK";
+error_log("Payhero Webhook Received: Status=$status, ID=$purchaseId");
+
+if (in_array(strtoupper($status), ['SUCCESSFUL', 'SUCCESS']) && $purchaseId) {
+    $completed = Purchase::complete($purchaseId);
+    if ($completed) {
+        echo "OK - Units Updated";
+    } else {
+        echo "ERROR - Purchase::complete failed for ID $purchaseId. Check PHP error logs.";
+    }
 } else {
-    echo "Status: " . $status;
+    echo "IGNORE - Status: $status, ID: $purchaseId";
 }
