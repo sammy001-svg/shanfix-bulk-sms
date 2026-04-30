@@ -15,9 +15,7 @@ if (!$data) {
 }
 
 // Log callback for debugging
-$logDir = __DIR__ . '/tmp';
-if (!is_dir($logDir)) mkdir($logDir, 0777, true);
-file_put_contents($logDir . '/payhero_callback.log', "[".date('Y-m-d H:i:s')."] " . $input . PHP_EOL, FILE_APPEND);
+file_put_contents(__DIR__ . '/payhero_callback.log', "[".date('Y-m-d H:i:s')."] " . $input . PHP_EOL, FILE_APPEND);
 
 $status = $data['status'] ?? ($data['success'] ? 'SUCCESSFUL' : 'FAILED');
 $purchaseId = $data['external_reference'] 
