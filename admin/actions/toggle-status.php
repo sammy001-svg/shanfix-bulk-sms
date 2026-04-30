@@ -14,6 +14,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $success = DB::execute("UPDATE users SET status = ? WHERE id = ? AND role != 'admin'", [$status, $userId]);
         
         if ($success) {
+            $title = ($status === 'suspended') ? 'Account Suspended' : 'Account Re-activated';
+            $msg = ($status === 'suspended') 
+                ? "Your account has been suspended by the administrator. Please contact support." 
+                : "Your account has been re-activated. You can now use all features again.";
+            $type = ($status === 'suspended') ? 'danger' : 'success';
+            notify($userId, $title, $msg, $type);
+
             $_SESSION['flash'] = ['type' => 'success', 'message' => "User status updated to $status."];
         } else {
             $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Failed to update user status.'];

@@ -2,7 +2,9 @@
 /**
  * Action: Save Reseller Settings
  */
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/auth.php';
+
+require_role('reseller');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ../settings.php');
@@ -18,7 +20,7 @@ if ($tab === 'profile') {
     $phone = sanitize($_POST['phone'] ?? '');
 
     if (!$name || !$email || !$phone) {
-        set_flash('error', 'All fields are required.');
+        flash_set('error', 'All fields are required.');
         header('Location: ../settings.php?tab=profile');
         exit;
     }
@@ -26,7 +28,7 @@ if ($tab === 'profile') {
     // Check if email is already taken by another user
     $existing = DB::queryOne("SELECT id FROM users WHERE email = ? AND id != ?", [$email, $userId]);
     if ($existing) {
-        set_flash('error', 'Email address is already in use by another account.');
+        flash_set('error', 'Email address is already in use by another account.');
         header('Location: ../settings.php?tab=profile');
         exit;
     }
@@ -34,9 +36,9 @@ if ($tab === 'profile') {
     $updated = DB::execute("UPDATE users SET name = ?, email = ?, phone = ? WHERE id = ?", [$name, $email, $phone, $userId]);
     
     if ($updated !== false) {
-        set_flash('success', 'Profile updated successfully.');
+        flash_set('success', 'Profile updated successfully.');
     } else {
-        set_flash('error', 'Failed to update profile.');
+        flash_set('error', 'Failed to update profile.');
     }
 } elseif ($tab === 'security') {
     $currentPass = $_POST['current_password'] ?? '';
@@ -44,13 +46,13 @@ if ($tab === 'profile') {
     $confirmPass = $_POST['confirm_password'] ?? '';
 
     if (empty($newPass)) {
-        set_flash('error', 'Please enter a new password.');
+        flash_set('error', 'Please enter a new password.');
         header('Location: ../settings.php?tab=security');
         exit;
     }
 
     if ($newPass !== $confirmPass) {
-        set_flash('error', 'New passwords do not match.');
+        flash_set('error', 'New passwords do not match.');
         header('Location: ../settings.php?tab=security');
         exit;
     }
@@ -58,7 +60,7 @@ if ($tab === 'profile') {
     // Verify current password
     $user = DB::queryOne("SELECT password_hash FROM users WHERE id = ?", [$userId]);
     if (!password_verify($currentPass, $user['password_hash'])) {
-        set_flash('error', 'Current password is incorrect.');
+        flash_set('error', 'Current password is incorrect.');
         header('Location: ../settings.php?tab=security');
         exit;
     }
@@ -67,9 +69,9 @@ if ($tab === 'profile') {
     $updated = DB::execute("UPDATE users SET password_hash = ? WHERE id = ?", [$hash, $userId]);
 
     if ($updated !== false) {
-        set_flash('success', 'Password changed successfully.');
+        flash_set('success', 'Password changed successfully.');
     } else {
-        set_flash('error', 'Failed to change password.');
+        flash_set('error', 'Failed to change password.');
     }
 }
 

@@ -44,20 +44,59 @@ $initials = implode('', array_map(fn($w) => strtoupper($w[0]),
     </div>
 
     <!-- Notifications -->
+    <?php 
+    $notifs = get_unread_notifications($user['id']); 
+    $notifCount = count($notifs);
+    ?>
     <div class="dropdown" id="notifDropdown">
       <div class="icon-btn" onclick="toggleDropdown('notifDropdown')" title="Notifications">
         <i class="fa-regular fa-bell"></i>
-        <span class="badge">3</span>
+        <?php if ($notifCount > 0): ?>
+          <span class="badge"><?= $notifCount ?></span>
+        <?php endif; ?>
       </div>
       <div class="dropdown-menu">
-        <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
+        <div style="padding:12px 14px;border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center">
           <strong style="font-size:13px">Notifications</strong>
+          <?php if ($notifCount > 0): ?>
+            <span style="font-size:10px; color:var(--text-secondary)"><?= $notifCount ?> Unread</span>
+          <?php endif; ?>
         </div>
-        <div class="dropdown-item"><i class="fa-solid fa-check-circle" style="color:var(--success)"></i> Campaign "Promo April" completed</div>
-        <div class="dropdown-item"><i class="fa-solid fa-id-badge" style="color:var(--info)"></i> Sender ID "BRANDCO" approved</div>
-        <div class="dropdown-item"><i class="fa-solid fa-coins" style="color:var(--warning)"></i> Units purchased: 1,000</div>
+        <div style="max-height: 300px; overflow-y: auto;">
+          <?php if (empty($notifs)): ?>
+            <div class="dropdown-item" style="justify-content:center; color:var(--text-secondary); font-size:12px; padding:20px 0">
+              No new notifications
+            </div>
+          <?php else: ?>
+            <?php foreach ($notifs as $n): ?>
+              <?php 
+                $icon = match($n['type']) {
+                  'success' => 'fa-check-circle',
+                  'warning' => 'fa-exclamation-triangle',
+                  'danger'  => 'fa-times-circle',
+                  default   => 'fa-info-circle'
+                };
+                $color = "var(--{$n['type']})";
+              ?>
+              <div class="dropdown-item" style="flex-direction:column; align-items:start; padding:10px 14px">
+                <div style="display:flex; align-items:start; gap:10px; width:100%">
+                  <i class="fa-solid <?= $icon ?>" style="color:<?= $color ?>; margin-top:3px"></i>
+                  <div style="flex:1">
+                    <div style="font-weight:600; font-size:12.5px"><?= htmlspecialchars($n['title']) ?></div>
+                    <div style="font-size:11.5px; color:var(--text-secondary); line-height:1.4; margin-top:2px">
+                      <?= htmlspecialchars($n['message']) ?>
+                    </div>
+                    <div style="font-size:10px; color:var(--text-muted); margin-top:5px">
+                      <?= date('M j, H:i', strtotime($n['created_at'])) ?>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </div>
         <div class="dropdown-divider"></div>
-        <div class="dropdown-item text-primary-color" style="justify-content:center;font-size:12px">View all</div>
+        <a href="#" class="dropdown-item text-primary-color" style="justify-content:center;font-size:12px" onclick="markAllAsRead()">Mark all as read</a>
       </div>
     </div>
 
@@ -85,3 +124,63 @@ $initials = implode('', array_map(fn($w) => strtoupper($w[0]),
     </div>
   </div>
 </header>
+
+<!-- Popup Notification Modals -->
+<?php foreach ($notifs as $n): ?>
+  <?php if ($n['is_popup']): ?>
+    <div class="modal-overlay" id="notif-modal-<?= $n['id'] ?>">
+      <div class="modal" style="max-width:500px; text-align:center; position:relative">
+        <button class="modal-close" onclick="closeModal('notif-modal-<?= $n['id'] ?>')" style="position:absolute; top:15px; right:15px; background:none; border:none; cursor:pointer; font-size:18px; color:var(--text-muted)">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        
+        <?php if ($n['image_url']): ?>
+          <img src="<?= htmlspecialchars($n['image_url']) ?>" style="width:100%; border-radius:12px; margin-bottom:15px; max-height:250px; object-fit:cover">
+        <?php endif; ?>
+
+        <div style="margin-bottom:15px">
+          <?php 
+            $pIcon = match($n['type']) {
+              'success' => 'fa-circle-check',
+              'warning' => 'fa-triangle-exclamation',
+              'danger'  => 'fa-circle-xmark',
+              default   => 'fa-circle-info'
+            };
+          ?>
+          <i class="fa-solid <?= $pIcon ?>" style="font-size:48px; color:var(--<?= $n['type'] ?>); margin-bottom:15px"></i>
+          <h2 style="margin-bottom:10px"><?= htmlspecialchars($n['title']) ?></h2>
+          <p style="color:var(--text-secondary); line-height:1.6"><?= nl2br(htmlspecialchars($n['message'])) ?></p>
+        </div>
+        
+        <button class="btn btn-<?= $n['type'] ?>" style="width:100%" onclick="dismissNotif(<?= $n['id'] ?>)">
+          Got it
+        </button>
+      </div>
+    </div>
+  <?php endif; ?>
+<?php endforeach; ?>
+
+<script>
+function dismissNotif(id) {
+    fetch('/includes/actions/notifications.php?action=dismiss&id=' + id)
+        .then(() => {
+            closeModal('notif-modal-' + id);
+        });
+}
+
+function markAllAsRead() {
+    fetch('/includes/actions/notifications.php?action=read_all')
+        .then(() => location.reload());
+}
+
+// Auto-show popup modals on load
+document.addEventListener('DOMContentLoaded', () => {
+    <?php foreach ($notifs as $n): ?>
+      <?php if ($n['is_popup']): ?>
+        setTimeout(() => {
+            openModal('notif-modal-<?= $n['id'] ?>');
+        }, 300);
+      <?php endif; ?>
+    <?php endforeach; ?>
+});
+</script>

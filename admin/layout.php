@@ -29,6 +29,7 @@ $navItems = [
   ['icon'=>'<i class="fa-solid fa-file-lines"></i>','label'=>'Reports',        'url'=>'/admin/reports.php'],
   ['icon'=>'<i class="fa-solid fa-envelope-open-text"></i>','label'=>'Message Logs', 'url'=>'/admin/logs.php'],
   ['type'=>'section','label'=>'SYSTEM'],
+  ['icon'=>'<i class="fa-solid fa-bell"></i>',      'label'=>'Notifications',  'url'=>'/admin/notifications.php'],
   ['icon'=>'<i class="fa-solid fa-gear"></i>',      'label'=>'Settings',       'url'=>'/admin/settings.php'],
 ];
 ?>

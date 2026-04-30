@@ -4,6 +4,7 @@
  * Handles the logic of verifying and applying unit purchases.
  */
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../auth.php';
 require_once __DIR__ . '/../gateways/payhero.php';
 
 class Purchase {
@@ -98,6 +99,10 @@ class Purchase {
             
             if ($deducted && $added && $marked) {
                 DB::commit();
+                
+                // Notify User
+                notify($userId, 'Purchase Successful', "Your purchase of " . number_format($purchase['units']) . " units was successful.", 'success');
+                
                 return true;
             } else {
                 DB::rollback();

@@ -174,3 +174,55 @@ function flash_get(): ?array {
     unset($_SESSION['flash']);
     return $flash;
 }
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+/**
+ * Create a new notification.
+ * @param int|null $userId Specific user ID or NULL for all users (broadcast).
+ */
+function notify(?int $userId, string $title, string $message, string $type = 'info', bool $isPopup = false, ?string $imageUrl = null): int|false {
+    return DB::insert(
+        "INSERT INTO notifications (user_id, title, message, type, is_popup, image_url, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())",
+        [$userId, $title, $message, $type, $isPopup ? 1 : 0, $imageUrl]
+    );
+}
+
+/**
+ * Get all unread notifications for a user (including broadcasts not yet read).
+ */
+function get_unread_notifications(int $userId): array {
+    // 1. Get personal notifications not in interactions (or marked not read)
+    // 2. Get broadcast (user_id IS NULL) notifications not in interactions (or marked not read)
+    $sql = "SELECT n.* FROM notifications n 
+            LEFT JOIN notification_interactions ni ON n.id = ni.notification_id AND ni.user_id = ?
+            WHERE (n.user_id = ? OR n.user_id IS NULL)
+            AND (ni.is_read IS NULL OR ni.is_read = 0)
+            AND (ni.is_dismissed IS NULL OR ni.is_dismissed = 0)
+            ORDER BY n.created_at DESC";
+    return DB::query($sql, [$userId, $userId]) ?: [];
+}
+
+/**
+ * Mark a notification as read for a specific user.
+ */
+function mark_notification_read(int $userId, int $notificationId): bool {
+    return DB::execute(
+        "INSERT INTO notification_interactions (user_id, notification_id, is_read) 
+         VALUES (?, ?, 1) 
+         ON DUPLICATE KEY UPDATE is_read = 1, interacted_at = NOW()",
+        [$userId, $notificationId]
+    );
+}
+
+/**
+ * Dismiss a notification (wont show up in popups or header anymore).
+ */
+function dismiss_notification(int $userId, int $notificationId): bool {
+    return DB::execute(
+        "INSERT INTO notification_interactions (user_id, notification_id, is_dismissed) 
+         VALUES (?, ?, 1) 
+         ON DUPLICATE KEY UPDATE is_dismissed = 1, interacted_at = NOW()",
+        [$userId, $notificationId]
+    );
+}

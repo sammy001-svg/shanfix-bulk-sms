@@ -12,6 +12,7 @@ if (isset($_SESSION['user_id'])) {
 
 $error = '';
 $success = '';
+$role = 'client'; // Default role
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = sanitize($_POST['name'] ?? '');

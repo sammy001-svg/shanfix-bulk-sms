@@ -18,9 +18,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $target = DB::queryOne("SELECT id, name, parent_id, sms_units FROM users WHERE id = ? AND parent_id = ?", [$toUser, $uid]);
         
         if (!$target) {
-            $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Unauthorized: Direct transfer only allowed to your own clients.'];
+            flash_set('danger', 'Unauthorized: Direct transfer only allowed to your own clients.');
         } elseif ($user['sms_units'] < $units) {
-            $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Insufficient units in your balance for this transfer.'];
+            flash_set('danger', 'Insufficient units in your balance for this transfer.');
         } else {
             // Transactional update
             $d1 = DB::execute("UPDATE users SET sms_units = sms_units - ? WHERE id = ?", [$units, $uid]);
@@ -32,13 +32,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                            VALUES (?, ?, 0, 'completed', 'reseller_allocation', ?, NOW())", 
                            [$toUser, $units, $note]);
                            
-                $_SESSION['flash'] = ['type' => 'success', 'message' => "Successfully transferred " . number_format($units) . " units to " . $target['name'] . "."];
+                flash_set('success', "Successfully transferred " . number_format($units) . " units to " . $target['name'] . ".");
             } else {
-                $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Failed to complete the transfer.'];
+                flash_set('danger', 'Failed to complete the transfer.');
             }
         }
     } else {
-        $_SESSION['flash'] = ['type' => 'warning', 'message' => 'Please provide a valid unit amount.'];
+        flash_set('warning', 'Please provide a valid unit amount.');
     }
 
     redirect($_SERVER['HTTP_REFERER'] ?? '/reseller/clients.php');

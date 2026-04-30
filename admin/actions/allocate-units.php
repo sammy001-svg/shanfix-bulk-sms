@@ -32,6 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                [$adminId, $toUser, $units, "Credit: $note"]);
                                
                     DB::commit();
+                    
+                    // Notify User
+                    notify($toUser, 'Units Allocated', "Admin has credited " . number_format($units) . " units to your account.", 'success');
+                    
                     $_SESSION['flash'] = ['type' => 'success', 'message' => "Successfully added " . number_format($units) . " units."];
                 } catch (Exception $e) {
                     DB::rollback();
@@ -55,6 +59,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                [$adminId, $toUser, -$units, "Debit: $note"]);
                                
                     DB::commit();
+                    
+                    // Notify User
+                    notify($toUser, 'Units Adjusted', "Admin has debited " . number_format($units) . " units from your account.", 'warning');
+                    
                     $_SESSION['flash'] = ['type' => 'success', 'message' => "Successfully removed " . number_format($units) . " units."];
                 } catch (Exception $e) {
                     DB::rollback();

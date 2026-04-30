@@ -21,6 +21,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 [$status, $reason, $approvedBy, $approvedAt, $id]);
         
         if ($success) {
+            // Get user_id and sender_id name for notification
+            $sid = DB::queryOne("SELECT user_id, sender_id FROM sender_ids WHERE id = ?", [$id]);
+            if ($sid) {
+                $title = ($status === 'approved') ? 'Sender ID Approved' : 'Sender ID Rejected';
+                $msg = ($status === 'approved') 
+                    ? "Your Sender ID '{$sid['sender_id']}' has been approved. You can now use it to send messages."
+                    : "Your Sender ID '{$sid['sender_id']}' was rejected. Reason: $reason";
+                $type = ($status === 'approved') ? 'success' : 'danger';
+                notify($sid['user_id'], $title, $msg, $type);
+            }
+
             $_SESSION['flash'] = ['type' => 'success', 'message' => "Sender ID ".ucfirst($status)." successfully."];
         } else {
             $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Failed to update Sender ID status.'];
