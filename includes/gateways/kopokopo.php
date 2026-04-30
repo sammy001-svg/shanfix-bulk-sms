@@ -88,7 +88,7 @@ class KopoKopo {
             ],
             'callback_url' => $callbackUrl,
             'metadata' => [
-                'reference' => (string)$purchaseId
+                'reference' => (string)$purchaseId . '-' . time()
             ]
         ];
 

@@ -15,7 +15,8 @@ if (!$data) exit;
 file_put_contents(__DIR__ . '/../../tmp/kk_callback.log', $input . PHP_EOL, FILE_APPEND);
 
 $status = $data['data']['attributes']['status'] ?? '';
-$purchaseId = $data['data']['attributes']['metadata']['reference'] ?? null;
+$ref = $data['data']['attributes']['metadata']['reference'] ?? '';
+$purchaseId = explode('-', $ref)[0]; // Extract the original purchase ID before the hyphen
 
 if ($status === 'Success' && $purchaseId) {
     Purchase::complete($purchaseId);
