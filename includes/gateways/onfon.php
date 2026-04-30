@@ -58,6 +58,13 @@ class Onfon {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        
+        // DNS Bypass for servers with broken DNS (e.g. some cPanel hosts)
+        // Maps api.onfonmedia.co.ke directly to Cloudflare IPs
+        curl_setopt($ch, CURLOPT_RESOLVE, [
+            "api.onfonmedia.co.ke:443:104.20.9.168",
+            "api.onfonmedia.co.ke:443:104.20.8.168"
+        ]);
 
         $response = curl_exec($ch);
         $curlError = curl_error($ch);
@@ -99,6 +106,14 @@ class Onfon {
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        
+        // DNS Bypass
+        curl_setopt($ch, CURLOPT_RESOLVE, [
+            "api.onfonmedia.co.ke:443:104.20.9.168",
+            "api.onfonmedia.co.ke:443:104.20.8.168"
+        ]);
+
         $response = curl_exec($ch);
         curl_close($ch);
 
