@@ -1,24 +1,6 @@
--- ============================================================
--- Update Admin Credentials
--- Email: info@shanfixtechnology.com
--- Password: [The one you provided]
--- ============================================================
+-- Clean and Update Kopo Kopo Settings
+UPDATE system_settings SET value = TRIM('-jNf19cpu9BRQWfqjKcRMPGPXZvv9k-M9Eh-xKfHQJk') WHERE `key` = 'kk_client_id';
+UPDATE system_settings SET value = TRIM('7cYIWiB6dk4ThVkzeZNt-252PoXkU4SbxJhn0L3XnEI') WHERE `key` = 'kk_client_secret';
+UPDATE system_settings SET value = TRIM('https://api.kopokopo.com') WHERE `key` = 'kk_base_url';
+UPDATE system_settings SET value = TRIM('5698666') WHERE `key` = 'kk_till_number';
 
--- If admin exists, update it. If not, insert it.
-INSERT INTO `users` (`name`, `email`, `phone`, `password_hash`, `role`, `sms_units`, `status`)
-VALUES (
-  'Shanfix Admin',
-  'info@shanfixtechnology.com',
-  '+254700000000',
-  '$2y$12$CR7NANdPPdjMuG0lUc13yeLiM4DtIIBm7RnJAO1w4hIK8eLX6RJgy', -- Generated hash for Shan@123@1s
-  'admin',
-  999999.00,
-  'active'
-)
-ON DUPLICATE KEY UPDATE 
-  `name` = 'Shanfix Admin',
-  `password_hash` = '$2y$12$CR7NANdPPdjMuG0lUc13yeLiM4DtIIBm7RnJAO1w4hIK8eLX6RJgy',
-  `role` = 'admin';
-
--- Optionally remove the default demo admin if it exists
-DELETE FROM `users` WHERE `email` = 'admin@bulksms.com';
