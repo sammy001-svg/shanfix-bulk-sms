@@ -38,6 +38,11 @@ $initials = implode('', array_map(fn($w) => strtoupper($w[0]),
       <input type="text" placeholder="Search..." id="globalSearch">
     </div>
 
+    <!-- Theme Toggle -->
+    <div class="icon-btn" id="themeToggle" title="Toggle Theme">
+      <i class="fa-solid fa-moon"></i>
+    </div>
+
     <!-- Notifications -->
     <div class="dropdown" id="notifDropdown">
       <div class="icon-btn" onclick="toggleDropdown('notifDropdown')" title="Notifications">

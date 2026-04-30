@@ -2,6 +2,37 @@
  * Shanfix Technology — Main Application JavaScript
  */
 
+// ─── Theme Management (Dark/Light Mode) ───────────────────────
+(function () {
+  const themeToggle = document.getElementById("themeToggle");
+  const html = document.documentElement;
+  const currentTheme = localStorage.getItem("theme") || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+
+  if (currentTheme === "dark") {
+    html.classList.add("dark-mode");
+  }
+
+  themeToggle?.addEventListener("click", () => {
+    html.classList.toggle("dark-mode");
+    const theme = html.classList.contains("dark-mode") ? "dark" : "light";
+    localStorage.setItem("theme", theme);
+    
+    // Smooth icon transition
+    const icon = themeToggle.querySelector("i");
+    if (icon) {
+      icon.className = theme === "dark" ? "fa-solid fa-sun" : "fa-solid fa-moon";
+    }
+  });
+
+  // Set initial icon
+  if (themeToggle) {
+    const icon = themeToggle.querySelector("i");
+    if (icon) {
+      icon.className = currentTheme === "dark" ? "fa-solid fa-sun" : "fa-solid fa-moon";
+    }
+  }
+})();
+
 // ─── Sidebar Toggle ───────────────────────────────────────────
 (function () {
   const sidebar = document.getElementById("sidebar");
@@ -174,9 +205,24 @@ if (globalSearch) {
   globalSearch.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       const q = globalSearch.value.trim();
-      if (q)
-        window.location.href =
-          window.location.pathname + "?q=" + encodeURIComponent(q);
+      if (!q) return;
+      
+      const role = document.body.dataset.role || 'client';
+      const currentPath = window.location.pathname;
+      let targetPath = currentPath;
+
+      // Intelligent routing based on role if on a non-searchable page (like Dashboard)
+      if (currentPath.includes('index.php') || currentPath.endsWith('/')) {
+        if (role === 'admin') {
+          targetPath = '/admin/resellers.php';
+        } else if (role === 'reseller') {
+          targetPath = '/reseller/clients.php';
+        } else {
+          targetPath = '/client/contacts.php';
+        }
+      }
+
+      window.location.href = targetPath + "?q=" + encodeURIComponent(q);
     }
   });
 }
