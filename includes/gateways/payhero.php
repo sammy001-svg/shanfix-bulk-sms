@@ -34,8 +34,8 @@ class Payhero {
         $body = [
             'amount' => (float)$amount,
             'phone_number' => $phone,
-            'channel_id' => $channelId,
-            'provider' => 'm-mpesa', // Some docs say m-pesa, others m-mpesa. Let's use m-mpesa as per latest v2 docs
+            'channel_id' => (int)$channelId,
+            'provider' => 'm-pesa',
             'external_reference' => (string)$purchaseId,
             'callback_url' => $callbackUrl
         ];
@@ -62,7 +62,9 @@ class Payhero {
             return ['success' => true, 'data' => $data];
         }
 
-        $errorMsg = $data['message'] ?? $data['status'] ?? 'Failed to initiate STK push.';
-        return ['success' => false, 'error' => $errorMsg . " (HTTP $httpCode)"];
+        // Detailed error for debugging
+        error_log("Payhero Error: " . $response);
+        $errorMsg = $data['message'] ?? $data['status'] ?? 'Bad Request';
+        return ['success' => false, 'error' => "Payhero: $errorMsg (HTTP $httpCode). Response: $response"];
     }
 }
