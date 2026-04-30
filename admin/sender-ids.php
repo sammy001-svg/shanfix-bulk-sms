@@ -39,19 +39,22 @@ $senderIds = DB::query("SELECT s.*, u.name, u.email, u.role FROM sender_ids s JO
               <td><span class="badge badge-<?=$sc?>"><?=ucfirst($s['status'])?></span></td>
               <td style="font-size:12px"><?=date('d M Y',strtotime($s['created_at']))?></td>
               <td>
-                <?php if ($s['status']==='pending'): ?>
-                  <div class="btn-group">
+                <div class="btn-group">
+                  <?php if ($s['status']==='pending'): ?>
                     <form method="POST" action="/admin/actions/approve-sender-id.php" style="display:inline">
                       <input type="hidden" name="id" value="<?=$s['id']?>">
                       <input type="hidden" name="action" value="approve">
                       <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
-                      <button class="btn btn-primary btn-sm"><i class="fa-solid fa-check"></i> Approve</button>
+                      <button class="btn btn-primary btn-sm" title="Approve"><i class="fa-solid fa-check"></i></button>
                     </form>
-                    <button class="btn btn-danger btn-sm" onclick="openReject(<?=$s['id']?>)"><i class="fa-solid fa-times"></i> Reject</button>
-                  </div>
-                <?php else: ?>
-                  <span style="font-size:12px;color:var(--text-muted)"><?=$s['approved_at']?date('d M Y',strtotime($s['approved_at'])):''?></span>
-                <?php endif; ?>
+                    <button class="btn btn-warning btn-sm" onclick="openReject(<?=$s['id']?>)" title="Reject"><i class="fa-solid fa-times"></i></button>
+                  <?php endif; ?>
+                  <form method="POST" action="/admin/actions/delete-sender-id.php" style="display:inline">
+                    <input type="hidden" name="id" value="<?=$s['id']?>">
+                    <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
+                    <button class="btn btn-danger btn-sm btn-icon" title="Delete Permanent" onclick="return confirm('Delete this Sender ID permanently?')"><i class="fa-solid fa-trash"></i></button>
+                  </form>
+                </div>
               </td>
             </tr>
           <?php endforeach; ?>

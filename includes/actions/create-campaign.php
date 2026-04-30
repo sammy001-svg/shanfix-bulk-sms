@@ -42,31 +42,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $id = (int)($_POST['id'] ?? 0);
-    $status = $scheduledAt ? 'scheduled' : 'running';
+    $status = $scheduledAt ? 'scheduled' : 'queued';
 
     if ($id) {
         // Update existing draft
-        DB::execute("UPDATE campaigns SET sender_id = ?, name = ?, message = ?, recipients_count = ?, status = ?, scheduled_at = ? WHERE id = ? AND user_id = ?", 
-                    [$senderId, $name, $message, $count, $status, $scheduledAt ?: null, $id, $user['id']]);
+        DB::execute("UPDATE campaigns SET sender_id = ?, name = ?, message = ?, group_id = ?, recipients = ?, total_count = ?, status = ?, scheduled_at = ? WHERE id = ? AND user_id = ?", 
+                    [$senderId, $name, $message, $groupId ?: null, implode(',', $recipients), $count, $status, $scheduledAt ?: null, $id, $user['id']]);
     } else {
         // Create new
-        $id = DB::insert("INSERT INTO campaigns (user_id, sender_id, name, message, recipients_count, status, scheduled_at, created_at) 
-                         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())", 
-                         [$user['id'], $senderId, $name, $message, $count, $status, $scheduledAt ?: null]);
+        $id = DB::insert("INSERT INTO campaigns (user_id, sender_id, name, message, group_id, recipients, total_count, status, scheduled_at, created_at) 
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())", 
+                         [$user['id'], $senderId, $name, $message, $groupId ?: null, implode(',', $recipients), $count, $status, $scheduledAt ?: null]);
     }
 
     if ($id) {
-        if ($status === 'running') {
-            // Trigger actual sending logic (background or loop)
-            foreach ($recipients as $to) {
-                SMS::send($user['id'], $to, $message, $senderId);
-            }
-            DB::execute("UPDATE campaigns SET status = 'completed' WHERE id = ?", [$id]);
-            $_SESSION['flash'] = ['type' => 'success', 'message' => "Campaign launched! $count messages processed."];
+        if ($status === 'queued') {
+            // Process immediately
+            SMS::processCampaign($id);
+            $_SESSION['flash'] = ['type' => 'success', 'message' => "Campaign launched! $count messages are being processed."];
         } else {
-            $_SESSION['flash'] = ['type' => 'success', 'message' => "Campaign " . ($id ? "updated and " : "") . "scheduled for $scheduledAt."];
+            $_SESSION['flash'] = ['type' => 'success', 'message' => "Campaign scheduled for " . date('d M Y H:i', strtotime($scheduledAt))];
         }
     }
 
-    redirect('/client/campaigns.php');
+    redirect($_SESSION['user']['role'] === 'reseller' ? '/reseller/campaigns.php' : '/client/campaigns.php');
 }
