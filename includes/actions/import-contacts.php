@@ -4,7 +4,8 @@
  */
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/db.php';
-if (!in_array($user['role'], ['reseller', 'client'])) redirect('/login.php');
+$user = auth_user();
+if (!$user || !in_array($user['role'], ['reseller', 'client'])) redirect('/login.php');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
     $groupId    = (int)($_POST['group_id'] ?? 0);

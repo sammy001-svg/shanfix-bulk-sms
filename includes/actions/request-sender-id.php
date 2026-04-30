@@ -4,6 +4,8 @@
  */
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/db.php';
+$user = auth_user();
+if (!$user) redirect('/login.php');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $senderId = sanitize($_POST['sender_id'] ?? '');
