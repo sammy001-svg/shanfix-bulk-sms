@@ -60,6 +60,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Create Account — Shanfix Technology</title>
+  <meta name="description" content="Join Shanfix Technology — The most reliable Bulk SMS platform in the region. Create an account today and start reaching your customers instantly.">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sms.shanfixtechnology.com/register.php">
+  <meta property="og:title" content="Join Shanfix Technology — Connect Instantly with Bulk SMS">
+  <meta property="og:description" content="Send bulk SMS, manage campaigns and contacts from one powerful platform. Create your account today.">
+  <meta property="og:image" content="https://sms.shanfixtechnology.com/assets/images/shanfix_og_image.png">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://sms.shanfixtechnology.com/register.php">
+  <meta property="twitter:title" content="Join Shanfix Technology — Connect Instantly with Bulk SMS">
+  <meta property="twitter:description" content="Send bulk SMS, manage campaigns and contacts from one powerful platform. Create your account today.">
+  <meta property="twitter:image" content="https://sms.shanfixtechnology.com/assets/images/shanfix_og_image.png">
   <link rel="stylesheet" href="/assets/css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">

@@ -35,7 +35,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sign In — Shanfix Technology</title>
-  <meta name="description" content="Sign in to Shanfix Technology — Send bulk SMS, manage campaigns and contacts from one powerful platform.">
+  <meta name="description" content="Sign in to Shanfix Technology — The most reliable Bulk SMS platform in the region. Send campaigns, manage contacts, and grow your business instantly.">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sms.shanfixtechnology.com/">
+  <meta property="og:title" content="Shanfix Technology — Connect Instantly with Bulk SMS">
+  <meta property="og:description" content="Send bulk SMS, manage campaigns and contacts from one powerful platform. High delivery rates and reliable infrastructure.">
+  <meta property="og:image" content="https://sms.shanfixtechnology.com/assets/images/shanfix_og_image.png">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://sms.shanfixtechnology.com/">
+  <meta property="twitter:title" content="Shanfix Technology — Connect Instantly with Bulk SMS">
+  <meta property="twitter:description" content="Send bulk SMS, manage campaigns and contacts from one powerful platform. High delivery rates and reliable infrastructure.">
+  <meta property="twitter:image" content="https://sms.shanfixtechnology.com/assets/images/shanfix_og_image.png">
+
   <link rel="stylesheet" href="/assets/css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
