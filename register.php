@@ -39,12 +39,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Email already registered. Please sign in.';
         } else {
             $hash = password_hash($password, PASSWORD_BCRYPT);
-            $reg_success = DB::execute(
+            $new_user_id = DB::insert(
                 "INSERT INTO users (name, email, phone, password_hash, role, status) VALUES (?, ?, ?, ?, ?, 'active')",
                 [$name, $email, $phone, $hash, $role]
             );
 
-            if ($reg_success) {
+            if ($new_user_id) {
+                generate_user_api_keys((int)$new_user_id);
                 $_SESSION['flash'] = ['type' => 'success', 'message' => 'Account created successfully! Please sign in.'];
                 header('Location: /login.php');
                 exit;

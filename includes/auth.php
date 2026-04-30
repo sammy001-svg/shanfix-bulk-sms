@@ -226,3 +226,35 @@ function dismiss_notification(int $userId, int $notificationId): bool {
         [$userId, $notificationId]
     );
 }
+// ─── API Integration ─────────────────────────────────────────────────────────
+
+/**
+ * Generate a new set of API credentials for a user.
+ */
+function generate_user_api_keys(int $userId): bool {
+    // Client ID format: SHX + 5-digit padded ID + 4 random hex chars
+    $clientId = 'SHX' . str_pad($userId, 5, '0', STR_PAD_LEFT) . strtoupper(bin2hex(random_bytes(2)));
+    
+    // API Key format: sk_live_ + 32 random hex chars
+    $apiKey = 'sk_live_' . bin2hex(random_bytes(16));
+    
+    return (bool)DB::execute(
+        "UPDATE users SET api_client_id = ?, api_key = ? WHERE id = ?",
+        [$clientId, $apiKey, $userId]
+    );
+}
+
+/**
+ * Validate API credentials and return the user record if valid.
+ */
+function validate_api_credentials(string $clientId, string $apiKey): ?array {
+    $user = DB::queryOne(
+        "SELECT * FROM users WHERE api_client_id = ? AND api_key = ? AND status = 'active' LIMIT 1",
+        [$clientId, $apiKey]
+    );
+    if ($user) {
+        unset($user['password_hash']);
+        return $user;
+    }
+    return null;
+}

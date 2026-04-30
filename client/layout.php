@@ -32,6 +32,7 @@ $navItems = [
   ['type'=>'section','label'=>'ACCOUNT'],
   ['icon'=>'<i class="fa-solid fa-id-badge"></i>',       'label'=>'Sender IDs',       'url'=>'/client/sender-ids.php'],
   ['icon'=>'<i class="fa-solid fa-cart-shopping"></i>',  'label'=>'Buy Units',         'url'=>'/client/purchases.php'],
+  ['icon'=>'<i class="fa-solid fa-code"></i>',           'label'=>'API & Integration', 'url'=>'/client/api.php'],
   ['icon'=>'<i class="fa-solid fa-chart-bar"></i>',      'label'=>'Reports',           'url'=>'/client/reports.php'],
 ];
 ?>
