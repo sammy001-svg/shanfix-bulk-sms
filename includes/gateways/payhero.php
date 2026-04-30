@@ -27,9 +27,9 @@ class Payhero {
             $phone = '0' . $phone;
         }
 
-        $host = $_SERVER['HTTP_HOST'] ?? 'shanfix.com';
-        $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')) ? "https" : "http";
-        $callbackUrl = "$protocol://$host/payhero_webhook.php";
+        $siteUrl = DB::queryOne("SELECT value FROM system_settings WHERE `key` = 'site_url'")['value'] ?? '';
+        $siteUrl = rtrim($siteUrl, '/');
+        $callbackUrl = "$siteUrl/payhero_webhook.php";
 
         $body = [
             'amount' => (float)$amount,
