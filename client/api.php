@@ -89,7 +89,14 @@ $u = DB::queryOne("SELECT api_client_id, api_key FROM users WHERE id = ?", [$use
             </div>
 
             <div style="padding:30px">
-                <h4 style="margin-bottom:15px">Endpoint: <code style="background:var(--bg-muted); padding:5px 10px; border-radius:4px; color:var(--primary)">POST <?= SITE_URL ?>/api/v1/sendsms.php</code></h4>
+                <!-- Send SMS Section -->
+                <div class="api-section">
+                    <h4 style="margin-bottom:15px; display:flex; align-items:center; gap:10px">
+                        <span style="background:var(--primary); color:#000; font-size:11px; padding:2px 8px; border-radius:4px; font-weight:800">POST</span>
+                        Send SMS
+                        <code style="background:var(--bg-muted); padding:5px 10px; border-radius:4px; color:var(--primary); font-size:12px; margin-left:auto"><?= SITE_URL ?>/api/v1/sendsms.php</code>
+                    </h4>
+
                 
                 <div id="php_example" class="api-tab-panel active">
 <pre style="background:#0f172a; color:#f8fafc; padding:20px; border-radius:12px; font-size:13px; line-height:1.6; overflow-x:auto">
@@ -145,6 +152,41 @@ response = requests.post(url, json=payload)
 print(response.json())
 </pre>
                 </div>
+
+                <hr style="border:none; border-top:1px solid var(--border); margin:40px 0">
+
+                <!-- Balance Check Section -->
+                <div class="api-section">
+                    <h4 style="margin-bottom:15px; display:flex; align-items:center; gap:10px">
+                        <span style="background:#3b82f6; color:#fff; font-size:11px; padding:2px 8px; border-radius:4px; font-weight:800">GET</span>
+                        Check Balance
+                        <code style="background:var(--bg-muted); padding:5px 10px; border-radius:4px; color:var(--primary); font-size:12px; margin-left:auto"><?= SITE_URL ?>/api/v1/balance.php</code>
+                    </h4>
+                    <p style="font-size:13px; color:var(--text-secondary); margin-bottom:15px">Retrieve your current account balance and remaining SMS units.</p>
+                    <pre style="background:#0f172a; color:#f8fafc; padding:20px; border-radius:12px; font-size:13px; line-height:1.6; overflow-x:auto">
+curl -X GET <?= SITE_URL ?>/api/v1/balance.php \
+  -H "X-Client-ID: <?= $u['api_client_id'] ?>" \
+  -H "X-API-Key: <?= $u['api_key'] ?>"
+</pre>
+                </div>
+
+                <hr style="border:none; border-top:1px solid var(--border); margin:40px 0">
+
+                <!-- Message Status Section -->
+                <div class="api-section">
+                    <h4 style="margin-bottom:15px; display:flex; align-items:center; gap:10px">
+                        <span style="background:#3b82f6; color:#fff; font-size:11px; padding:2px 8px; border-radius:4px; font-weight:800">GET</span>
+                        Check Status
+                        <code style="background:var(--bg-muted); padding:5px 10px; border-radius:4px; color:var(--primary); font-size:12px; margin-left:auto"><?= SITE_URL ?>/api/v1/status.php</code>
+                    </h4>
+                    <p style="font-size:13px; color:var(--text-secondary); margin-bottom:15px">Check the delivery status of a specific message using its ID.</p>
+                    <pre style="background:#0f172a; color:#f8fafc; padding:20px; border-radius:12px; font-size:13px; line-height:1.6; overflow-x:auto">
+curl -X GET "<?= SITE_URL ?>/api/v1/status.php?message_id=MESSAGE_ID" \
+  -H "X-Client-ID: <?= $u['api_client_id'] ?>" \
+  -H "X-API-Key: <?= $u['api_key'] ?>"
+</pre>
+                </div>
+
 
                 <div style="margin-top:40px">
                     <h4 style="margin-bottom:20px">Parameter Reference</h4>

@@ -33,9 +33,9 @@ $navItems = [
   ['icon'=>'<i class="fa-solid fa-tags"></i>',        'label'=>'My Pricing',     'url'=>'/reseller/pricing.php'],
   ['icon'=>'<i class="fa-solid fa-id-badge"></i>',    'label'=>'Sender IDs',     'url'=>'/reseller/sender-ids.php'],
   ['icon'=>'<i class="fa-solid fa-cart-shopping"></i>','label'=>'Buy Units',     'url'=>'/reseller/purchases.php'],
-  ['icon'=>'<i class="fa-solid fa-code"></i>',         'label'=>'API & Integration', 'url'=>'/reseller/api.php'],
   ['type'=>'section','label'=>'REPORTS'],
   ['icon'=>'<i class="fa-solid fa-chart-bar"></i>',   'label'=>'Reports',        'url'=>'/reseller/reports.php'],
+  ['icon'=>'<i class="fa-solid fa-code"></i>',         'label'=>'API & Integration', 'url'=>'/reseller/api.php'],
 ];
 ?>
 <!DOCTYPE html>

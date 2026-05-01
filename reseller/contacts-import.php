@@ -69,7 +69,7 @@ $groups = DB::query("SELECT id,name FROM contact_groups WHERE user_id=? ORDER BY
           +254711222333,,
         </div>
         <div style="margin-top:14px">
-          <a href="/reseller/actions/download-template.php" class="btn btn-outline btn-full">
+          <a href="/includes/actions/download-template.php" class="btn btn-outline btn-full">
             <i class="fa-solid fa-download"></i> Download Template
           </a>
         </div>
