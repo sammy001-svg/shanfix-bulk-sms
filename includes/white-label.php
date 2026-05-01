@@ -14,28 +14,34 @@ class Branding {
         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
         $reseller = null;
 
-        // 1. Try to find reseller by domain
-        $reseller = DB::queryOne("SELECT * FROM reseller_settings WHERE custom_domain = ?", [$host]);
-        
-        // 2. If not found by domain, check logged-in user's context
-        if (!$reseller && isset($_SESSION['user']['id'])) {
-            $user = $_SESSION['user'];
+        try {
+            // 1. Try to find reseller by domain
+            $reseller = DB::queryOne("SELECT * FROM reseller_settings WHERE custom_domain = ?", [$host]);
             
-            // ADMINS ALWAYS SEE MAIN BRAND
-            if ($user['role'] === 'admin') {
-                $reseller = null; 
-            } else {
-                $resellerId = null;
-                if ($user['role'] === 'reseller') {
-                    $resellerId = $user['id'];
-                } elseif ($user['role'] === 'client' && !empty($user['parent_id'])) {
-                    $resellerId = $user['parent_id'];
-                }
+            // 2. If not found by domain, check logged-in user's context
+            if (!$reseller && isset($_SESSION['user']['id'])) {
+                $user = $_SESSION['user'];
+                
+                // ADMINS ALWAYS SEE MAIN BRAND
+                if ($user['role'] === 'admin') {
+                    $reseller = null; 
+                } else {
+                    $resellerId = null;
+                    if ($user['role'] === 'reseller') {
+                        $resellerId = $user['id'];
+                    } elseif ($user['role'] === 'client' && !empty($user['parent_id'])) {
+                        $resellerId = $user['parent_id'];
+                    }
 
-                if ($resellerId) {
-                    $reseller = DB::queryOne("SELECT * FROM reseller_settings WHERE reseller_id = ?", [$resellerId]);
+                    if ($resellerId) {
+                        $reseller = DB::queryOne("SELECT * FROM reseller_settings WHERE reseller_id = ?", [$resellerId]);
+                    }
                 }
             }
+        } catch (Exception $e) {
+            // Silently fail and use default branding if table is missing or query fails
+            error_log("Branding Engine Error: " . $e->getMessage());
+            $reseller = null;
         }
 
         if ($reseller) {
