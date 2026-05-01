@@ -16,6 +16,15 @@ try {
     $logFile = __DIR__ . '/tmp/payhero_callback.log';
     if (!is_dir(__DIR__ . '/tmp')) @mkdir(__DIR__ . '/tmp', 0777, true);
     
+    // Check Config & DB
+    $configLoaded = defined('DB_NAME') ? 'YES' : 'NO';
+    $currentDB = '';
+    try {
+        $currentDB = DB::queryOne("SELECT DATABASE()")['DATABASE()'] ?? 'UNKNOWN';
+    } catch (Exception $e) { $currentDB = 'ERROR: ' . $e->getMessage(); }
+    
+    @file_put_contents($logFile, "[".date('Y-m-d H:i:s')."] DIAG: ConfigLoaded=$configLoaded, DB=$currentDB" . PHP_EOL, FILE_APPEND);
+    
     if (!$data) {
         $msg = "[".date('Y-m-d H:i:s')."] Webhook Access: No POST data received." . PHP_EOL;
         @file_put_contents($logFile, $msg, FILE_APPEND);
