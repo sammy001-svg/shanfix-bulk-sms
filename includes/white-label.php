@@ -51,7 +51,7 @@ class Branding {
             // 3. Fallback to system settings
             self::$settings = [
                 'system_name'   => get_setting('site_name', 'Shanfix Technology'),
-                'system_logo'   => get_setting('site_logo', '/assets/images/logo.png'),
+                'system_logo'   => get_setting('site_logo', '/assets/images/shanfix-logo.png'),
                 'primary_color' => '#00c896',
                 'sidebar_color' => '#0e1726',
                 'support_email' => get_setting('support_email'),

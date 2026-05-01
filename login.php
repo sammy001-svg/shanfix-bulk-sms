@@ -196,16 +196,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <!-- Right: Login Form -->
   <div class="login-right">
     <div class="login-box animate-in">
-      <div class="login-logo">
+      <div class="login-logo" style="justify-content: center; margin-bottom: 30px;">
         <?php if ($logo = Branding::get('system_logo')): ?>
-            <img src="<?= $logo ?>" alt="Logo" style="max-height:45px; margin-bottom:10px">
+            <img src="<?= $logo ?>" alt="Logo" style="max-height:60px; width:auto;">
         <?php else: ?>
             <div class="logo-icon"><?= substr(Branding::get('system_name', 'S'), 0, 1) ?></div>
+            <div class="logo-name"><?= htmlspecialchars(Branding::get('system_name')) ?></div>
         <?php endif; ?>
-        <div>
-          <div class="logo-name"><?= htmlspecialchars(Branding::get('system_name')) ?></div>
-          <div class="logo-tag">Enterprise Platform</div>
-        </div>
       </div>
 
       <h1 class="login-title">Welcome back</h1>

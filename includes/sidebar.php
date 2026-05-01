@@ -20,16 +20,15 @@ $initials = implode('', array_map(fn($w) => strtoupper($w[0]),
   </div>
 
   <!-- Brand -->
-  <div class="sidebar-brand">
+  <div class="sidebar-brand" style="justify-content: center; padding: 20px 15px;">
     <?php if ($logo = Branding::get('system_logo')): ?>
-        <img src="<?= $logo ?>" alt="Logo" style="max-height:32px; width:auto; border-radius:4px">
+        <div style="background: rgba(255,255,255,0.9); padding: 8px 15px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            <img src="<?= $logo ?>" alt="Logo" style="max-height:35px; width:auto;">
+        </div>
     <?php else: ?>
         <div class="logo-icon"><?= substr(Branding::get('system_name', 'S'), 0, 1) ?></div>
+        <div class="logo-text"><?= htmlspecialchars(Branding::get('system_name', 'Shanfix Technology')) ?></div>
     <?php endif; ?>
-    <div class="logo-text-wrap">
-      <div class="logo-text"><?= htmlspecialchars(Branding::get('system_name', 'Shanfix Technology')) ?></div>
-      <div class="logo-sub"><?= strtoupper($role) ?></div>
-    </div>
   </div>
 
   <!-- User info -->
