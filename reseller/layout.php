@@ -37,6 +37,17 @@ $navItems = [
   ['icon'=>'<i class="fa-solid fa-brush"></i>',        'label'=>'Site Branding',  'url'=>'/reseller/branding.php'],
   ['type'=>'section','label'=>'REPORTS'],
   ['icon'=>'<i class="fa-solid fa-chart-bar"></i>',   'label'=>'Reports',        'url'=>'/reseller/reports.php'],
+  [
+    'id'=>'ussd','icon'=>'<i class="fa-solid fa-hashtag"></i>','label'=>'USSD',
+    'active'=> str_contains($_SERVER['PHP_SELF'], '/ussd'),
+    'children'=>[
+      ['icon'=>'<i class="fa-solid fa-plus"></i>',          'label'=>'Request USSD Code', 'url'=>'/reseller/ussd-request.php'],
+      ['icon'=>'<i class="fa-solid fa-list-ol"></i>',       'label'=>'USSD Codes',        'url'=>'/reseller/ussd-codes.php'],
+      ['icon'=>'<i class="fa-solid fa-chart-line"></i>',    'label'=>'Usage Analytics',   'url'=>'/reseller/ussd-analytics.php'],
+      ['icon'=>'<i class="fa-solid fa-clock-rotate-left"></i>','label'=>'USSD Sessions',    'url'=>'/reseller/ussd-sessions.php'],
+      ['icon'=>'<i class="fa-solid fa-wallet"></i>',        'label'=>'Wallet Balance',    'url'=>'/reseller/ussd-wallet.php'],
+    ]
+  ],
   ['icon'=>'<i class="fa-solid fa-code"></i>',         'label'=>'API & Integration', 'url'=>'/reseller/api.php'],
 ];
 ?>

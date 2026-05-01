@@ -28,6 +28,17 @@ $navItems = [
   ['icon'=>'<i class="fa-solid fa-chart-line"></i>','label'=>'Analytics',      'url'=>'/admin/analytics.php'],
   ['icon'=>'<i class="fa-solid fa-file-lines"></i>','label'=>'Reports',        'url'=>'/admin/reports.php'],
   ['icon'=>'<i class="fa-solid fa-envelope-open-text"></i>','label'=>'Message Logs', 'url'=>'/admin/logs.php'],
+  [
+    'id'=>'ussd','icon'=>'<i class="fa-solid fa-hashtag"></i>','label'=>'USSD',
+    'active'=> str_contains($_SERVER['PHP_SELF'], '/ussd'),
+    'children'=>[
+      ['icon'=>'<i class="fa-solid fa-plus"></i>',          'label'=>'Request USSD Code', 'url'=>'/admin/ussd-requests.php'],
+      ['icon'=>'<i class="fa-solid fa-list-ol"></i>',       'label'=>'USSD Codes',        'url'=>'/admin/ussd-codes.php'],
+      ['icon'=>'<i class="fa-solid fa-chart-line"></i>',    'label'=>'Usage Analytics',   'url'=>'/admin/ussd-analytics.php'],
+      ['icon'=>'<i class="fa-solid fa-clock-rotate-left"></i>','label'=>'USSD Sessions',    'url'=>'/admin/ussd-sessions.php'],
+      ['icon'=>'<i class="fa-solid fa-wallet"></i>',        'label'=>'Wallet Balance',    'url'=>'/admin/ussd-wallet.php'],
+    ]
+  ],
   ['type'=>'section','label'=>'SYSTEM'],
   ['icon'=>'<i class="fa-solid fa-bell"></i>',      'label'=>'Notifications',  'url'=>'/admin/notifications.php'],
   ['icon'=>'<i class="fa-solid fa-gear"></i>',      'label'=>'Settings',       'url'=>'/admin/settings.php'],

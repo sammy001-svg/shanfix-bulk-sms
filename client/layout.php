@@ -35,6 +35,17 @@ $navItems = [
   ['icon'=>'<i class="fa-solid fa-id-badge"></i>',       'label'=>'Sender IDs',       'url'=>'/client/sender-ids.php'],
   ['icon'=>'<i class="fa-solid fa-cart-shopping"></i>',  'label'=>'Buy Units',         'url'=>'/client/purchases.php'],
   ['icon'=>'<i class="fa-solid fa-chart-bar"></i>',      'label'=>'Reports',           'url'=>'/client/reports.php'],
+  [
+    'id'=>'ussd','icon'=>'<i class="fa-solid fa-hashtag"></i>','label'=>'USSD',
+    'active'=> str_contains($_SERVER['PHP_SELF'], '/ussd'),
+    'children'=>[
+      ['icon'=>'<i class="fa-solid fa-plus"></i>',          'label'=>'Request USSD Code', 'url'=>'/client/ussd-request.php'],
+      ['icon'=>'<i class="fa-solid fa-list-ol"></i>',       'label'=>'USSD Codes',        'url'=>'/client/ussd-codes.php'],
+      ['icon'=>'<i class="fa-solid fa-chart-line"></i>',    'label'=>'Usage Analytics',   'url'=>'/client/ussd-analytics.php'],
+      ['icon'=>'<i class="fa-solid fa-clock-rotate-left"></i>','label'=>'USSD Sessions',    'url'=>'/client/ussd-sessions.php'],
+      ['icon'=>'<i class="fa-solid fa-wallet"></i>',        'label'=>'Wallet Balance',    'url'=>'/client/ussd-wallet.php'],
+    ]
+  ],
   ['icon'=>'<i class="fa-solid fa-code"></i>',           'label'=>'API & Integration', 'url'=>'/client/api.php'],
 ];
 ?>
