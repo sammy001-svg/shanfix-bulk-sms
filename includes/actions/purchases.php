@@ -68,7 +68,9 @@ class Purchase {
             }
 
             // AUTOMATED STK PUSH FLOW (For direct platform clients)
-            $res = Payhero::initiateSTKPush($ref, $amount, $id);
+            $sitePrefix = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', SITE_NAME), 0, 3));
+            $prefixedId = "{$sitePrefix}{$id}";
+            $res = Payhero::initiateSTKPush($ref, $amount, $prefixedId);
             
             if ($res['success']) {
                 return ['success' => true, 'id' => $id, 'manual' => false];

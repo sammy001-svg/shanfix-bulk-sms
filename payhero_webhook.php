@@ -44,13 +44,26 @@ try {
     /**
      * EXTRACT PURCHASE ID (External Reference)
      */
-    $purchaseId = $data['external_reference'] 
-               ?? $data['response']['ExternalReference'] 
-               ?? $data['response']['external_reference'] 
-               ?? $data['ExternalReference'] 
-               ?? $data['reference']
-               ?? $data['CheckoutRequestID'] 
-               ?? null;
+    $rawId = $data['external_reference'] 
+          ?? $data['response']['ExternalReference'] 
+          ?? $data['response']['external_reference'] 
+          ?? $data['ExternalReference'] 
+          ?? $data['reference']
+          ?? $data['CheckoutRequestID'] 
+          ?? null;
+
+    // Strip Prefix (e.g. SHA62 -> 62)
+    $sitePrefix = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', SITE_NAME), 0, 3));
+    $purchaseId = $rawId;
+    if ($rawId && !is_numeric($rawId)) {
+        if (strpos(strtoupper($rawId), $sitePrefix) === 0) {
+            $purchaseId = (int)substr($rawId, strlen($sitePrefix));
+        } else {
+            // This belongs to another server!
+            @file_put_contents($logFile, "[".date('Y-m-d H:i:s')."] FOREIGN_PAYMENT: ID $rawId ignored (prefix mismatch)." . PHP_EOL, FILE_APPEND);
+            $purchaseId = null; 
+        }
+    }
 
     /**
      * EXTRACT TRANSACTION REFERENCE (M-Pesa Code)
