@@ -23,10 +23,10 @@ $history = DB::query("SELECT * FROM purchases WHERE user_id=? ORDER BY created_a
 // Set unit rate
 if ($customRate) {
     $unitRate = $customRate;
-} elseif ($resellerSettings && $resellerSettings['unit_price'] > 0) {
+} elseif ($resellerSettings && isset($resellerSettings['unit_price']) && (float)$resellerSettings['unit_price'] > 0) {
     $unitRate = (float)$resellerSettings['unit_price'];
 } else {
-    $unitRate = 1.00; // Default
+    $unitRate = 1.00; // Default platform rate
 }
 ?>
 <div class="page-header">
@@ -46,9 +46,7 @@ if ($customRate) {
   </div>
 </div>
 
-<?php
-$unitRate = $customRate ?? 1.00; // Fallback to 1.00 if no rate is set
-?>
+
 
 <!-- Dynamic Buy Section -->
 <div class="card" style="max-width: 600px; margin: 0 auto 28px;">
@@ -124,15 +122,19 @@ $unitRate = $customRate ?? 1.00; // Fallback to 1.00 if no rate is set
             <div style="font-size:18px;font-weight:700" id="summaryTotal">KES 0.00</div>
         </div>
         
-        <?php if ($resellerSettings && !empty($resellerSettings['payment_instructions'])): ?>
+        <?php if ($parentId): ?>
             <div class="alert alert-warning" style="margin-bottom:15px">
-                <div style="font-weight:700;margin-bottom:5px"><i class="fa-solid fa-circle-info"></i> Payment Instructions:</div>
-                <div style="font-size:14px"><?= nl2br(htmlspecialchars($resellerSettings['payment_instructions'])) ?></div>
+                <div style="font-weight:700;margin-bottom:5px"><i class="fa-solid fa-circle-info"></i> Reseller Payment:</div>
+                <div style="font-size:14px">
+                  <?= ($resellerSettings && !empty($resellerSettings['payment_instructions'])) 
+                      ? nl2br(htmlspecialchars($resellerSettings['payment_instructions'])) 
+                      : "Please contact your reseller to make payment and receive your units. Once paid, enter the transaction code below." ?>
+                </div>
             </div>
             <div class="form-group">
-              <label class="form-label">M-Pesa Transaction Code <span class="required">*</span></label>
-              <input type="text" name="payment_ref" class="form-control" placeholder="e.g. SCN7WXXXXX" required>
-              <div class="form-hint">Enter the M-Pesa code after making payment. Your reseller will verify and approve.</div>
+              <label class="form-label">Transaction Reference Code <span class="required">*</span></label>
+              <input type="text" name="payment_ref" class="form-control" placeholder="e.g. M-Pesa Code" required>
+              <div class="form-hint">Enter the reference code after making payment. Your reseller will verify and approve.</div>
             </div>
         <?php else: ?>
             <div class="form-group">
@@ -148,7 +150,7 @@ $unitRate = $customRate ?? 1.00; // Fallback to 1.00 if no rate is set
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('checkoutModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> <?= ($resellerSettings && !empty($resellerSettings['payment_instructions'])) ? 'Submit for Approval' : 'Pay Now' ?></button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> <?= ($parentId) ? 'Submit for Approval' : 'Pay Now' ?></button>
       </div>
     </form>
   </div>

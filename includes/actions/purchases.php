@@ -29,6 +29,14 @@ class Purchase {
 
         $customRate = ($user['custom_unit_price'] > 0) ? (float)$user['custom_unit_price'] : null;
 
+        // If no custom rate, check if parent (reseller) has a set unit price
+        if (!$customRate && $user['parent_id']) {
+            $resellerSettings = DB::queryOne("SELECT unit_price FROM reseller_settings WHERE reseller_id = ?", [$user['parent_id']]);
+            if ($resellerSettings && $resellerSettings['unit_price'] > 0) {
+                $customRate = (float)$resellerSettings['unit_price'];
+            }
+        }
+
         if ($planId) {
             $plan = DB::queryOne("SELECT * FROM pricing_plans WHERE id = ?", [$planId]);
             if (!$plan) return ['success' => false, 'error' => 'Invalid plan selected.'];
@@ -37,7 +45,7 @@ class Purchase {
             $amount = $customRate ? ($units * $customRate) : $plan['price'];
         } else {
             if ($units <= 0) return ['success' => false, 'error' => 'Invalid unit amount.'];
-            $rate = $customRate ?? 0.8; 
+            $rate = $customRate ?? 1.00; // Use custom/reseller rate or default to 1.00
             $amount = $units * $rate;
         }
 
@@ -52,19 +60,14 @@ class Purchase {
                          [$userId, $units, $amount, $method, $ref]);
 
         if ($id) {
-            // Check if this is a manual payment for a reseller client
-            $resellerSettings = null;
+            // Check if this is a reseller client
             if ($user['parent_id']) {
-                $resellerSettings = DB::queryOne("SELECT payment_instructions FROM reseller_settings WHERE reseller_id = ?", [$user['parent_id']]);
-            }
-
-            if ($resellerSettings && !empty($resellerSettings['payment_instructions'])) {
-                // MANUAL PAYMENT FLOW
+                // ALWAYS use manual/reseller-managed flow for reseller clients
                 DB::execute("UPDATE purchases SET payment_method = 'manual_mpesa' WHERE id = ?", [$id]);
                 return ['success' => true, 'id' => $id, 'manual' => true];
             }
 
-            // AUTOMATED STK PUSH FLOW
+            // AUTOMATED STK PUSH FLOW (For direct platform clients)
             $res = Payhero::initiateSTKPush($ref, $amount, $id);
             
             if ($res['success']) {
