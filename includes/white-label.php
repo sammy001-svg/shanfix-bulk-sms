@@ -51,7 +51,7 @@ class Branding {
             // 3. Fallback to system settings
             self::$settings = [
                 'system_name'   => get_setting('site_name', 'Shanfix Technology'),
-                'system_logo'   => get_setting('site_logo', '/assets/images/shanfix-logo.png'),
+                'system_logo'   => get_setting('site_logo', '/assets/images/logo.png'),
                 'primary_color' => '#00c896',
                 'sidebar_color' => '#0e1726',
                 'support_email' => get_setting('support_email'),
@@ -62,7 +62,14 @@ class Branding {
 
     public static function get($key, $default = null) {
         self::init();
-        return self::$settings[$key] ?? $default;
+        $val = self::$settings[$key] ?? $default;
+        
+        // Auto-resolve relative paths for logos to handle cPanel subfolders
+        if ($key === 'system_logo' && $val && strpos($val, '/') === 0 && defined('SITE_URL')) {
+            return rtrim(SITE_URL, '/') . $val;
+        }
+        
+        return $val;
     }
 
     public static function isWhiteLabeled() {
