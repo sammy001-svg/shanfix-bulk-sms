@@ -98,12 +98,12 @@ function require_role(string ...$roles): void {
         exit;
     }
     if (!in_array($user['role'], $roles, true)) {
-        $panel = match ($user['role']) {
-            'admin'    => '/admin/',
-            'reseller' => '/reseller/',
-            'client'   => '/client/',
-            default    => '/login.php',
-        };
+        switch ($user['role']) {
+            case 'admin':    $panel = '/admin/'; break;
+            case 'reseller': $panel = '/reseller/'; break;
+            case 'client':   $panel = '/client/'; break;
+            default:         $panel = '/login.php'; break;
+        }
         header("Location: $panel");
         exit;
     }
@@ -116,12 +116,12 @@ function require_role(string ...$roles): void {
 function redirect_if_logged_in(): void {
     $user = auth_user();
     if ($user) {
-        $dest = match ($user['role']) {
-            'admin'    => '/admin/',
-            'reseller' => '/reseller/',
-            'client'   => '/client/',
-            default    => '/login.php',
-        };
+        switch ($user['role']) {
+            case 'admin':    $dest = '/admin/'; break;
+            case 'reseller': $dest = '/reseller/'; break;
+            case 'client':   $dest = '/client/'; break;
+            default:         $dest = '/login.php'; break;
+        }
         header("Location: $dest");
         exit;
     }
