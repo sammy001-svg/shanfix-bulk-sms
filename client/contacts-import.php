@@ -48,7 +48,7 @@ $groups = DB::query("SELECT id,name FROM contact_groups WHERE user_id=? ORDER BY
     <div class="card"><div class="card-body">
       <h4 style="font-size:14px;font-weight:700;margin-bottom:12px"><i class="fa-solid fa-file-lines" style="color:var(--primary)"></i> CSV Format</h4>
       <div style="background:var(--bg-muted);padding:12px;border-radius:var(--radius-md);font-family:monospace;font-size:12px">phone,name,email<br>+254712345678,John,<br>+254798765432,,jane@x.com</div>
-      <a href="/includes/actions/download-template.php" class="btn btn-outline btn-full" style="margin-top:12px"><i class="fa-solid fa-download"></i> Download Template</a>
+      <a href="/actions/download-template.php" class="btn btn-outline btn-full" style="margin-top:12px"><i class="fa-solid fa-download"></i> Download Template</a>
     </div></div>
     <div class="card"><div class="card-body">
       <ul style="font-size:12.5px;color:var(--text-secondary);display:flex;flex-direction:column;gap:6px;list-style:disc;padding-left:16px">
