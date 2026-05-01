@@ -40,9 +40,11 @@ $plans = DB::query("SELECT * FROM pricing_plans WHERE owner_id = ? ORDER BY unit
           <div class="btn-group" style="justify-content:center">
             <button class="btn btn-outline btn-sm" onclick="editPlan(<?=htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8')?>)"><i class="fa-solid fa-pen"></i> Edit</button>
             <form method="POST" action="/reseller/actions/delete-plan.php" style="display:inline">
-              <input type="hidden" name="id" value="<?=$p['id']?>">
-              <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
-              <button class="btn btn-danger btn-sm" onclick="return confirm('Delete this plan?')"><i class="fa-solid fa-trash"></i></button>
+              <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+              <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+              <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you absolutely sure you want to delete this pricing plan?')">
+                <i class="fa-solid fa-trash"></i> Delete
+              </button>
             </form>
           </div>
         </div>

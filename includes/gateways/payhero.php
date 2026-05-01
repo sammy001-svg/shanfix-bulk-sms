@@ -31,7 +31,11 @@ class Payhero {
         $siteUrl = DB::queryOne("SELECT value FROM system_settings WHERE `key` = 'site_url'")['value'] ?? '';
         if (empty($siteUrl)) {
             // Fallback to dynamic detection
-            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https" : "http";
+            $protocol = 'http';
+            if ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || 
+                ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') {
+                $protocol = 'https';
+            }
             $host = $_SERVER['HTTP_HOST'] ?? 'sms.shanfixtechnology.com';
             $siteUrl = "$protocol://$host";
         }
