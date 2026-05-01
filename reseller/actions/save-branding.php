@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $instructions = sanitize($_POST['payment_instructions'] ?? '');
 
         // Check if settings exist
-        $exists = DB::queryOne("SELECT id FROM reseller_settings WHERE reseller_id = ?", [$uid]);
+        $exists = DB::queryOne("SELECT reseller_id FROM reseller_settings WHERE reseller_id = ?", [$uid]);
         if ($exists) {
             $sql = "UPDATE reseller_settings SET unit_price = ?, payment_instructions = ? WHERE reseller_id = ?";
             $res = DB::execute($sql, [$unitPrice, $instructions, $uid]);
@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // Check if settings exist
-        $exists = DB::queryOne("SELECT id FROM reseller_settings WHERE reseller_id = ?", [$uid]);
+        $exists = DB::queryOne("SELECT reseller_id FROM reseller_settings WHERE reseller_id = ?", [$uid]);
 
         if ($exists) {
             $sql = "UPDATE reseller_settings SET 
