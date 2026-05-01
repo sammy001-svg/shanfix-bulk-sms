@@ -83,8 +83,19 @@ class Purchase {
     }
 
     public static function complete($purchaseId) {
-        $purchase = DB::queryOne("SELECT * FROM purchases WHERE id = ? AND status = 'pending'", [$purchaseId]);
-        if (!$purchase) return false;
+        $purchase = DB::queryOne("SELECT * FROM purchases WHERE id = ?", [$purchaseId]);
+        
+        if (!$purchase) {
+            $err = "[".date('Y-m-d H:i:s')."] Purchase::complete - ERROR: Purchase #$purchaseId NOT FOUND in database." . PHP_EOL;
+            @file_put_contents(__DIR__ . '/../../tmp/purchase_debug.log', $err, FILE_APPEND);
+            return false;
+        }
+
+        if ($purchase['status'] !== 'pending') {
+            $err = "[".date('Y-m-d H:i:s')."] Purchase::complete - IGNORE: Purchase #$purchaseId is already '{$purchase['status']}'." . PHP_EOL;
+            @file_put_contents(__DIR__ . '/../../tmp/purchase_debug.log', $err, FILE_APPEND);
+            return false;
+        }
 
         $userId = $purchase['user_id'];
         $user = DB::queryOne("SELECT parent_id FROM users WHERE id = ?", [$userId]);

@@ -30,20 +30,26 @@ try {
      * Payhero can send 'status' at root or inside 'response' object.
      * Possible values: 'Successful', 'SUCCESSFUL', 'Failed', etc.
      */
-    $status = $data['status'] 
-           ?? $data['response']['Status'] 
+    /**
+     * EXTRACT STATUS & RESULT CODE
+     * Payhero can send 'status' at root (often boolean) or inside 'response' object (string).
+     * We prioritize the descriptive string from 'response'.
+     */
+    $resultCode = $data['ResultCode'] ?? $data['response']['ResultCode'] ?? null;
+    $status = $data['response']['Status'] 
            ?? $data['response']['status'] 
+           ?? $data['status'] 
            ?? ($data['success'] ? 'Successful' : 'Failed');
 
     /**
      * EXTRACT PURCHASE ID (External Reference)
-     * We pass our internal Purchase ID as 'external_reference'.
      */
     $purchaseId = $data['external_reference'] 
-               ?? $data['ExternalReference'] 
                ?? $data['response']['ExternalReference'] 
                ?? $data['response']['external_reference'] 
-               ?? $data['CheckoutRequestID'] // Last resort
+               ?? $data['ExternalReference'] 
+               ?? $data['reference']
+               ?? $data['CheckoutRequestID'] 
                ?? null;
 
     /**
