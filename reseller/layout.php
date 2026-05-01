@@ -33,6 +33,8 @@ $navItems = [
   ['icon'=>'<i class="fa-solid fa-tags"></i>',        'label'=>'My Pricing',     'url'=>'/reseller/pricing.php'],
   ['icon'=>'<i class="fa-solid fa-id-badge"></i>',    'label'=>'Sender IDs',     'url'=>'/reseller/sender-ids.php'],
   ['icon'=>'<i class="fa-solid fa-cart-shopping"></i>','label'=>'Buy Units',     'url'=>'/reseller/purchases.php'],
+  ['icon'=>'<i class="fa-solid fa-receipt"></i>',     'label'=>'Purchase Requests','url'=>'/reseller/purchase-requests.php'],
+  ['icon'=>'<i class="fa-solid fa-brush"></i>',        'label'=>'Site Branding',  'url'=>'/reseller/branding.php'],
   ['type'=>'section','label'=>'REPORTS'],
   ['icon'=>'<i class="fa-solid fa-chart-bar"></i>',   'label'=>'Reports',        'url'=>'/reseller/reports.php'],
   ['icon'=>'<i class="fa-solid fa-code"></i>',         'label'=>'API & Integration', 'url'=>'/reseller/api.php'],
@@ -43,9 +45,10 @@ $navItems = [
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><?= htmlspecialchars($pageTitle) ?> — BulkSMS Reseller</title>
+  <title><?= htmlspecialchars($pageTitle) ?> — <?= htmlspecialchars(Branding::get('system_name')) ?></title>
   <link rel="stylesheet" href="/assets/css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <?php Branding::renderStyles(); ?>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script>
     (function() {

@@ -77,3 +77,15 @@ class DB {
     public static function commit(): void             { self::getInstance()->commit(); }
     public static function rollback(): void           { self::getInstance()->rollBack(); }
 }
+
+/**
+ * Global Helper: Get system setting by key
+ */
+function get_setting($key, $default = null) {
+    try {
+        $row = DB::queryOne("SELECT value FROM system_settings WHERE `key` = ?", [$key]);
+        return $row ? $row['value'] : $default;
+    } catch (Exception $e) {
+        return $default;
+    }
+}

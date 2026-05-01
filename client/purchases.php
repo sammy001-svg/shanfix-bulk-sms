@@ -8,9 +8,10 @@ $uid          = $user['id'];
 $parentId     = $user['parent_id'];
 $customRate   = ($user['custom_unit_price'] > 0) ? (float)$user['custom_unit_price'] : null;
 
-// Fetch plans based on hierarchy
-if ($parentId) {
-    // Client belongs to a reseller
+// Fetch plans and reseller settings if white-labeled
+$resellerSettings = null;
+if (Branding::isWhiteLabeled() && $parentId) {
+    $resellerSettings = DB::queryOne("SELECT unit_price, payment_instructions FROM reseller_settings WHERE reseller_id = ?", [$parentId]);
     $plans = DB::query("SELECT * FROM pricing_plans WHERE is_active=1 AND owner_id = ? ORDER BY units ASC", [$parentId]);
 } else {
     // Direct client (Admin plans)
@@ -18,6 +19,15 @@ if ($parentId) {
 }
 
 $history = DB::query("SELECT * FROM purchases WHERE user_id=? ORDER BY created_at DESC LIMIT 10",[$uid]);
+
+// Set unit rate
+if ($customRate) {
+    $unitRate = $customRate;
+} elseif ($resellerSettings && $resellerSettings['unit_price'] > 0) {
+    $unitRate = (float)$resellerSettings['unit_price'];
+} else {
+    $unitRate = 1.00; // Default
+}
 ?>
 <div class="page-header">
   <div>
@@ -114,19 +124,31 @@ $unitRate = $customRate ?? 1.00; // Fallback to 1.00 if no rate is set
             <div style="font-size:18px;font-weight:700" id="summaryTotal">KES 0.00</div>
         </div>
         
-        <div class="form-group">
-          <label class="form-label">M-Pesa Phone Number <span class="required">*</span></label>
-          <input type="text" name="payment_ref" class="form-control" value="<?= htmlspecialchars($user['phone'] ?? '') ?>" placeholder="e.g. 254712345678" required>
-          <div class="form-hint">Enter the number to receive the STK prompt.</div>
-        </div>
-        
-        <div class="alert alert-info" style="font-size:12px;margin-bottom:0">
-            <i class="fa-solid fa-mobile-screen-button"></i> An M-Pesa STK push will be sent to your phone.
-        </div>
+        <?php if ($resellerSettings && !empty($resellerSettings['payment_instructions'])): ?>
+            <div class="alert alert-warning" style="margin-bottom:15px">
+                <div style="font-weight:700;margin-bottom:5px"><i class="fa-solid fa-circle-info"></i> Payment Instructions:</div>
+                <div style="font-size:14px"><?= nl2br(htmlspecialchars($resellerSettings['payment_instructions'])) ?></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">M-Pesa Transaction Code <span class="required">*</span></label>
+              <input type="text" name="payment_ref" class="form-control" placeholder="e.g. SCN7WXXXXX" required>
+              <div class="form-hint">Enter the M-Pesa code after making payment. Your reseller will verify and approve.</div>
+            </div>
+        <?php else: ?>
+            <div class="form-group">
+              <label class="form-label">M-Pesa Phone Number <span class="required">*</span></label>
+              <input type="text" name="payment_ref" class="form-control" value="<?= htmlspecialchars($user['phone'] ?? '') ?>" placeholder="e.g. 254712345678" required>
+              <div class="form-hint">Enter the number to receive the STK prompt.</div>
+            </div>
+            
+            <div class="alert alert-info" style="font-size:12px;margin-bottom:0">
+                <i class="fa-solid fa-mobile-screen-button"></i> An M-Pesa STK push will be sent to your phone.
+            </div>
+        <?php endif; ?>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('checkoutModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> Pay Now</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> <?= ($resellerSettings && !empty($resellerSettings['payment_instructions'])) ? 'Submit for Approval' : 'Pay Now' ?></button>
       </div>
     </form>
   </div>

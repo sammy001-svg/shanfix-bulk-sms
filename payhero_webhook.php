@@ -15,7 +15,9 @@ if (!$data) {
 }
 
 // Log callback for debugging
-file_put_contents(__DIR__ . '/payhero_callback.log', "[".date('Y-m-d H:i:s')."] " . $input . PHP_EOL, FILE_APPEND);
+$logFile = __DIR__ . '/tmp/payhero_callback.log';
+if (!is_dir(__DIR__ . '/tmp')) mkdir(__DIR__ . '/tmp', 0777, true);
+file_put_contents($logFile, "[".date('Y-m-d H:i:s')."] RAW: " . $input . PHP_EOL, FILE_APPEND);
 
 $status = $data['response']['Status'] ?? $data['status'] ?? ($data['success'] ? 'Success' : 'Failed');
 $purchaseId = $data['response']['ExternalReference'] 
@@ -23,6 +25,7 @@ $purchaseId = $data['response']['ExternalReference']
            ?? $data['reference']
            ?? null;
 
+file_put_contents($logFile, "[".date('Y-m-d H:i:s')."] PARSED: Status=$status, ID=$purchaseId" . PHP_EOL, FILE_APPEND);
 error_log("Payhero Webhook Received: Status=$status, ID=$purchaseId");
 
 if (in_array(strtoupper((string)$status), ['SUCCESSFUL', 'SUCCESS']) && $purchaseId) {

@@ -61,7 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Create Account — Shanfix Technology</title>
+  <title>Create Account — <?= htmlspecialchars(Branding::get('system_name')) ?></title>
+  <?php Branding::renderStyles(); ?>
   <meta name="description" content="Join Shanfix Technology — The most reliable Bulk SMS platform in the region. Create an account today and start reaching your customers instantly.">
   
   <!-- Open Graph / Facebook -->
@@ -225,9 +226,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="login-box animate-in">
       <div class="login-logo">
-        <div class="logo-icon">S</div>
+        <?php if ($logo = Branding::get('system_logo')): ?>
+            <img src="<?= $logo ?>" alt="Logo" style="max-height:45px; margin-bottom:10px">
+        <?php else: ?>
+            <div class="logo-icon"><?= substr(Branding::get('system_name', 'S'), 0, 1) ?></div>
+        <?php endif; ?>
         <div>
-          <div class="logo-name">Shanfix Technology</div>
+          <div class="logo-name"><?= htmlspecialchars(Branding::get('system_name')) ?></div>
           <div class="logo-tag">Enterprise Platform</div>
         </div>
       </div>
@@ -312,7 +317,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </div>
 
       <p class="text-center text-muted mt-20" style="font-size:12px;">
-        &copy; <?= date('Y') ?> Shanfix Technology. All rights reserved.
+        &copy; <?= date('Y') ?> <?= htmlspecialchars(Branding::get('system_name')) ?>. All rights reserved.
       </p>
     </div>
   </div>

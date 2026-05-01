@@ -21,9 +21,13 @@ $initials = implode('', array_map(fn($w) => strtoupper($w[0]),
 
   <!-- Brand -->
   <div class="sidebar-brand">
-    <div class="logo-icon">S</div>
+    <?php if ($logo = Branding::get('system_logo')): ?>
+        <img src="<?= $logo ?>" alt="Logo" style="max-height:32px; width:auto; border-radius:4px">
+    <?php else: ?>
+        <div class="logo-icon"><?= substr(Branding::get('system_name', 'S'), 0, 1) ?></div>
+    <?php endif; ?>
     <div class="logo-text-wrap">
-      <div class="logo-text">Shanfix Technology</div>
+      <div class="logo-text"><?= htmlspecialchars(Branding::get('system_name', 'Shanfix Technology')) ?></div>
       <div class="logo-sub"><?= strtoupper($role) ?></div>
     </div>
   </div>

@@ -66,6 +66,11 @@ $totalPages = ceil($total/$perPage);
               <td style="font-size:12px"><?= date('d M Y',strtotime($u['created_at'])) ?></td>
               <td>
                 <div class="btn-group">
+                  <?php if ($u['role'] === 'reseller'): ?>
+                    <button class="btn btn-outline btn-sm btn-icon" title="White-Label Branding" onclick="openWhiteLabel(<?=$u['id']?>,'<?=htmlspecialchars($u['name'])?>')">
+                      <i class="fa-solid fa-brush"></i>
+                    </button>
+                  <?php endif; ?>
                   <button class="btn btn-outline btn-sm btn-icon" title="Allocate Units" onclick="openAllocate(<?=$u['id']?>,'<?=htmlspecialchars($u['name'])?>',<?=$u['sms_units']?>)"><i class="fa-solid fa-coins"></i></button>
                   <a class="btn btn-secondary btn-sm btn-icon" title="Edit" href="/admin/edit-user.php?id=<?=$u['id']?>"><i class="fa-solid fa-pen"></i></a>
                   <form method="POST" action="/admin/actions/toggle-status.php" style="display:inline">
@@ -155,6 +160,42 @@ $totalPages = ceil($total/$perPage);
   </div>
 </div>
 
+<!-- White-Label Modal -->
+<div class="modal-overlay" id="whiteLabelModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title"><i class="fa-solid fa-brush" style="color:var(--primary)"></i> White-Label Management</h3>
+      <button class="modal-close" onclick="closeModal('whiteLabelModal')">×</button>
+    </div>
+    <form method="POST" action="/admin/actions/save-white-label.php">
+      <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
+      <input type="hidden" name="reseller_id" id="wlResellerId">
+      <div class="modal-body">
+        <div id="wlResellerName" style="background:var(--bg-muted);padding:12px;border-radius:var(--radius-md);margin-bottom:16px;font-weight:700">
+          Reseller: —
+        </div>
+        <div class="form-group">
+          <label class="form-label">Custom Domain</label>
+          <input type="text" name="custom_domain" id="wlDomain" class="form-control" placeholder="e.g. sms.reseller.com">
+          <div class="form-hint">Point this domain's A record or CNAME to your server IP.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">SSL Status</label>
+          <select name="ssl_enabled" id="wlSSL" class="form-control">
+            <option value="0">Disabled (HTTP)</option>
+            <option value="1">Enabled (HTTPS)</option>
+          </select>
+          <div class="form-hint">Enable only after installing SSL certificate on the server.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('whiteLabelModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Update Domain/SSL</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <?php
 $extraScript = <<<'JS'
 <script>
@@ -163,6 +204,20 @@ function openAllocate(id, name, units) {
   document.getElementById('allocUserName').textContent = name;
   document.getElementById('allocUserUnits').textContent = parseFloat(units).toLocaleString();
   openModal('allocateModal');
+}
+
+function openWhiteLabel(id, name) {
+    document.getElementById('wlResellerId').value = id;
+    document.getElementById('wlResellerName').textContent = 'Reseller: ' + name;
+    
+    // Fetch current settings via AJAX
+    fetch('/admin/actions/get-white-label.php?id=' + id)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('wlDomain').value = data.custom_domain || '';
+            document.getElementById('wlSSL').value = data.ssl_enabled || 0;
+            openModal('whiteLabelModal');
+        });
 }
 </script>
 JS;

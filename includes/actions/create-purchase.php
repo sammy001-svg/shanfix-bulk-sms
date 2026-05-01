@@ -19,7 +19,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $result = Purchase::create($user['id'], $_POST);
 
     if ($result['success']) {
-        $_SESSION['flash'] = ['type' => 'success', 'message' => 'STK Push initiated! Please enter your M-Pesa PIN on your phone. Units will be added automatically once confirmed by Kopo Kopo.'];
+        if (!empty($result['manual'])) {
+            $_SESSION['flash'] = ['type' => 'success', 'message' => 'Payment reference submitted! Your reseller will verify and approve your units shortly.'];
+        } else {
+            $_SESSION['flash'] = ['type' => 'success', 'message' => 'STK Push initiated! Please enter your M-Pesa PIN on your phone. Units will be added automatically once confirmed.'];
+        }
     } else {
         $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Transaction failed: ' . $result['error']];
     }

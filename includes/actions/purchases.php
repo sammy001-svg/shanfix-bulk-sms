@@ -52,13 +52,24 @@ class Purchase {
                          [$userId, $units, $amount, $method, $ref]);
 
         if ($id) {
-            // Initiate real Payhero STK Push
+            // Check if this is a manual payment for a reseller client
+            $resellerSettings = null;
+            if ($user['parent_id']) {
+                $resellerSettings = DB::queryOne("SELECT payment_instructions FROM reseller_settings WHERE reseller_id = ?", [$user['parent_id']]);
+            }
+
+            if ($resellerSettings && !empty($resellerSettings['payment_instructions'])) {
+                // MANUAL PAYMENT FLOW
+                DB::execute("UPDATE purchases SET payment_method = 'manual_mpesa' WHERE id = ?", [$id]);
+                return ['success' => true, 'id' => $id, 'manual' => true];
+            }
+
+            // AUTOMATED STK PUSH FLOW
             $res = Payhero::initiateSTKPush($ref, $amount, $id);
             
             if ($res['success']) {
-                return ['success' => true, 'id' => $id];
+                return ['success' => true, 'id' => $id, 'manual' => false];
             } else {
-                // If STK push fails, we should ideally delete or mark the purchase as failed
                 error_log("STK Push Initiation Failed for Purchase #$id: " . $res['error']);
                 DB::execute("UPDATE purchases SET status = 'failed' WHERE id = ?", [$id]);
                 return ['success' => false, 'error' => $res['error']];
@@ -81,8 +92,9 @@ class Purchase {
             $parentId = $admin['id'] ?? 1;
         }
 
-        // DEBUG
-        error_log("Purchase::complete - ID: $purchaseId, User: $userId, Parent: $parentId, Units: {$purchase['units']}");
+        // Custom log for debugging webhooks
+        $logMsg = "[".date('Y-m-d H:i:s')."] Purchase::complete - ID: $purchaseId, User: $userId, Parent: $parentId, Units: {$purchase['units']}" . PHP_EOL;
+        file_put_contents(__DIR__ . '/../../tmp/purchase_debug.log', $logMsg, FILE_APPEND);
 
         // Use transaction for atomic balance update
         try {
@@ -97,8 +109,9 @@ class Purchase {
             // Mark purchase as completed
             $marked = DB::execute("UPDATE purchases SET status = 'completed' WHERE id = ?", [$purchaseId]);
             
-            if ($deducted && $added && $marked) {
+            if ($deducted !== false && $added !== false && $marked !== false) {
                 DB::commit();
+                error_log("Purchase #$purchaseId completed successfully. Units: {$purchase['units']}");
                 
                 // Notify User
                 notify($userId, 'Purchase Successful', "Your purchase of " . number_format($purchase['units']) . " units was successful.", 'success');
@@ -106,12 +119,16 @@ class Purchase {
                 return true;
             } else {
                 DB::rollback();
-                error_log("Purchase completion failed: Deduction=$deducted, Added=$added, Marked=$marked");
+                $err = "Purchase completion failed for #$purchaseId: Deducted=$deducted, Added=$added, Marked=$marked. Rolling back." . PHP_EOL;
+                file_put_contents(__DIR__ . '/../../tmp/purchase_debug.log', $err, FILE_APPEND);
+                error_log($err);
                 return false;
             }
         } catch (Exception $e) {
             DB::rollback();
-            error_log("Purchase completion error: " . $e->getMessage());
+            $err = "Purchase completion exception for #$purchaseId: " . $e->getMessage() . PHP_EOL;
+            file_put_contents(__DIR__ . '/../../tmp/purchase_debug.log', $err, FILE_APPEND);
+            error_log($err);
             return false;
         }
     }
