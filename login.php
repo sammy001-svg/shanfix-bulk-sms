@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/includes/auth.php';
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 redirect_if_logged_in();
 
 $error = '';
@@ -15,12 +17,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $user = auth_login($email, $password);
             if ($user) {
-                $dest = match ($user['role']) {
-                    'admin'    => '/admin/',
-                    'reseller' => '/reseller/',
-                    'client'   => '/client/',
-                    default    => '/login.php',
-                };
+                switch ($user['role']) {
+                    case 'admin':    $dest = '/admin/'; break;
+                    case 'reseller': $dest = '/reseller/'; break;
+                    case 'client':   $dest = '/client/'; break;
+                    default:         $dest = '/login.php'; break;
+                }
                 redirect($dest);
             } else {
                 $error = 'Invalid email or password. Please try again.';

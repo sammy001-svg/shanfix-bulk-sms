@@ -5,9 +5,12 @@
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/db.php';
 
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 // Redirect if already logged in
 if (isset($_SESSION['user_id'])) {
-    redirect_by_role($_SESSION['user_role']);
+    redirect_if_logged_in();
 }
 
 $error = '';
