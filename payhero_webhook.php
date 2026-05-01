@@ -19,10 +19,12 @@ $logFile = __DIR__ . '/tmp/payhero_callback.log';
 if (!is_dir(__DIR__ . '/tmp')) mkdir(__DIR__ . '/tmp', 0777, true);
 file_put_contents($logFile, "[".date('Y-m-d H:i:s')."] RAW: " . $input . PHP_EOL, FILE_APPEND);
 
-$status = $data['response']['Status'] ?? $data['status'] ?? ($data['success'] ? 'Success' : 'Failed');
+$status = $data['response']['Status'] ?? $data['status'] ?? ($data['success'] ? 'Successful' : 'Failed');
 $purchaseId = $data['response']['ExternalReference'] 
+           ?? $data['external_reference']
            ?? $data['ExternalReference'] 
            ?? $data['reference']
+           ?? $data['CheckoutRequestID'] // Fallback to CheckoutRequestID if needed
            ?? null;
 
 file_put_contents($logFile, "[".date('Y-m-d H:i:s')."] PARSED: Status=$status, ID=$purchaseId" . PHP_EOL, FILE_APPEND);

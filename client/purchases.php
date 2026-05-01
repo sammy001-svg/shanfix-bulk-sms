@@ -36,7 +36,7 @@ if ($customRate) {
       <?php if ($customRate): ?>
         Your account has a fixed rate of <strong>KES <?= number_format($customRate, 2) ?></strong> per unit.
       <?php else: ?>
-        Choose a package that fits your needs
+        Choose a package or enter custom units
       <?php endif; ?>
     </div>
   </div>
@@ -46,14 +46,40 @@ if ($customRate) {
   </div>
 </div>
 
-
+<!-- Packages Section -->
+<?php if (!empty($plans)): ?>
+  <div style="margin-bottom: 32px;">
+    <h3 style="margin-bottom: 20px; font-weight: 700;"><i class="fa-solid fa-layer-group" style="color:var(--primary)"></i> Select a Package</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
+      <?php foreach ($plans as $p): ?>
+        <div class="card package-card" onclick="selectPlan(<?= htmlspecialchars(json_encode($p)) ?>)" style="cursor: pointer; transition: all 0.2s ease; border: 1px solid var(--border); position: relative;">
+          <div class="card-body" style="text-align: center; padding: 24px 15px;">
+            <?php if ($p['is_popular']): ?>
+              <div style="position: absolute; top: -1px; right: -1px; background: var(--primary); color: #000; font-size: 10px; font-weight: 800; padding: 4px 10px; border-top-right-radius: var(--radius-md); border-bottom-left-radius: var(--radius-sm);">BEST VALUE</div>
+            <?php endif; ?>
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;"><?= htmlspecialchars($p['name']) ?></div>
+            <div style="font-size: 32px; font-weight: 800; color: var(--primary); margin-bottom: 2px;"><?= number_format($p['units']) ?></div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 15px;">SMS Units</div>
+            <div style="font-size: 20px; font-weight: 700; margin-bottom: 15px;"><?= htmlspecialchars($p['currency'] ?? 'KES') ?> <?= number_format($p['price'], 2) ?></div>
+            <button class="btn btn-outline btn-sm btn-full" style="pointer-events: none;">Select Package</button>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+  </div>
+  
+  <style>
+    .package-card:hover { border-color: var(--primary) !important; transform: translateY(-3px); box-shadow: var(--shadow-md); }
+    .package-card:hover button { background: var(--primary); color: #000; border-color: var(--primary); }
+  </style>
+<?php endif; ?>
 
 <!-- Dynamic Buy Section -->
 <div class="card" style="max-width: 600px; margin: 0 auto 28px;">
   <div class="card-body" style="padding: 30px 20px; text-align: center;">
     <div style="font-size: 48px; color: var(--primary); margin-bottom: 10px;"><i class="fa-solid fa-coins"></i></div>
-    <h2 style="margin-bottom: 8px;">Buy SMS Units</h2>
-    <p class="text-muted" style="margin-bottom: 24px;">Enter the number of units you need</p>
+    <h2 style="margin-bottom: 8px;">Buy Custom Units</h2>
+    <p class="text-muted" style="margin-bottom: 24px;">Enter the exact number of units you need</p>
 
     <div style="background: var(--bg-muted); padding: 20px; border-radius: var(--radius-lg); margin-bottom: 24px;">
       <div class="form-group" style="margin-bottom: 15px;">
@@ -81,13 +107,12 @@ if ($customRate) {
 
 <input type="hidden" id="userRate" value="<?= $unitRate ?>">
 
-
 <!-- Purchase History -->
-<div class="card">
+<div class="card" style="margin-bottom: 28px;">
   <div class="card-header"><h3 class="card-title"><i class="fa-solid fa-receipt" style="color:var(--primary)"></i> Purchase History</h3></div>
   <div class="table-wrapper">
     <table class="data-table">
-      <thead><tr><th>Package</th><th>Units</th><th>Amount</th><th>Method</th><th>Status</th><th>Date</th></tr></thead>
+      <thead><tr><th>Reference</th><th>Units</th><th>Amount</th><th>Method</th><th>Status</th><th>Date</th></tr></thead>
       <tbody>
         <?php if (empty($history)): ?>
           <tr><td colspan="6" class="text-center text-muted" style="padding:24px">No purchases yet</td></tr>
@@ -105,7 +130,8 @@ if ($customRate) {
     </table>
   </div>
 </div>
-<!-- Checkout Modal -->
+
+<!-- Checkout Modal -->
 <div class="modal-overlay" id="checkoutModal">
   <div class="modal">
     <div class="modal-header">
@@ -114,6 +140,7 @@ if ($customRate) {
     </div>
     <form method="POST" action="/client/actions/create-purchase.php">
       <?= csrf_field() ?>
+      <input type="hidden" name="plan_id" id="chkPlanId">
       <input type="hidden" name="custom_units" id="chkUnits">
       <div class="modal-body">
         <div id="chkSummary" style="background:var(--bg-muted);padding:16px;border-radius:var(--radius-md);text-align:center;margin-bottom:18px">
@@ -159,7 +186,16 @@ if ($customRate) {
 <?php
 $extraScript = <<<'JS'
 <script>
+function selectPlan(plan) {
+    document.getElementById('chkPlanId').value = plan.id;
+    document.getElementById('chkUnits').value = plan.units;
+    document.getElementById('summaryUnits').textContent = parseInt(plan.units).toLocaleString() + ' SMS (' + plan.name + ')';
+    document.getElementById('summaryTotal').textContent = (plan.currency || 'KES') + ' ' + parseFloat(plan.price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    openModal('checkoutModal');
+}
+
 function calculateTotal(units) {
+    if (document.getElementById('chkPlanId')) document.getElementById('chkPlanId').value = ''; 
     const rate = parseFloat(document.getElementById('userRate').value);
     const total = units * rate;
     document.getElementById('totalCostDisplay').textContent = 'KES ' + total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -172,6 +208,7 @@ function startCheckout() {
         return;
     }
     
+    if (document.getElementById('chkPlanId')) document.getElementById('chkPlanId').value = ''; 
     const rate = parseFloat(document.getElementById('userRate').value);
     const total = units * rate;
     

@@ -42,7 +42,7 @@ class Purchase {
             if (!$plan) return ['success' => false, 'error' => 'Invalid plan selected.'];
             
             $units = $plan['units'];
-            $amount = $customRate ? ($units * $customRate) : $plan['price'];
+            $amount = $plan['price']; // Use the fixed price of the plan
         } else {
             if ($units <= 0) return ['success' => false, 'error' => 'Invalid unit amount.'];
             $rate = $customRate ?? 1.00; // Use custom/reseller rate or default to 1.00
@@ -96,8 +96,10 @@ class Purchase {
         }
 
         // Custom log for debugging webhooks
+        $tmpDir = __DIR__ . '/../../tmp';
+        if (!is_dir($tmpDir)) @mkdir($tmpDir, 0777, true);
         $logMsg = "[".date('Y-m-d H:i:s')."] Purchase::complete - ID: $purchaseId, User: $userId, Parent: $parentId, Units: {$purchase['units']}" . PHP_EOL;
-        file_put_contents(__DIR__ . '/../../tmp/purchase_debug.log', $logMsg, FILE_APPEND);
+        @file_put_contents($tmpDir . '/purchase_debug.log', $logMsg, FILE_APPEND);
 
         // Use transaction for atomic balance update
         try {

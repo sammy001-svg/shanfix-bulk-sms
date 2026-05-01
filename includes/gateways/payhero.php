@@ -27,7 +27,14 @@ class Payhero {
             $phone = '0' . $phone;
         }
 
+        // Detect Site URL for Callback
         $siteUrl = DB::queryOne("SELECT value FROM system_settings WHERE `key` = 'site_url'")['value'] ?? '';
+        if (empty($siteUrl)) {
+            // Fallback to dynamic detection
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https" : "http";
+            $host = $_SERVER['HTTP_HOST'] ?? 'sms.shanfixtechnology.com';
+            $siteUrl = "$protocol://$host";
+        }
         $siteUrl = rtrim($siteUrl, '/');
         $callbackUrl = "$siteUrl/payhero_webhook.php";
 
