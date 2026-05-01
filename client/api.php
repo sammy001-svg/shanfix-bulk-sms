@@ -2,9 +2,9 @@
 /**
  * Client: API Documentation & Integration - Shanfix Technology
  */
-$pageTitle = 'API & Integration';
-$breadcrumb = [['label' => 'Account'], ['label' => 'API & Integration']];
-require_once __DIR__ . '/layout.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_role('client');
+$user = current_user();
 
 // Handle Regeneration
 if (isset($_POST['regenerate'])) {
@@ -16,8 +16,13 @@ if (isset($_POST['regenerate'])) {
     }
 }
 
+$pageTitle = 'API & Integration';
+$breadcrumb = [['label' => 'Account'], ['label' => 'API & Integration']];
+require_once __DIR__ . '/layout.php';
+
 $u = DB::queryOne("SELECT api_client_id, api_key FROM users WHERE id = ?", [$user['id']]);
 ?>
+
 
 <div class="page-header">
     <div>

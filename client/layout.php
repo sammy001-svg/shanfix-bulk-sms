@@ -11,6 +11,7 @@ $navItems = [
   ['icon'=>'<i class="fa-solid fa-gauge-high"></i>',     'label'=>'Dashboard',       'url'=>'/client/index.php'],
   ['type'=>'section','label'=>'SMS'],
   ['icon'=>'<i class="fa-solid fa-paper-plane"></i>',    'label'=>'Send SMS',         'url'=>'/client/send-sms.php'],
+  ['icon'=>'<i class="fa-solid fa-file-import"></i>',   'label'=>'Send from File',   'url'=>'/client/send-from-file.php'],
   [
     'id'=>'campaigns','icon'=>'<i class="fa-solid fa-bullhorn"></i>','label'=>'Campaigns',
     'active'=> str_contains($_SERVER['PHP_SELF'], '/campaign'),

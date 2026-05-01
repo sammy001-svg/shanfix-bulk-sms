@@ -1,9 +1,6 @@
 <?php
-require_once 'config.php';
-try {
-    $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME, DB_USER, DB_PASS);
-    $stmt = $pdo->query("DESCRIBE users");
-    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC), JSON_PRETTY_PRINT);
-} catch (PDOException $e) {
-    echo "ERROR: " . $e->getMessage();
+$pdo = new PDO('mysql:host=localhost;dbname=bulk_sms_system', 'root', '');
+$stmt = $pdo->query('DESCRIBE users');
+while($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    print_r($row);
 }

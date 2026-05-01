@@ -14,10 +14,10 @@ class SMS {
             $user = DB::queryOne("SELECT id, sms_units FROM users WHERE id = ?", [$userId]);
             if (!$user) return ['success' => false, 'error' => 'User not found'];
 
-            // Calculate cost (1 unit per 160 chars)
+            // Calculate cost (Enforced: 1 unit per 160 characters)
             $len = mb_strlen($message);
             $parts = ceil($len / 160) ?: 1;
-            $cost = $parts * 1.0; 
+            $cost = (float)$parts; 
 
             if ($user['sms_units'] < $cost) {
                 return ['success' => false, 'error' => 'Insufficient SMS units. Need ' . $cost . ' units.'];
@@ -70,30 +70,45 @@ class SMS {
 
         $userId   = $campaign['user_id'];
         $senderId = $campaign['sender_id'];
-        $message  = $campaign['message'];
+        $msgTemplate = $campaign['message'];
         $groupId  = $campaign['group_id'];
         $numbers  = $campaign['recipients']; // Comma separated
 
-        $recipients = [];
+        $sent = 0; $failed = 0;
+
+        // 1. Handle Group Recipients (with personalization support)
         if ($groupId) {
-            $contacts = DB::query("SELECT phone FROM contacts WHERE group_id = ? AND user_id = ?", [$groupId, $userId]);
-            foreach ($contacts as $c) $recipients[] = $c['phone'];
-        }
-        if ($numbers) {
-            $nums = explode(',', $numbers);
-            foreach ($nums as $n) {
-                $n = trim($n);
-                if ($n) $recipients[] = $n;
+            $contacts = DB::query("SELECT phone, metadata FROM contacts WHERE group_id = ? AND user_id = ?", [$groupId, $userId]);
+            foreach ($contacts as $c) {
+                $to = $c['phone'];
+                $personalizedMsg = $msgTemplate;
+                
+                // Replace placeholders if metadata exists
+                if ($c['metadata']) {
+                    $meta = json_decode($c['metadata'], true);
+                    if (is_array($meta)) {
+                        foreach ($meta as $key => $val) {
+                            $personalizedMsg = str_replace('{' . $key . '}', $val, $personalizedMsg);
+                        }
+                    }
+                }
+                
+                $res = self::send($userId, $to, $personalizedMsg, $senderId, $campaignId);
+                if ($res['success']) $sent++; else $failed++;
             }
         }
 
-        $recipients = array_unique($recipients);
-        $total = count($recipients);
-        $sent = 0; $failed = 0;
-
-        foreach ($recipients as $to) {
-            $res = self::send($userId, $to, $message, $senderId, $campaignId);
-            if ($res['success']) $sent++; else $failed++;
+        // 2. Handle Manual Numbers (no personalization for raw numbers)
+        if ($numbers) {
+            $nums = array_unique(array_filter(explode(',', $numbers)));
+            foreach ($nums as $to) {
+                $to = trim($to);
+                if (!$to) continue;
+                
+                // For manual numbers, we just send the template as is
+                $res = self::send($userId, $to, $msgTemplate, $senderId, $campaignId);
+                if ($res['success']) $sent++; else $failed++;
+            }
         }
 
         DB::execute("UPDATE campaigns SET status = 'completed', sent_count = ?, failed_count = ?, sent_at = NOW() WHERE id = ?", [$sent, $failed, $campaignId]);
