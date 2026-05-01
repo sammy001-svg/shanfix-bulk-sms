@@ -54,11 +54,15 @@ try {
               ?? $data['response']['MpesaReceiptNumber'] 
               ?? null;
 
-    $logMsg = "[".date('Y-m-d H:i:s')."] PARSED: Status=$status, PurchaseID=$purchaseId, MpesaRef=$mpesaCode" . PHP_EOL;
+    $logMsg = "[".date('Y-m-d H:i:s')."] PARSED: Status=$status, ResultCode=".($resultCode ?? 'N/A').", ID=$purchaseId, MpesaRef=$mpesaCode" . PHP_EOL;
     @file_put_contents($logFile, $logMsg, FILE_APPEND);
 
     // SUCCESSFUL PAYMENT CHECK
-    $isSuccessful = in_array(strtoupper((string)$status), ['SUCCESSFUL', 'SUCCESS', '0']);
+    $resultCode = $data['ResultCode'] ?? $data['response']['ResultCode'] ?? null;
+    $isSuccessful = (in_array(strtoupper((string)$status), ['SUCCESSFUL', 'SUCCESS', 'OK'])) || 
+                    ($resultCode !== null && (int)$resultCode === 0);
+
+    @file_put_contents($logFile, "[".date('Y-m-d H:i:s')."] CHECK: isSuccessful=" . ($isSuccessful ? 'YES' : 'NO') . PHP_EOL, FILE_APPEND);
 
     if ($isSuccessful && $purchaseId) {
         // We found a successful payment and a purchase ID
