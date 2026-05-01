@@ -24,10 +24,10 @@ $senderIds = DB::query("SELECT s.*, u.name, u.email, u.role FROM sender_ids s JO
 <div class="card">
   <div class="table-wrapper">
     <table class="data-table">
-      <thead><tr><th>Sender ID</th><th>Requested By</th><th>Role</th><th>Purpose</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Sender ID</th><th>Requested By</th><th>Role</th><th>Purpose</th><th>Documents</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
       <tbody>
         <?php if (empty($senderIds)): ?>
-          <tr><td colspan="7" class="text-center text-muted" style="padding:30px">No records found</td></tr>
+          <tr><td colspan="8" class="text-center text-muted" style="padding:30px">No records found</td></tr>
         <?php else: ?>
           <?php foreach ($senderIds as $s): ?>
             <?php $sc=['approved'=>'success','rejected'=>'danger','pending'=>'warning'][$s['status']]??'muted'; ?>
@@ -36,6 +36,20 @@ $senderIds = DB::query("SELECT s.*, u.name, u.email, u.role FROM sender_ids s JO
               <td><?=htmlspecialchars($s['name'])?><div style="font-size:11px;color:var(--text-secondary)"><?=htmlspecialchars($s['email'])?></div></td>
               <td><span class="badge <?=$s['role']==='reseller'?'badge-success':'badge-info'?>"><?=ucfirst($s['role'])?></span></td>
               <td style="max-width:240px;font-size:13px;color:var(--text-secondary)"><?=htmlspecialchars($s['purpose']??'—')?></td>
+              <td>
+                <?php if ($s['application_letter']): ?>
+                  <div style="display:flex; flex-direction:column; gap:4px">
+                    <a href="/<?= $s['application_letter'] ?>" target="_blank" class="btn btn-outline btn-xs" style="font-size:10px; padding:2px 6px">
+                      <i class="fa-solid fa-file-pdf"></i> App Letter
+                    </a>
+                    <a href="/<?= $s['registration_cert'] ?>" target="_blank" class="btn btn-outline btn-xs" style="font-size:10px; padding:2px 6px">
+                      <i class="fa-solid fa-certificate"></i> Reg Cert
+                    </a>
+                  </div>
+                <?php else: ?>
+                  <span class="text-muted" style="font-size:11px">—</span>
+                <?php endif; ?>
+              </td>
               <td><span class="badge badge-<?=$sc?>"><?=ucfirst($s['status'])?></span></td>
               <td style="font-size:12px"><?=date('d M Y',strtotime($s['created_at']))?></td>
               <td>
