@@ -31,11 +31,22 @@ if (!file_exists('config.php')) {
         
         // 3. Check Tables and Columns
         echo "<h2>3. Schema Integrity</h2>";
-        $tables = ['users', 'reseller_settings', 'purchases', 'notifications'];
+        $dbName = $pdo->query("SELECT DATABASE()")->fetchColumn();
+        echo "Active Database: <b style='color:blue'>$dbName</b><br>";
+
+        $tables = ['users', 'reseller_settings', 'purchases', 'notifications', 'pricing_plans'];
         foreach ($tables as $table) {
             $check = $pdo->query("SHOW TABLES LIKE '$table'")->fetch();
             if ($check) {
                 echo "<b style='color:green'>SUCCESS: Table '$table' exists.</b><br>";
+                
+                if ($table === 'purchases') {
+                    $latest = $pdo->query("SELECT id, user_id, status, created_at FROM purchases ORDER BY id DESC LIMIT 5")->fetchAll();
+                    echo " - Latest Purchases: <br>";
+                    foreach ($latest as $l) {
+                        echo "   #{$l['id']} | User:{$l['user_id']} | Status:{$l['status']} | Time:{$l['created_at']}<br>";
+                    }
+                }
                 
                 // Check new columns in reseller_settings
                 if ($table === 'reseller_settings') {
