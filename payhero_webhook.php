@@ -96,6 +96,13 @@ try {
         // Retry logic for DB lag
         $purchase = DB::queryOne("SELECT * FROM purchases WHERE id = ?", [$purchaseId]);
         if (!$purchase) {
+            // Table Scan Diagnostic
+            try {
+                $recentIds = DB::query("SELECT id FROM purchases ORDER BY id DESC LIMIT 5");
+                $idsList = implode(', ', array_column($recentIds, 'id'));
+                @file_put_contents($logFile, "[".date('Y-m-d H:i:s')."] TABLE_SCAN: Latest IDs in DB are: [$idsList]" . PHP_EOL, FILE_APPEND);
+            } catch (Exception $e) {}
+
             @file_put_contents($logFile, "[".date('Y-m-d H:i:s')."] DB_LAG: ID $purchaseId not found. Retrying in 1s..." . PHP_EOL, FILE_APPEND);
             sleep(1);
             $purchase = DB::queryOne("SELECT * FROM purchases WHERE id = ?", [$purchaseId]);
@@ -103,10 +110,15 @@ try {
 
         // Fallback Search by Phone and Amount (if ID lookup failed)
         if (!$purchase && !empty($data['response']['Phone'])) {
-            $phone = $data['response']['Phone'];
+            $phone = (string)$data['response']['Phone'];
             $amount = $data['response']['Amount'];
-            @file_put_contents($logFile, "[".date('Y-m-d H:i:s')."] FALLBACK: Searching for Pending purchase (Phone: $phone, Amount: $amount)" . PHP_EOL, FILE_APPEND);
-            $purchase = DB::queryOne("SELECT * FROM purchases WHERE transaction_ref = ? AND amount = ? AND status = 'pending' ORDER BY id DESC LIMIT 1", [$phone, $amount]);
+            
+            // Format-blind phone search (match last 9 digits)
+            $phoneSuffix = substr($phone, -9);
+            @file_put_contents($logFile, "[".date('Y-m-d H:i:s')."] FALLBACK: Searching for Pending purchase (Phone Suffix: $phoneSuffix, Amount: $amount)" . PHP_EOL, FILE_APPEND);
+            
+            $purchase = DB::queryOne("SELECT * FROM purchases WHERE transaction_ref LIKE ? AND amount = ? AND status = 'pending' ORDER BY id DESC LIMIT 1", ["%$phoneSuffix", $amount]);
+            
             if ($purchase) {
                 $purchaseId = $purchase['id'];
                 @file_put_contents($logFile, "[".date('Y-m-d H:i:s')."] FALLBACK_FOUND: Matched ID #$purchaseId" . PHP_EOL, FILE_APPEND);
