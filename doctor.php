@@ -12,6 +12,9 @@ echo "<h1>System Diagnostic</h1>";
 // 1. Check PHP Version
 echo "<h2>1. PHP Environment</h2>";
 echo "Current PHP Version: " . PHP_VERSION . "<br>";
+if (!defined('SITE_NAME')) define('SITE_NAME', 'Shanfix Technology');
+$sitePrefix = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', SITE_NAME), 0, 3));
+echo "Generated Site Prefix: <b style='color:blue'>$sitePrefix</b><br>";
 if (version_compare(PHP_VERSION, '8.0.0', '<')) {
     echo "<b style='color:red'>WARNING: Your PHP version is below 8.0. The code uses 'match' expressions which require PHP 8.0+.</b><br>";
 } else {
