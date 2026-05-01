@@ -63,7 +63,20 @@ $units     = $user['sms_units'];
         </div>
 
         <div class="form-group sms-composer">
-          <label class="form-label">Message <span class="required">*</span></label>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+            <label class="form-label" style="margin-bottom:0">Message <span class="required">*</span></label>
+            <?php
+            $myTemplates = DB::query("SELECT id, title, message FROM sms_templates WHERE user_id = ?", [$uid]);
+            if (!empty($myTemplates)):
+            ?>
+            <select class="form-control" style="width:auto; height:32px; font-size:12px; padding:0 10px" onchange="loadTemplate(this)">
+                <option value="">-- Quick Templates --</option>
+                <?php foreach($myTemplates as $mt): ?>
+                    <option value="<?= htmlspecialchars($mt['message']) ?>"><?= htmlspecialchars($mt['title']) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <?php endif; ?>
+          </div>
           <textarea name="message" id="smsMsg" class="form-control" placeholder="Type your SMS message here..." maxlength="918" required></textarea>
           <div class="sms-counter"><span id="chars">0</span>/160 · <span id="segs">1</span> SMS part(s) · Est. cost: <strong id="cost" style="color:var(--primary)">1</strong> unit/recipient</div>
           
@@ -158,6 +171,16 @@ function switchSendTab(btn, tabId, mode) {
     const guide = document.getElementById('personalizationGuide');
     if (guide) {
         guide.style.display = (mode === 'group') ? 'block' : 'none';
+    }
+}
+
+function loadTemplate(select) {
+    const msg = select.value;
+    if (msg) {
+        const ta = document.getElementById('smsMsg');
+        ta.value = msg;
+        // Trigger input event to update counter
+        ta.dispatchEvent(new Event('input'));
     }
 }
 
