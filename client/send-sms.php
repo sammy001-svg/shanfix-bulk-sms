@@ -21,8 +21,9 @@ $units     = $user['sms_units'];
   <div class="card">
     <div class="card-header"><h3 class="card-title"><i class="fa-solid fa-paper-plane" style="color:var(--primary)"></i> Compose Message</h3></div>
     <div class="card-body">
-      <form method="POST" action="/client/actions/quick-send.php" id="sendForm">
+      <form method="POST" action="/client/actions/quick-send.php" id="sendForm" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
+        <input type="hidden" name="send_mode" id="sendMode" value="single">
 
         <div class="form-group">
           <label class="form-label">Sender ID <span class="required">*</span></label>
@@ -40,9 +41,10 @@ $units     = $user['sms_units'];
         <div class="form-group">
           <label class="form-label">Send To</label>
           <div class="tabs">
-            <button type="button" class="tab-btn active" onclick="switchTab(this,'tab-single')">Single Number</button>
-            <button type="button" class="tab-btn" onclick="switchTab(this,'tab-multiple')">Multiple Numbers</button>
-            <button type="button" class="tab-btn" onclick="switchTab(this,'tab-grp')">Contact Group</button>
+            <button type="button" class="tab-btn active" onclick="switchSendTab(this,'tab-single', 'single')">Single Number</button>
+            <button type="button" class="tab-btn" onclick="switchSendTab(this,'tab-multiple', 'multiple')">Multiple Numbers</button>
+            <button type="button" class="tab-btn" onclick="switchSendTab(this,'tab-grp', 'group')">Contact Group</button>
+            <button type="button" class="tab-btn" onclick="switchSendTab(this,'tab-file', 'file')">Send from File</button>
           </div>
 
           <div class="tab-panel active" id="tab-single">
@@ -59,10 +61,22 @@ $units     = $user['sms_units'];
               <?php endforeach; ?>
             </select>
           </div>
+          <div class="tab-panel" id="tab-file">
+            <div class="upload-zone" id="dz" onclick="document.getElementById('csvFile').click()" ondrop="handleDrop(event)" ondragover="event.preventDefault()" style="padding:20px">
+              <i class="fa-solid fa-file-csv upload-icon" style="font-size:28px"></i>
+              <div style="font-size:13px">Drop CSV or click to browse</div>
+              <div id="fn" style="margin-top:5px;font-size:12px;color:var(--primary);font-weight:600"></div>
+            </div>
+            <input type="file" id="csvFile" name="csv_file" accept=".csv" style="display:none" onchange="showFn(this)">
+            <div class="form-hint">Download <a href="/assets/templates/sms-template.csv" target="_blank">CSV Template</a></div>
+          </div>
         </div>
 
         <div class="form-group sms-composer">
           <label class="form-label">Message <span class="required">*</span></label>
+          <div id="placeholderGuide" style="display:none; background:var(--bg-muted); padding:8px 12px; border-radius:var(--radius-md); margin-bottom:10px; font-size:11.5px; border:1px dashed var(--border)">
+             <strong>Placeholders:</strong> {username}, {order_id}, {currency}, {amount}
+          </div>
           <textarea name="message" id="smsMsg" class="form-control" placeholder="Type your SMS message here..." maxlength="918" required></textarea>
           <div class="sms-counter"><span id="chars">0</span>/160 · <span id="segs">1</span> SMS part(s) · Est. cost: <strong id="cost" style="color:var(--primary)">1</strong> unit/recipient</div>
         </div>
@@ -128,6 +142,47 @@ $units     = $user['sms_units'];
 <?php
 $extraScript = <<<'JS'
 <script>
+function switchSendTab(btn, tabId, mode) {
+    // Standard tab switching
+    const parent = btn.closest('.form-group');
+    parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    parent.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(tabId).classList.add('active');
+    
+    // Update hidden mode field
+    document.getElementById('sendMode').value = mode;
+    
+    // Update form action
+    const form = document.getElementById('sendForm');
+    if (mode === 'file') {
+        form.action = '/client/actions/send-from-file.php';
+        document.getElementById('placeholderGuide').style.display = 'block';
+    } else {
+        form.action = '/client/actions/quick-send.php';
+        document.getElementById('placeholderGuide').style.display = 'none';
+    }
+}
+
+function showFn(i){
+    const f=i.files[0];
+    if(f){
+        document.getElementById('fn').textContent='✅ '+f.name;
+    }
+}
+
+function handleDrop(e){
+    e.preventDefault();
+    const f=e.dataTransfer.files[0];
+    if(f && f.name.endsWith('.csv')){
+        const i=document.getElementById('csvFile');
+        const dt=new DataTransfer();
+        dt.items.add(f);
+        i.files=dt.files;
+        showFn(i);
+    }
+}
+
 const ta = document.getElementById('smsMsg');
 if (ta) {
   ta.addEventListener('input', () => {
