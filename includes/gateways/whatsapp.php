@@ -6,12 +6,14 @@
  */
 class WhatsApp_Gateway {
     private $instance_id;
+    private $account_id;
     private $token;
     private $base_url = "https://api.whatsapp-provider.com/v1"; // Placeholder
 
-    public function __construct($instance_id = null, $token = null) {
+    public function __construct($instance_id = null, $token = null, $account_id = null) {
         $this->instance_id = $instance_id;
         $this->token = $token;
+        $this->account_id = $account_id;
     }
 
     /**
@@ -31,6 +33,18 @@ class WhatsApp_Gateway {
         if ($media_url) {
             $payload['media'] = $media_url;
         }
+
+        // Log the outgoing message
+        DB::execute("
+            INSERT INTO whatsapp_messages (user_id, account_id, recipient, message, status, external_id) 
+            VALUES (?, ?, ?, ?, 'sent', ?)
+        ", [
+            $GLOBALS['uid'] ?? 1, 
+            $this->account_id ?? 0,
+            $to,
+            $message,
+            'wa_' . bin2hex(random_bytes(8))
+        ]);
 
         // Simulate API response
         return [

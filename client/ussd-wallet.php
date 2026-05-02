@@ -37,7 +37,7 @@ if ($parentId) {
             <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em; opacity:0.8">Available Balance</div>
             <div style="font-size:42px; font-weight:800; margin:10px 0">KES <?= number_format($user['ussd_balance'] ?? 0, 2) ?></div>
             <div style="display:flex; gap:10px; margin-top:20px">
-                <button class="btn btn-light btn-sm" style="background:rgba(255,255,255,0.2); border:none; color:#fff" onclick="openTopUpModal()">
+                <button class="btn btn-light btn-sm" style="background:rgba(255,255,255,0.2); border:none; color:#fff" onclick="openModal('topupModal')">
                     <i class="fa-solid fa-plus-circle"></i> Top Up Balance
                 </button>
             </div>
@@ -104,14 +104,14 @@ if ($parentId) {
 </div>
 
 <!-- Top Up Modal -->
-<div id="topupModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:transparent !important; backdrop-filter:none !important; z-index:2000; align-items:center; justify-content:center">
-  <div class="card" style="width:100%; max-width:400px; margin:20px; border:none; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25)">
-    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-light)">
-      <h3 class="card-title" style="margin:0"><i class="fa-solid fa-mobile-screen-button" style="color:var(--primary)"></i> M-Pesa Top Up</h3>
-      <button type="button" class="btn btn-icon" onclick="closeTopUpModal()"><i class="fa-solid fa-xmark"></i></button>
+<div id="topupModal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" style="margin:0"><i class="fa-solid fa-mobile-screen-button" style="color:var(--primary)"></i> M-Pesa Top Up</h3>
+      <button type="button" class="btn btn-icon" onclick="closeModal('topupModal')"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <form action="/client/actions/ussd-topup.php" method="POST" id="topupForm">
-        <div class="card-body" style="padding:24px">
+        <div class="modal-body">
             <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
             
             <div class="form-group mb-16">
@@ -132,21 +132,13 @@ if ($parentId) {
                 <i class="fa-solid fa-info-circle"></i> You will receive an STK Push prompt on your phone to enter your M-Pesa PIN.
             </div>
         </div>
-        <div class="card-footer" style="padding:16px 24px; display:flex; gap:10px">
-            <button type="button" class="btn btn-muted flex-1" onclick="closeTopUpModal()">Cancel</button>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-muted flex-1" onclick="closeModal('topupModal')">Cancel</button>
             <button type="submit" class="btn btn-primary flex-1">Send Prompt</button>
         </div>
     </form>
   </div>
 </div>
 
-<script>
-function openTopUpModal() {
-    document.getElementById('topupModal').style.display = 'flex';
-}
-function closeTopUpModal() {
-    document.getElementById('topupModal').style.display = 'none';
-}
-</script>
 
 <?php include __DIR__ . '/../includes/layout-footer.php'; ?>

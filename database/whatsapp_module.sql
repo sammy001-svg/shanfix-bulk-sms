@@ -53,3 +53,47 @@ CREATE TABLE IF NOT EXISTS `whatsapp_chatbots` (
   KEY `idx_user` (`user_id`),
   CONSTRAINT `fk_chatbot_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 5. Table for WhatsApp Self-Service Module Configurations
+CREATE TABLE IF NOT EXISTS `whatsapp_self_service` (
+  `id`              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id`         INT UNSIGNED NOT NULL,
+  `module_type`     ENUM('order_status','appointment','delivery','account') NOT NULL,
+  `trigger_keyword` VARCHAR(50)  NOT NULL,
+  `response_template` TEXT       NOT NULL,
+  `is_enabled`      TINYINT(1)   NOT NULL DEFAULT 1,
+  `config_json`     JSON         DEFAULT NULL, -- For extra fields like API endpoints or custom logic
+  `created_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_user_module` (`user_id`, `module_type`),
+  CONSTRAINT `fk_ss_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 6. Demo Tables for Self-Service Logic (Placeholders)
+CREATE TABLE IF NOT EXISTS `demo_orders` (
+  `id`              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `order_no`        VARCHAR(20)  NOT NULL UNIQUE,
+  `customer_phone`  VARCHAR(20)  NOT NULL,
+  `status`          VARCHAR(50)  NOT NULL,
+  `delivery_date`   DATE         DEFAULT NULL,
+  `amount`          DECIMAL(10,2) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `demo_appointments` (
+  `id`              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `customer_phone`  VARCHAR(20)  NOT NULL,
+  `service_type`    VARCHAR(100) NOT NULL,
+  `appointment_at`  DATETIME     NOT NULL,
+  `status`          VARCHAR(50)  NOT NULL DEFAULT 'confirmed',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Seed some demo data for testing
+INSERT IGNORE INTO `demo_orders` (`order_no`, `customer_phone`, `status`, `delivery_date`, `amount`) VALUES
+('ORD-1001', '254700000000', 'In Transit', '2026-05-05', 4500.00),
+('ORD-1002', '254700000000', 'Pending', '2026-05-06', 1200.00);
+
+INSERT IGNORE INTO `demo_appointments` (`customer_phone`, `service_type`, `appointment_at`, `status`) VALUES
+('254700000000', 'Hair Cut', '2026-05-03 10:00:00', 'confirmed');
