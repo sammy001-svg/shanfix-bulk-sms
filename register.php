@@ -228,16 +228,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <div class="login-box animate-in">
-      <div class="login-logo">
+      <div class="login-logo" style="justify-content: center;">
         <?php if ($logo = Branding::get('system_logo')): ?>
-            <img src="<?= $logo ?>" alt="Logo" style="max-height:45px; margin-bottom:10px">
+            <div style="background: rgba(255,255,255,0.9); padding: 12px 20px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+                <img src="<?= $logo ?>" alt="Logo" style="max-height:50px; width:auto;">
+            </div>
         <?php else: ?>
             <div class="logo-icon"><?= substr(Branding::get('system_name', 'S'), 0, 1) ?></div>
+            <div class="logo-name"><?= htmlspecialchars(Branding::get('system_name')) ?></div>
         <?php endif; ?>
-        <div>
-          <div class="logo-name"><?= htmlspecialchars(Branding::get('system_name')) ?></div>
-          <div class="logo-tag">Enterprise Platform</div>
-        </div>
       </div>
 
       <h1 class="login-title">Join us today</h1>

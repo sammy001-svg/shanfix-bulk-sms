@@ -59,6 +59,13 @@ class DB {
         return $row ?: null;
     }
 
+    /** Return a single value from the first column of the first row */
+    public static function queryValue(string $sql, array $params = []) {
+        $stmt = self::getInstance()->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchColumn();
+    }
+
     /** Execute INSERT/UPDATE/DELETE and return affected rows */
     public static function execute(string $sql, array $params = []): int {
         $stmt = self::getInstance()->prepare($sql);

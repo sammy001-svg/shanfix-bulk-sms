@@ -6,6 +6,10 @@ $pageTitle = $pageTitle ?? 'Dashboard';
 $breadcrumb = $breadcrumb ?? [];
 $user = current_user();
 
+// Fetch pending counts for badges
+$pendingSenderIds = DB::queryValue("SELECT COUNT(*) FROM sender_ids WHERE status = 'pending'");
+$pendingUssdRequests = DB::queryValue("SELECT COUNT(*) FROM ussd_codes WHERE status = 'pending'");
+
 $navItems = [
   ['type'=>'section','label'=>'MAIN'],
   ['icon'=>'<i class="fa-solid fa-gauge-high"></i>',    'label'=>'Dashboard',   'url'=>'/admin/index.php'],
@@ -31,6 +35,7 @@ $navItems = [
   [
     'id'=>'ussd','icon'=>'<i class="fa-solid fa-hashtag"></i>','label'=>'USSD',
     'active'=> str_contains($_SERVER['PHP_SELF'], '/ussd'),
+    'badge'=> ($pendingUssdRequests ?? 0) > 0 ? ($pendingUssdRequests ?? 0) : null,
     'children'=>[
       ['icon'=>'<i class="fa-solid fa-plus"></i>',          'label'=>'Request USSD Code', 'url'=>'/admin/ussd-requests.php'],
       ['icon'=>'<i class="fa-solid fa-list-ol"></i>',       'label'=>'USSD Codes',        'url'=>'/admin/ussd-codes.php'],
