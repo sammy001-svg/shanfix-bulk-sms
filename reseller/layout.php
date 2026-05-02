@@ -46,6 +46,7 @@ $navItems = [
       ['icon'=>'<i class="fa-solid fa-chart-line"></i>',    'label'=>'Usage Analytics',   'url'=>'/reseller/ussd-analytics.php'],
       ['icon'=>'<i class="fa-solid fa-clock-rotate-left"></i>','label'=>'USSD Sessions',    'url'=>'/reseller/ussd-sessions.php'],
       ['icon'=>'<i class="fa-solid fa-wallet"></i>',        'label'=>'Wallet Balance',    'url'=>'/reseller/ussd-wallet.php'],
+      ['icon'=>'<i class="fa-solid fa-code-branch"></i>',   'label'=>'API Callbacks',      'url'=>'/reseller/ussd-callbacks.php'],
     ]
   ],
   ['icon'=>'<i class="fa-solid fa-code"></i>',         'label'=>'API & Integration', 'url'=>'/reseller/api.php'],

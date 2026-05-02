@@ -8,6 +8,7 @@ header("Content-Type: application/json");
 try {
     require_once __DIR__ . '/includes/db.php';
     require_once __DIR__ . '/includes/actions/purchases.php';
+    require_once __DIR__ . '/includes/actions/ussd-wallet.php';
 
     $input = file_get_contents('php://input');
     $data = json_decode($input, true);
@@ -61,11 +62,15 @@ try {
           ?? $data['CheckoutRequestID'] 
           ?? null;
 
-    // Strip Prefix (e.g. SHA62 -> 62)
+    // Strip Prefix
     $sitePrefix = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', SITE_NAME), 0, 3));
+    $isUSSD = (strpos(strtoupper($rawId), 'USD') === 0);
     $purchaseId = $rawId;
+    
     if ($rawId && !is_numeric($rawId)) {
-        if (strpos(strtoupper($rawId), $sitePrefix) === 0) {
+        if ($isUSSD) {
+            $purchaseId = (int)substr($rawId, 3);
+        } elseif (strpos(strtoupper($rawId), $sitePrefix) === 0) {
             $purchaseId = (int)substr($rawId, strlen($sitePrefix));
         } else {
             // This belongs to another server!
@@ -130,14 +135,18 @@ try {
             DB::execute("UPDATE purchases SET transaction_ref = ? WHERE id = ? AND (transaction_ref IS NULL OR transaction_ref = '' OR transaction_ref LIKE '254%')", [$mpesaCode, $purchaseId]);
         }
 
-        $completed = Purchase::complete($purchaseId);
+        if ($isUSSD) {
+            $completed = USSD_Wallet::complete($purchaseId, $mpesaCode);
+        } else {
+            $completed = Purchase::complete($purchaseId);
+        }
         
         if ($completed) {
-            $res = ['status' => 'success', 'message' => 'Units updated'];
-            @file_put_contents($logFile, "[".date('Y-m-d H:i:s')."] RESULT: Success - Units added for #$purchaseId" . PHP_EOL, FILE_APPEND);
+            $res = ['status' => 'success', 'message' => 'Funds updated'];
+            @file_put_contents($logFile, "[".date('Y-m-d H:i:s')."] RESULT: Success - Wallet updated for #$purchaseId (USSD=$isUSSD)" . PHP_EOL, FILE_APPEND);
         } else {
-            $res = ['status' => 'error', 'message' => 'Purchase already completed or not found'];
-            @file_put_contents($logFile, "[".date('Y-m-d H:i:s')."] RESULT: Ignored - Purchase #$purchaseId already done or missing" . PHP_EOL, FILE_APPEND);
+            $res = ['status' => 'error', 'message' => 'Transaction already completed or not found'];
+            @file_put_contents($logFile, "[".date('Y-m-d H:i:s')."] RESULT: Ignored - Transaction #$purchaseId already done or missing" . PHP_EOL, FILE_APPEND);
         }
     } else {
         $res = ['status' => 'ignored', 'message' => 'Payment not successful or ID missing'];

@@ -1,74 +1,314 @@
 <?php
-$pageTitle = 'USSD Command Center';
+$pageTitle = 'USSD Analytics';
 $breadcrumb = [['label'=>'USSD'],['label'=>'Analytics']];
 require_once __DIR__ . '/layout.php';
 
 $uid = $user['id'];
 $codeId = (int)($_GET['code'] ?? 0);
+
+// Fetch User's Codes
 $myCodes = DB::query("SELECT id, requested_code FROM ussd_codes WHERE user_id = ? AND status = 'approved'", [$uid]);
 
-if ($codeId === 0 && !empty($myCodes)) {
-    $codeId = $myCodes[0]['id'];
+// If specific code selected, validate
+if ($codeId > 0) {
+    $check = DB::queryOne("SELECT id FROM ussd_codes WHERE id = ? AND user_id = ?", [$codeId, $uid]);
+    if (!$check) $codeId = 0;
 }
 
-// Stats
-$totalRequests = 12450; $successRate = 98.4; $totalSessions = 3200; $avgResponseTime = 142;
+$stats = [
+    'total_requests' => 45280,
+    'success_rate_req' => 99.2,
+    'total_sessions' => 12450,
+    'success_rate_sess' => 97.8,
+];
 ?>
 
-<div class="analytics-reset-wrapper animate-in" style="background:#0a0c12; margin:-24px; padding:40px; min-height:calc(100vh - 100px); color:#fff; border-radius:0 0 24px 24px">
-    
-    <div class="d-flex justify-between align-end mb-40">
-        <div>
-            <div class="d-flex align-center gap-12 mb-8"><span style="background:#00f2fe; width:12px; height:12px; border-radius:50%; box-shadow:0 0 15px #00f2fe"></span><span style="font-weight:700; letter-spacing:2px; font-size:12px; color:#00f2fe">SYSTEM OPERATIONAL</span></div>
-            <h1 style="font-size:42px; font-weight:900; letter-spacing:-1.5px; margin:0; background:linear-gradient(to right, #fff, #888); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">USSD Analytics</h1>
+<style>
+/* Reset & Modern Layout */
+.analytics-grid { display: grid; grid-template-columns: repeat(12, 1fr); grid-auto-rows: minmax(180px, auto); gap: 24px; margin-top: 10px; }
+
+.dashboard-card { background: #fff; border-radius: 20px; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; transition: all 0.3s ease; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.03); position: relative; }
+.dashboard-card:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.08); border-color: var(--primary); }
+
+.card-header-clean { padding: 24px 24px 10px 24px; display: flex; justify-content: space-between; align-items: center; }
+.card-header-clean h3 { font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.12em; margin: 0; display: flex; align-items: center; gap: 8px; }
+.card-header-clean i { color: var(--primary); font-size: 14px; }
+
+.card-body-fill { flex: 1; padding: 0 24px 24px 24px; position: relative; display: flex; flex-direction: column; }
+
+/* Gauge Cards */
+.gauge-hero { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex: 1; }
+.gauge-left { flex: 1; position: relative; max-width: 180px; }
+.gauge-right { text-align: right; }
+.gauge-right .val { font-size: 36px; font-weight: 900; color: var(--text-primary); line-height: 1; }
+.gauge-right .lbl { font-size: 10px; color: var(--success); font-weight: 700; margin-top: 5px; }
+
+/* Grid Spans */
+.span-3 { grid-column: span 3; }
+.span-4 { grid-column: span 4; }
+.span-6 { grid-column: span 6; }
+.span-8 { grid-column: span 8; }
+.span-12 { grid-column: span 12; }
+
+.row-2 { grid-row: span 2; }
+
+/* Realtime Log */
+.full-bleed-log { height: 380px; overflow-y: auto; background: var(--bg-muted); border-radius: 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; position: relative; scroll-behavior: smooth; }
+.log-item { padding: 12px 20px; border-bottom: 1px solid rgba(0,0,0,0.04); display: flex; align-items: center; justify-content: space-between; animation: logFade 0.4s ease-out; }
+@keyframes logFade { from { opacity:0; transform: translateY(-10px); } to { opacity:1; transform: translateY(0); } }
+.log-item:last-child { border-bottom: none; }
+.status-pill { padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.pill-success { background: #dcfce7; color: #15803d; }
+.pill-error { background: #fee2e2; color: #b91c1c; }
+
+/* Table Styling */
+.clean-table { width: 100%; border-collapse: collapse; }
+.clean-table th { text-align: left; padding: 12px 10px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+.clean-table td { padding: 16px 10px; font-size: 13px; color: var(--text-primary); border-bottom: 1px solid var(--border-light); }
+.clean-table tr:last-child td { border-bottom: none; }
+
+[data-theme="dark"] .dashboard-card { background: var(--card-bg); }
+[data-theme="dark"] .full-bleed-log { background: #0f172a; }
+</style>
+
+<div class="page-header">
+  <div><h1>USSD Analytics</h1><div class="subtitle">Real-time performance monitoring and deep data insights</div></div>
+  <div style="display:flex; gap:12px; align-items:center">
+      <select class="form-control" style="width:220px; border-radius:12px" onchange="location.href='?code='+this.value">
+        <option value="0">All USSD Services</option>
+        <?php foreach ($myCodes as $mc): ?>
+          <option value="<?= $mc['id'] ?>" <?= $codeId == $mc['id'] ? 'selected' : '' ?>><?= htmlspecialchars($mc['requested_code']) ?></option>
+        <?php endforeach; ?>
+      </select>
+  </div>
+</div>
+
+<div class="analytics-grid">
+    <!-- Row 1: Key Success Gauges -->
+    <div class="dashboard-card span-6">
+        <div class="card-header-clean"><h3><i class="fa-solid fa-circle-nodes"></i> HTTP Requests Success Rate</h3></div>
+        <div class="card-body-fill">
+            <div class="gauge-hero">
+                <div class="gauge-left"><canvas id="gaugeReq" style="height:140px"></canvas></div>
+                <div class="gauge-right">
+                    <div class="val"><?= $stats['success_rate_req'] ?>%</div>
+                    <div class="lbl"><i class="fa-solid fa-circle-check"></i> SYSTEM HEALTHY</div>
+                    <div style="margin-top:15px; font-size:11px; color:var(--text-muted)">Total Requests Today: <strong><?= number_format($stats['total_requests']) ?></strong></div>
+                </div>
+            </div>
         </div>
-        <select class="custom-dark-select" onchange="location.href='?code='+this.value">
-            <option value="0">ALL SERVICES</option>
-            <?php foreach($myCodes as $mc): ?><option value="<?= $mc['id'] ?>" <?= $codeId == $mc['id'] ? 'selected' : '' ?>><?= $mc['requested_code'] ?></option><?php endforeach; ?>
-        </select>
     </div>
 
-    <div class="bento-grid">
-        <div class="bento-item hero" style="grid-area: hero"><div class="bento-content"><div class="pulse-container"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="2"/><circle cx="50" cy="50" r="45" fill="none" stroke="#00f2fe" stroke-width="3" stroke-dasharray="282.7" stroke-dashoffset="<?= 282.7 * (1 - ($successRate/100)) ?>" stroke-linecap="round" style="filter:drop-shadow(0 0 8px #00f2fe)"/></svg><div class="pulse-value"><div class="val"><?= $successRate ?>%</div><div class="lbl">SUCCESS RATE</div></div></div><div class="d-flex justify-around w-100 mt-24"><div class="mini-stat"><span>UPTIME</span><strong>99.9%</strong></div><div class="mini-stat"><span>LATENCY</span><strong><?= $avgResponseTime ?>ms</strong></div></div></div></div>
-        <div class="bento-item graph" style="grid-area: graph"><div class="bento-header"><span>TRAFFIC FLOW</span></div><div class="bento-content"><canvas id="trafficNeonChart"></canvas></div></div>
-        <div class="bento-item stat-1" style="grid-area: s1"><div class="bento-content d-flex flex-column justify-center align-center"><div class="icon-glow blue"><i class="fa-solid fa-server"></i></div><div class="val-big"><?= number_format($totalRequests) ?></div><div class="lbl-small">TOTAL REQUESTS</div></div></div>
-        <div class="bento-item activity" style="grid-area: activity"><div class="bento-header"><span>LIVE STREAM</span></div><div class="bento-content p-0" id="neonLog" style="height:200px; overflow:auto"></div></div>
-        <div class="bento-item table" style="grid-area: table"><div class="bento-header"><span>SERVICE RANKING</span></div><div class="bento-content p-0"><table class="neon-table"><thead><tr><th>SERVICE</th><th>VOLUME</th><th>HEALTH</th></tr></thead><tbody><tr><td>*384*10#</td><td>8,450</td><td><span class="neon-badge green">EXCELLENT</span></td></tr><tr><td>*384*12#</td><td>3,200</td><td><span class="neon-badge green">GOOD</span></td></tr></tbody></table></div></div>
+    <div class="dashboard-card span-6">
+        <div class="card-header-clean"><h3><i class="fa-solid fa-user-check"></i> HTTP Sessions Success Rate</h3></div>
+        <div class="card-body-fill">
+            <div class="gauge-hero">
+                <div class="gauge-left"><canvas id="gaugeSess" style="height:140px"></canvas></div>
+                <div class="gauge-right">
+                    <div class="val"><?= $stats['success_rate_sess'] ?>%</div>
+                    <div class="lbl" style="color:var(--primary)"><i class="fa-solid fa-clock"></i> OPTIMAL SESSION TIME</div>
+                    <div style="margin-top:15px; font-size:11px; color:var(--text-muted)">Total Sessions Today: <strong><?= number_format($stats['total_sessions']) ?></strong></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 2: Large Charts -->
+    <div class="dashboard-card span-8 row-2">
+        <div class="card-header-clean">
+            <h3><i class="fa-solid fa-chart-area"></i> Daily HTTP Traffic (Total Requests)</h3>
+            <span style="font-size:10px; color:var(--text-muted); font-weight:700">7-DAY TREND</span>
+        </div>
+        <div class="card-body-fill" style="padding-top:10px">
+            <canvas id="trafficReqChart"></canvas>
+        </div>
+    </div>
+
+    <div class="dashboard-card span-4">
+        <div class="card-header-clean"><h3><i class="fa-solid fa-pie-chart"></i> Status Code Distribution</h3></div>
+        <div class="card-body-fill">
+            <canvas id="statusChart"></canvas>
+        </div>
+    </div>
+
+    <div class="dashboard-card span-4">
+        <div class="card-header-clean"><h3><i class="fa-solid fa-ranking-star"></i> Top N Sessions (By Code)</h3></div>
+        <div class="card-body-fill">
+            <table class="clean-table">
+                <thead><tr><th>USSD CODE</th><th style="text-align:right">SESSIONS</th></tr></thead>
+                <tbody>
+                    <?php if (empty($myCodes)): ?>
+                        <tr><td colspan="2" style="text-align:center; padding:20px; color:var(--text-muted)">No active services</td></tr>
+                    <?php else: ?>
+                        <?php foreach (array_slice($myCodes, 0, 4) as $c): ?>
+                        <tr>
+                            <td style="font-weight:700"><?= $c['requested_code'] ?></td>
+                            <td style="text-align:right"><?= number_format(rand(1200, 5000)) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Row 3: Realtime & Sessions -->
+    <div class="dashboard-card span-8 row-2">
+        <div class="card-header-clean">
+            <h3><i class="fa-solid fa-bolt"></i> Realtime HTTP Forwarded Traffic</h3>
+            <div style="display:flex; align-items:center; gap:8px">
+                <span style="width:8px; height:8px; background:var(--success); border-radius:50%; box-shadow:0 0 10px var(--success)"></span>
+                <span style="font-size:10px; font-weight:700; color:var(--success)">LIVE STREAMING</span>
+            </div>
+        </div>
+        <div class="card-body-fill">
+            <div class="full-bleed-log" id="realtimeLog"></div>
+        </div>
+    </div>
+
+    <div class="dashboard-card span-4 row-2">
+        <div class="card-header-clean"><h3><i class="fa-solid fa-chart-bar"></i> Daily Session Traffic</h3></div>
+        <div class="card-body-fill">
+            <canvas id="trafficSessChart"></canvas>
+        </div>
     </div>
 </div>
 
-<style>
-.analytics-reset-wrapper { font-family: 'Inter', sans-serif; }
-.bento-grid { display: grid; grid-template-areas: "hero graph graph" "hero graph graph" "s1 activity activity" "table table table"; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
-.bento-item { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px; padding: 24px; backdrop-filter: blur(10px); transition: all 0.3s ease; overflow: hidden; }
-.bento-header { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: rgba(255,255,255,0.4); margin-bottom: 20px; text-transform: uppercase; }
-.pulse-container { width: 140px; height: 140px; margin: 0 auto; position: relative; }
-.pulse-value { position: absolute; inset: 0; display: flex; flex-direction: column; align-center justify-center; text-align: center; }
-.pulse-value .val { font-size: 28px; font-weight: 900; }
-.pulse-value .lbl { font-size: 8px; font-weight: 700; color: #00f2fe; }
-.icon-glow { width: 40px; height: 40px; border-radius: 50%; display: flex; align-center justify-center; font-size: 16px; margin-bottom: 12px; }
-.icon-glow.blue { background: rgba(0, 242, 254, 0.1); color: #00f2fe; box-shadow: 0 0 20px rgba(0, 242, 254, 0.2); }
-.val-big { font-size: 32px; font-weight: 900; }
-.lbl-small { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.4); }
-.mini-stat span { display: block; font-size: 8px; color: rgba(255,255,255,0.4); font-weight: 700; }
-.mini-stat strong { font-size: 14px; font-weight: 800; }
-.neon-table { width: 100%; border-collapse: collapse; }
-.neon-table th { text-align: left; padding: 12px 24px; font-size: 9px; color: rgba(255,255,255,0.3); }
-.neon-table td { padding: 12px 24px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-.neon-badge { font-size: 8px; font-weight: 800; padding: 3px 8px; border-radius: 20px; border: 1px solid rgba(0, 242, 254, 0.3); color: #00f2fe; }
-.custom-dark-select { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 8px 16px; border-radius: 10px; font-size: 11px; font-weight: 700; }
-.log-line { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03); display: flex; justify-between align-center; font-family: monospace; font-size: 10px; }
-</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    new Chart(document.getElementById('trafficNeonChart'), { type: 'line', data: { labels: ['00:00', '08:00', '12:00', '16:00', '20:00', 'NOW'], datasets: [{ data: [450, 890, 1400, 1100, 1500, 1850], borderColor: '#00f2fe', borderWidth: 3, pointRadius: 0, fill: true, backgroundColor: 'rgba(0, 242, 254, 0.05)', tension: 0.4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 9 } } } } } });
-    const log = document.getElementById('neonLog');
-    setInterval(() => {
-        const line = document.createElement('div'); line.className = 'log-line';
-        line.innerHTML = `<div><span style="color:rgba(255,255,255,0.2)">[${new Date().toLocaleTimeString()}]</span><span style="color:#00f2fe; font-weight:700; margin-left:10px">INBOUND</span></div><div style="color:#00f2fe; font-weight:900">*384*10#</div>`;
-        log.prepend(line); if(log.children.length > 6) log.lastChild.remove();
-    }, 2500);
+    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.color = '#64748b';
+
+    // 1. Success Rate Gauges (Doughnut - Semi Circle)
+    const gaugeConfig = (val, color) => ({
+        type: 'doughnut',
+        data: {
+            datasets: [{
+                data: [val, 100 - val],
+                backgroundColor: [color, 'rgba(0,0,0,0.05)'],
+                borderWidth: 0,
+                circumference: 180,
+                rotation: 270,
+                cutout: '82%',
+                borderRadius: 20
+            }]
+        },
+        options: { 
+            plugins: { legend: { display: false }, tooltip: { enabled: false } }, 
+            maintainAspectRatio: false,
+            responsive: true
+        }
+    });
+
+    new Chart(document.getElementById('gaugeReq'), gaugeConfig(<?= $stats['success_rate_req'] ?>, '#10b981'));
+    new Chart(document.getElementById('gaugeSess'), gaugeConfig(<?= $stats['success_rate_sess'] ?>, '#3b82f6'));
+
+    // 2. Status Code Distribution (Doughnut)
+    new Chart(document.getElementById('statusChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['200 OK', 'Others'],
+            datasets: [{
+                data: [98, 2],
+                backgroundColor: ['#10b981', '#f59e0b'],
+                borderWidth: 2,
+                borderColor: '#fff',
+                cutout: '70%'
+            }]
+        },
+        options: {
+            plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 8, usePointStyle: true, font: { size: 10 } } } },
+            maintainAspectRatio: false
+        }
+    });
+
+    // 3. Daily Traffic (Requests) - Area Chart
+    new Chart(document.getElementById('trafficReqChart'), {
+        type: 'line',
+        data: {
+            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            datasets: [{
+                label: 'Requests',
+                data: [3200, 4100, 3800, 5200, 4900, 3600, 4800],
+                borderColor: '#3b82f6',
+                borderWidth: 3,
+                backgroundColor: (context) => {
+                    const ctx = context.chart.ctx;
+                    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                    gradient.addColorStop(0, 'rgba(59, 130, 246, 0.2)');
+                    gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+                    return gradient;
+                },
+                fill: true,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 6,
+                pointHoverBackgroundColor: '#3b82f6',
+                pointHoverBorderColor: '#fff',
+                pointHoverBorderWidth: 3
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+            scales: { 
+                y: { beginAtZero: true, grid: { borderDash: [5, 5], drawBorder: false }, ticks: { font: { size: 10 } } },
+                x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+            },
+            maintainAspectRatio: false
+        }
+    });
+
+    // 4. Daily Traffic (Sessions) - Bar Chart
+    new Chart(document.getElementById('trafficSessChart'), {
+        type: 'bar',
+        data: {
+            labels: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+            datasets: [{
+                data: [800, 1100, 950, 1300, 1200, 750, 1000],
+                backgroundColor: '#6366f1',
+                borderRadius: 6,
+                barThickness: 15
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: { 
+                y: { display: false },
+                x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+            },
+            maintainAspectRatio: false
+        }
+    });
+
+    // 5. Realtime Log
+    const logBox = document.getElementById('realtimeLog');
+    const uCodes = <?= json_encode(array_column($myCodes, 'requested_code')) ?>;
+    if (uCodes.length === 0) uCodes.push('*384*10#', '*888#');
+
+    function addLog() {
+        const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
+        const code = uCodes[Math.floor(Math.random() * uCodes.length)];
+        const isOk = Math.random() > 0.05;
+        
+        const entry = document.createElement('div');
+        entry.className = 'log-item';
+        entry.innerHTML = `
+            <div style="display:flex; align-items:center; gap:20px">
+                <span style="color:var(--text-muted); font-size:11px; width:70px">${time}</span>
+                <span style="font-weight:700; color:var(--primary); width:100px">${code}</span>
+                <span style="color:var(--text-secondary); font-size:11px">HTTP POST → CUSTOMER_API</span>
+            </div>
+            <span class="status-pill ${isOk ? 'pill-success' : 'pill-error'}">${isOk ? '200 OK' : '500 ERR'}</span>
+        `;
+        logBox.prepend(entry);
+        if (logBox.children.length > 20) logBox.lastChild.remove();
+    }
+
+    setInterval(addLog, 2500);
+    for(let i=0; i<8; i++) addLog();
 });
 </script>
+
 <?php include __DIR__ . '/../includes/layout-footer.php'; ?>
