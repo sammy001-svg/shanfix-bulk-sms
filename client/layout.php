@@ -47,6 +47,16 @@ $navItems = [
       ['icon'=>'<i class="fa-solid fa-code-branch"></i>',   'label'=>'API Callbacks',      'url'=>'/client/ussd-callbacks.php'],
     ]
   ],
+  [
+    'id'=>'whatsapp','icon'=>'<i class="fa-brands fa-whatsapp"></i>','label'=>'WhatsApp Hub',
+    'active'=> str_contains($_SERVER['PHP_SELF'], '/whatsapp'),
+    'children'=>[
+      ['icon'=>'<i class="fa-solid fa-link"></i>',          'label'=>'Connect Account',   'url'=>'/client/whatsapp-connect.php'],
+      ['icon'=>'<i class="fa-solid fa-paper-plane"></i>',   'label'=>'Bulk Messaging',    'url'=>'/client/whatsapp-bulk.php'],
+      ['icon'=>'<i class="fa-solid fa-robot"></i>',         'label'=>'Chatbot Builder',   'url'=>'/client/whatsapp-chatbot.php'],
+      ['icon'=>'<i class="fa-solid fa-message"></i>',       'label'=>'Message Logs',      'url'=>'/client/whatsapp-logs.php'],
+    ]
+  ],
   ['icon'=>'<i class="fa-solid fa-code"></i>',           'label'=>'API & Integration', 'url'=>'/client/api.php'],
 ];
 ?>

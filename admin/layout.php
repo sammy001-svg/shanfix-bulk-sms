@@ -44,6 +44,14 @@ $navItems = [
       ['icon'=>'<i class="fa-solid fa-wallet"></i>',        'label'=>'Wallet Balance',    'url'=>'/admin/ussd-wallet.php'],
     ]
   ],
+  [
+    'id'=>'whatsapp','icon'=>'<i class="fa-brands fa-whatsapp"></i>','label'=>'WhatsApp Hub',
+    'active'=> str_contains($_SERVER['PHP_SELF'], '/whatsapp'),
+    'children'=>[
+      ['icon'=>'<i class="fa-solid fa-list"></i>',          'label'=>'Service Overview',  'url'=>'/admin/whatsapp-management.php'],
+      ['icon'=>'<i class="fa-solid fa-tags"></i>',          'label'=>'Global Pricing',    'url'=>'/admin/whatsapp-pricing.php'],
+    ]
+  ],
   ['type'=>'section','label'=>'SYSTEM'],
   ['icon'=>'<i class="fa-solid fa-bell"></i>',      'label'=>'Notifications',  'url'=>'/admin/notifications.php'],
   ['icon'=>'<i class="fa-solid fa-gear"></i>',      'label'=>'Settings',       'url'=>'/admin/settings.php'],
