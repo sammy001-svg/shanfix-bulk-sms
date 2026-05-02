@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $handle = fopen('php://temp', 'r+');
         fwrite($handle, $csvData);
         rewind($handle);
-    } elseif ($file && $file['error'] === UPLOAD_ERR_OK) {
+    } elseif ($file && ($file['error'] ?? null) === UPLOAD_ERR_OK) {
         // Use the uploaded CSV file
         $handle = fopen($file['tmp_name'], "r");
     }
@@ -57,7 +57,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $totalRows = 0;
 
     // We'll create a campaign record to group these messages
-    $campaignName = "File Upload: " . sanitize($file['name']) . " (" . date('Y-m-d H:i') . ")";
+    $fileName = $file['name'] ?? 'Data Paste';
+    $campaignName = "File Upload: " . sanitize($fileName) . " (" . date('Y-m-d H:i') . ")";
     $campaignId = DB::insert(
         "INSERT INTO campaigns (user_id, name, sender_id, message, status, created_at) VALUES (?, ?, ?, ?, 'sending', NOW())",
         [$user['id'], $campaignName, $senderId, $msgTemplate]
