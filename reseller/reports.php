@@ -25,7 +25,9 @@ $totalPages=ceil($total/$perPage);
 ?>
 <div class="page-header">
   <div><h1>Reports</h1><div class="subtitle">Your message delivery reports</div></div>
+  <button onclick="downloadPDF(event)" class="btn btn-secondary"><i class="fa-solid fa-file-pdf"></i> Download PDF</button>
 </div>
+<div id="report-content">
 
 <!-- Date filter -->
 <div class="card" style="margin-bottom:18px">
@@ -54,7 +56,7 @@ $totalPages=ceil($total/$perPage);
 </div>
 
 <!-- Table -->
-<div class="card">
+<div class="card" id="message-log-section">
   <div class="card-header">
     <h3 class="card-title"><i class="fa-solid fa-file-lines" style="color:var(--primary)"></i> Message Log <span class="badge badge-muted"><?=$total?></span></h3>
   </div>
@@ -86,10 +88,44 @@ $totalPages=ceil($total/$perPage);
     </div></div>
   <?php endif; ?>
 </div>
+</div>
 
 <?php
 $extraScript = <<<JS
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
+function downloadPDF(event) {
+    const element = document.getElementById('message-log-section');
+    const btn = event.currentTarget;
+    const originalContent = btn.innerHTML;
+    
+    // Use the dates from PHP
+    const fromDate = '{$from}';
+    const toDate = '{$to}';
+    
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+    btn.disabled = true;
+
+    const opt = {
+        margin:       [10, 10],
+        filename:     'Reseller_Report_' + fromDate + '_to_' + toDate + '.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, logging: false },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).toPdf().get('pdf').then((pdf) => {
+        window.open(pdf.output('bloburl'), '_blank');
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+    }).catch(err => {
+        console.error('PDF Error:', err);
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+        alert('Failed to generate PDF. Please try again.');
+    });
+}
+
 new Chart(document.getElementById('repChart'),{type:'bar',data:{labels:{$tLabels}||[],datasets:[{label:'Messages',data:{$tValues}||[],backgroundColor:'rgba(0,200,150,0.7)',borderRadius:6,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}}});
 </script>
 JS;

@@ -9,6 +9,26 @@ $groups    = DB::query("SELECT id,name FROM contact_groups WHERE user_id=?",[$ui
 $units     = $user['sms_units'];
 ?>
 
+<style>
+/* Simple Modal Styling (Matching Send from File) */
+#confirmModal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:2000; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
+#confirmModal .modal-card { width:100%; max-width:600px; margin:20px; animation: modalSlideUp 0.3s ease-out; }
+@keyframes modalSlideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.sample-msg-bubble { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 12px 15px; border-radius: 4px; font-size: 13px; color: var(--text-primary); line-height: 1.5; margin-bottom: 12px; }
+
+/* Enhanced Table Styling */
+.preview-card { border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--border); box-shadow:var(--shadow-md); margin-top:24px; background:var(--card-bg); }
+.preview-table-container { width:100%; overflow-x:auto; }
+.preview-table { width:100%; border-collapse:collapse; margin:0; font-size:13px; }
+.preview-table th { background:var(--bg-muted); color:var(--text-primary); font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:0.05em; padding:12px 15px; text-align:left; border-bottom:2px solid var(--border); position:sticky; top:0; z-index:10; }
+.preview-table td { padding:10px 15px; border-bottom:1px solid var(--border-light); color:var(--text-secondary); }
+.preview-table tr:hover { background:rgba(0,0,0,0.02); }
+
+#placeholderWrap { animation:fadeInDown 0.3s ease-out; }
+@keyframes fadeInDown { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
+</style>
+
 <div class="page-header">
   <div><h1>Send SMS</h1><div class="subtitle">Send a single SMS or to a group of contacts</div></div>
   <div style="background:var(--primary-light);border:1px solid var(--primary);padding:8px 18px;border-radius:var(--radius-md)">
@@ -18,102 +38,107 @@ $units     = $user['sms_units'];
 </div>
 
 <div style="display:grid;grid-template-columns:1fr 360px;gap:22px;align-items:start">
-  <div class="card">
-    <div class="card-header"><h3 class="card-title"><i class="fa-solid fa-paper-plane" style="color:var(--primary)"></i> Compose Message</h3></div>
-    <div class="card-body">
-      <form method="POST" action="/client/actions/quick-send.php" id="sendForm">
-        <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
-        <input type="hidden" name="send_mode" id="sendMode" value="single">
+  <div>
+    <div class="card">
+      <div class="card-header"><h3 class="card-title"><i class="fa-solid fa-paper-plane" style="color:var(--primary)"></i> Compose Message</h3></div>
+      <div class="card-body">
+        <form method="POST" action="/client/actions/quick-send.php" id="sendForm">
+          <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
+          <input type="hidden" name="send_mode" id="sendMode" value="single">
+          <input type="hidden" name="csv_data" id="mainCsvData">
 
-        <div class="form-group">
-          <label class="form-label">Sender ID <span class="required">*</span></label>
-          <select name="sender_id" class="form-control" required>
-            <option value="">-- Select Sender ID --</option>
-            <?php foreach ($senderIds as $s): ?>
-              <option value="<?=htmlspecialchars($s['sender_id'])?>"><?=htmlspecialchars($s['sender_id'])?></option>
-            <?php endforeach; ?>
-          </select>
-          <?php if (empty($senderIds)): ?>
-            <div class="form-hint"><a href="/client/sender-ids.php?new=1">You need an approved Sender ID first →</a></div>
-          <?php endif; ?>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Send To</label>
-          <div class="tabs">
-            <button type="button" class="tab-btn active" onclick="switchSendTab(this,'tab-single', 'single')">Single Number</button>
-            <button type="button" class="tab-btn" onclick="switchSendTab(this,'tab-multiple', 'multiple')">Multiple Numbers</button>
-            <button type="button" class="tab-btn" onclick="switchSendTab(this,'tab-grp', 'group')">Contact Group</button>
-          </div>
-
-          <div class="tab-panel active" id="tab-single">
-            <input type="text" name="recipient" class="form-control" placeholder="+254712345678">
-          </div>
-          <div class="tab-panel" id="tab-multiple">
-            <textarea name="numbers" class="form-control" rows="3" placeholder="+254712345678, +254798765432&#10;One per line or comma-separated"></textarea>
-          </div>
-          <div class="tab-panel" id="tab-grp">
-            <select name="group_id" class="form-control">
-              <option value="">-- Select Group --</option>
-              <?php foreach ($groups as $g): ?>
-                <option value="<?=$g['id']?>"><?=htmlspecialchars($g['name'])?></option>
+          <div class="form-group">
+            <label class="form-label">Sender ID <span class="required">*</span></label>
+            <select name="sender_id" id="mainSenderId" class="form-control" required>
+              <option value="">-- Select Sender ID --</option>
+              <?php foreach ($senderIds as $s): ?>
+                <option value="<?=htmlspecialchars($s['sender_id'])?>"><?=htmlspecialchars($s['sender_id'])?></option>
               <?php endforeach; ?>
             </select>
           </div>
-        </div>
 
-        <div class="form-group sms-composer">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
-            <label class="form-label" style="margin-bottom:0">Message <span class="required">*</span></label>
-            <?php
-            $myTemplates = DB::query("SELECT id, title, message FROM sms_templates WHERE user_id = ?", [$uid]);
-            if (!empty($myTemplates)):
-            ?>
-            <select class="form-control" style="width:auto; height:32px; font-size:12px; padding:0 10px" onchange="loadTemplate(this)">
-                <option value="">-- Quick Templates --</option>
-                <?php foreach($myTemplates as $mt): ?>
-                    <option value="<?= htmlspecialchars($mt['message']) ?>"><?= htmlspecialchars($mt['title']) ?></option>
+          <div class="form-group" id="sendToSection">
+            <label class="form-label">Send To</label>
+            <div class="tabs">
+              <button type="button" class="tab-btn active" onclick="switchSendTab(this,'tab-single', 'single')">Single Number</button>
+              <button type="button" class="tab-btn" onclick="switchSendTab(this,'tab-multiple', 'multiple')">Multiple Numbers</button>
+              <button type="button" class="tab-btn" onclick="switchSendTab(this,'tab-grp', 'group')">Contact Group</button>
+            </div>
+
+            <div class="tab-panel active" id="tab-single">
+              <input type="text" name="recipient" class="form-control" placeholder="+254712345678">
+            </div>
+            <div class="tab-panel" id="tab-multiple">
+              <textarea name="numbers" class="form-control" rows="3" placeholder="+254712345678, +254798765432&#10;One per line or comma-separated"></textarea>
+            </div>
+            <div class="tab-panel" id="tab-grp">
+              <select name="group_id" class="form-control">
+                <option value="">-- Select Group --</option>
+                <?php foreach ($groups as $g): ?>
+                  <option value="<?=$g['id']?>"><?=htmlspecialchars($g['name'])?></option>
                 <?php endforeach; ?>
-            </select>
-            <?php endif; ?>
-          </div>
-          <textarea name="message" id="smsMsg" class="form-control" placeholder="Type your SMS message here..." maxlength="918" required></textarea>
-          <div class="sms-counter"><span id="chars">0</span>/160 · <span id="segs">1</span> SMS part(s) · Est. cost: <strong id="cost" style="color:var(--primary)">1</strong> unit/recipient</div>
-          
-          <!-- Personalization Guide (hidden by default) -->
-          <div id="personalizationGuide" style="display:none; margin-top:15px; padding:15px; background:rgba(255,255,255,0.03); border:1px dashed var(--border); border-radius:var(--radius-sm)">
-            <div style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.05em">
-              <i class="fa-solid fa-wand-magic-sparkles"></i> Personalization Guide
+              </select>
             </div>
-            <div style="font-size:12px; color:var(--text-muted); line-height:1.5">
-              Use headers from your imported CSV as placeholders. For example:
-              <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:8px">
-                <code style="background:var(--bg-muted); padding:2px 6px; border-radius:4px; color:var(--primary)">{name}</code>
-                <code style="background:var(--bg-muted); padding:2px 6px; border-radius:4px; color:var(--primary)">{amount}</code>
-                <code style="background:var(--bg-muted); padding:2px 6px; border-radius:4px; color:var(--primary)">{date}</code>
-                <code style="background:var(--bg-muted); padding:2px 6px; border-radius:4px; color:var(--primary)">{balance}</code>
+          </div>
+
+          <div class="form-group sms-composer">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+              <label class="form-label" style="margin-bottom:0">Message <span class="required">*</span></label>
+              <div style="display:flex; gap:8px">
+                  <div id="placeholderWrap" style="display:none">
+                      <select class="form-control" style="width:auto; height:32px; font-size:12px; padding:0 10px; border-color:var(--primary); color:var(--primary); font-weight:600" onchange="insertPlaceholder(this)">
+                          <option value="">+ Insert Placeholder</option>
+                      </select>
+                  </div>
+                  <?php if (!empty($myTemplates = DB::query("SELECT id, title, message FROM sms_templates WHERE user_id = ?", [$uid]))): ?>
+                  <select class="form-control" style="width:auto; height:32px; font-size:12px; padding:0 10px" onchange="loadTemplate(this)">
+                      <option value="">-- Quick Templates --</option>
+                      <?php foreach($myTemplates as $mt): ?>
+                          <option value="<?= htmlspecialchars($mt['message']) ?>"><?= htmlspecialchars($mt['title']) ?></option>
+                      <?php endforeach; ?>
+                  </select>
+                  <?php endif; ?>
               </div>
-              <div style="margin-top:8px; font-style:italic">"Hello {name}, your balance is {balance}."</div>
             </div>
+            <textarea name="message" id="smsMsg" class="form-control" placeholder="Type your SMS message here..." maxlength="918" required></textarea>
+            <div class="sms-counter"><span id="chars">0</span>/160 · <span id="segs">1</span> SMS part(s) · Est. cost: <strong id="cost" style="color:var(--primary)">1</strong> unit/recipient</div>
           </div>
-        </div>
 
-        <div class="form-group">
-          <label class="form-label">Schedule (optional)</label>
-          <input type="datetime-local" name="scheduled_at" class="form-control">
-          <div class="form-hint">Leave empty to send immediately</div>
-        </div>
+          <div class="form-group">
+            <label class="form-label">Schedule (optional)</label>
+            <input type="datetime-local" name="scheduled_at" class="form-control">
+          </div>
 
-        <div style="display:flex;gap:12px;margin-top:8px">
-          <button type="submit" class="btn btn-primary btn-lg" style="flex:1" <?=empty($senderIds)?'disabled':''?>>
-            <i class="fa-solid fa-paper-plane"></i> Send SMS
-          </button>
+          <div style="display:flex;gap:12px;margin-top:8px">
+            <button type="submit" class="btn btn-primary btn-lg" style="flex:1" <?=empty($senderIds)?'disabled':''?>>
+              <i class="fa-solid fa-paper-plane"></i> Send SMS
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- FILE DATA PREVIEW -->
+    <div id="mainFilePreviewSection" style="display:none">
+        <div class="preview-card">
+            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center">
+                <h3 class="card-title"><i class="fa-solid fa-table-list" style="color:var(--primary)"></i> File Data Preview</h3>
+                <div style="display:flex; align-items:center; gap:10px">
+                    <span id="mainFileCountBadge" style="font-size:12px; font-weight:600; color:var(--text-muted)"></span>
+                    <button type="button" class="btn btn-icon" style="color:var(--danger)" onclick="clearSideFile()"><i class="fa-solid fa-trash-can"></i></button>
+                </div>
+            </div>
+            <div class="preview-table-container" style="max-height:400px; overflow:auto">
+                <table class="preview-table">
+                    <thead id="mainQpHead"></thead>
+                    <tbody id="mainQpBody"></tbody>
+                </table>
+            </div>
         </div>
-      </form>
     </div>
   </div>
 
-  <!-- Info Panel -->
+  <!-- Sidebar -->
   <div style="display:flex;flex-direction:column;gap:16px">
     <div class="card">
       <div class="card-body">
@@ -127,95 +152,254 @@ $units     = $user['sms_units'];
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="quickUploadCard">
       <div class="card-body">
-        <h4 style="font-size:14px;font-weight:700;margin-bottom:12px"><i class="fa-solid fa-lightbulb" style="color:var(--warning)"></i> Tips</h4>
-        <ul style="font-size:12.5px;color:var(--text-secondary);display:flex;flex-direction:column;gap:8px;list-style:disc;padding-left:16px">
-          <li>Keep messages under 160 chars to use 1 SMS unit</li>
-          <li>Use your approved Sender ID for better deliverability</li>
-          <li>Include an opt-out instruction for bulk sends</li>
-          <li>Schedule campaigns during business hours (8AM–8PM)</li>
-        </ul>
+        <h4 style="font-size:14px;font-weight:700;margin-bottom:12px"><i class="fa-solid fa-file-import" style="color:var(--primary)"></i> Quick File Upload</h4>
+        <div id="dz" style="border:2px dashed var(--border); border-radius:var(--radius-md); padding:20px; text-align:center; transition:all 0.2s; cursor:pointer" onclick="document.getElementById('sideFileInput').click()">
+          <i class="fa-solid fa-cloud-arrow-up" style="font-size:28px; color:var(--text-muted); margin-bottom:10px"></i>
+          <div style="font-size:12px; color:var(--text-secondary); font-weight:600">Click or Drag Excel/CSV</div>
+          <input type="file" id="sideFileInput" style="display:none" accept=".csv, .xlsx, .xls" onchange="handleSideFile(this)">
+        </div>
+        
+        <div id="sideFileInfo" style="display:none; margin-top:15px; padding:12px; background:var(--primary-light); border:1px solid var(--primary); border-radius:var(--radius-sm); display:flex; align-items:center; gap:10px">
+              <i class="fa-solid fa-file-excel" style="color:var(--primary); font-size:20px"></i>
+              <div style="overflow:hidden; flex:1">
+                 <div id="sideFileName" style="font-weight:700; font-size:12px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap">File.xlsx</div>
+                 <div style="font-size:10px; color:var(--text-secondary)">File Broadcasting Ready</div>
+              </div>
+              <button type="button" class="btn btn-icon" style="color:var(--danger)" onclick="clearSideFile()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
       </div>
     </div>
+  </div>
+</div>
 
-    <?php if (empty($senderIds)): ?>
-    <div class="alert alert-warning">
-      <i class="fa-solid fa-triangle-exclamation"></i>
-      You need an approved Sender ID to send SMS.
-      <a href="/client/sender-ids.php?new=1" style="display:block;margin-top:8px;font-weight:700">Request Sender ID →</a>
+<!-- SIMPLE CONFIRMATION MODAL (Matching Send from File) -->
+<div id="confirmModal">
+  <div class="card modal-card">
+    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center">
+      <h3 class="card-title"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i> Confirm Campaign Dispatch</h3>
+      <button type="button" class="btn btn-icon" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <?php endif; ?>
+    <div class="card-body" style="padding:25px">
+      <div style="margin-bottom:20px">
+        <h4 style="font-size:13px; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:12px; letter-spacing:0.05em">Sample Previews (First 2 Contacts)</h4>
+        <div id="samplePreviews"></div>
+      </div>
 
-    <?php if ($units < 5): ?>
-    <div class="alert alert-warning">
-      <i class="fa-solid fa-coins"></i>
-      Low balance! <a href="/client/purchases.php" style="font-weight:700">Buy more units →</a>
+      <div style="background:var(--bg-muted); border-radius:var(--radius-md); padding:20px; display:grid; grid-template-columns:repeat(2, 1fr); gap:15px">
+        <div><div style="font-size:11px; color:var(--text-muted)">Sender ID</div><div id="mSender" style="font-weight:700; color:var(--text-primary)">-</div></div>
+        <div><div style="font-size:11px; color:var(--text-muted)">Total Numbers</div><div id="mContacts" style="font-weight:700; color:var(--text-primary)">-</div></div>
+        <div><div style="font-size:11px; color:var(--text-muted)">Message Length</div><div id="mChars" style="font-weight:700; color:var(--text-primary)">-</div></div>
+        <div><div style="font-size:11px; color:var(--text-muted)">Cost per SMS</div><div style="font-weight:700; color:var(--text-primary)">1.00 unit</div></div>
+        <div style="grid-column: span 2; padding-top:10px; border-top:1px solid var(--border); margin-top:5px; display:flex; justify-content:space-between; align-items:center">
+           <div style="font-size:13px; font-weight:700">Estimated Total Cost</div>
+           <div id="mTotal" style="font-size:20px; font-weight:800; color:var(--primary)">0.00 units</div>
+        </div>
+      </div>
+
+      <div style="margin-top:25px; display:flex; gap:15px">
+        <button type="button" class="btn btn-muted" style="flex:1; height:50px" onclick="closeModal()">Cancel & Edit</button>
+        <button type="button" class="btn btn-primary" style="flex:2; height:50px; font-weight:700" onclick="confirmAndSend()">
+          <i class="fa-solid fa-paper-plane" style="margin-right:8px"></i> Confirm & Send Now
+        </button>
+      </div>
     </div>
-    <?php endif; ?>
   </div>
 </div>
 
 <?php
 $extraScript = <<<'JS'
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
+let sideHeaders = [];
+let sideRows = [];
+let hasFile = false;
+
 function switchSendTab(btn, tabId, mode) {
+    if (hasFile && !confirm('Switching tabs will ignore the uploaded file. Continue?')) return;
+    if (hasFile) clearSideFile();
+
     const parent = btn.closest('.form-group');
     parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     parent.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(tabId).classList.add('active');
     document.getElementById('sendMode').value = mode;
+}
 
-    // Show/hide personalization guide for group mode
-    const guide = document.getElementById('personalizationGuide');
-    if (guide) {
-        guide.style.display = (mode === 'group') ? 'block' : 'none';
+function insertPlaceholder(select) {
+    const val = select.value;
+    if (!val) return;
+    const ta = document.getElementById('smsMsg');
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const text = ta.value;
+    ta.value = text.substring(0, start) + '##' + val + '##' + text.substring(end);
+    ta.focus();
+    ta.selectionStart = ta.selectionEnd = start + val.length + 4;
+    select.value = '';
+    ta.dispatchEvent(new Event('input'));
+}
+
+function handleSideFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rawJson = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+        let hIdx = 0;
+        while (hIdx < rawJson.length && (!rawJson[hIdx] || rawJson[hIdx].every(c => !c))) hIdx++;
+        if (hIdx >= rawJson.length) { alert('File is empty.'); return; }
+
+        sideHeaders = rawJson[hIdx].map(h => String(h || '').trim());
+        const pIdx = sideHeaders.findIndex(h => {
+            const low = h.toLowerCase();
+            return low.includes('phone') || low.includes('number') || low.includes('mobile');
+        });
+        if (pIdx === -1) { alert('Missing "phone" column.'); return; }
+
+        sideRows = rawJson.slice(hIdx + 1).filter(r => r.length > 0 && r[pIdx]);
+        hasFile = true;
+
+        // UI Updates
+        document.getElementById('sideFileName').textContent = file.name;
+        document.getElementById('sideFileInfo').style.display = 'flex';
+        document.getElementById('dz').style.display = 'none';
+        document.getElementById('sendToSection').style.opacity = '0.3';
+        document.getElementById('sendToSection').style.pointerEvents = 'none';
+        document.getElementById('sendMode').value = 'file';
+
+        // Placeholder Dropdown
+        const pWrap = document.getElementById('placeholderWrap');
+        const pSel = pWrap.querySelector('select');
+        pSel.innerHTML = '<option value="">+ Insert Placeholder</option>';
+        sideHeaders.forEach(h => {
+            const opt = document.createElement('option');
+            opt.value = h;
+            opt.textContent = h;
+            pSel.appendChild(opt);
+        });
+        pWrap.style.display = 'block';
+
+        // Main Preview Card
+        document.getElementById('mainFilePreviewSection').style.display = 'block';
+        document.getElementById('mainFileCountBadge').textContent = sideRows.length + ' contacts found';
+        document.getElementById('mainQpHead').innerHTML = `<tr>${sideHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+        document.getElementById('mainQpBody').innerHTML = sideRows.slice(0, 5).map(r => `<tr>${sideHeaders.map((_, i) => `<td>${r[i] || ''}</td>`).join('')}</tr>`).join('');
+        
+        document.getElementById('mainFilePreviewSection').scrollIntoView({ behavior: 'smooth' });
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function clearSideFile() {
+    sideHeaders = [];
+    sideRows = [];
+    hasFile = false;
+    document.getElementById('sideFileInput').value = '';
+    document.getElementById('sideFileInfo').style.display = 'none';
+    document.getElementById('dz').style.display = 'block';
+    document.getElementById('sendToSection').style.opacity = '1';
+    document.getElementById('sendToSection').style.pointerEvents = 'auto';
+    document.getElementById('sendMode').value = 'single';
+    document.getElementById('placeholderWrap').style.display = 'none';
+    document.getElementById('mainFilePreviewSection').style.display = 'none';
+}
+
+// Modal Logic
+function openModal() {
+    const msg = document.getElementById('smsMsg').value;
+    const sid = document.getElementById('mainSenderId').value;
+    
+    if (!sid) { alert('Please select a Sender ID.'); return; }
+    if (!msg) { alert('Please type a message.'); return; }
+
+    const sampleContainer = document.getElementById('samplePreviews');
+    sampleContainer.innerHTML = '';
+    sideRows.slice(0, 2).forEach((row, i) => {
+        let text = msg;
+        sideHeaders.forEach((h, hIdx) => {
+            text = text.replace(new RegExp('##' + h + '##', 'g'), row[hIdx] || '');
+        });
+        const bubble = document.createElement('div');
+        bubble.className = 'sample-msg-bubble';
+        bubble.innerHTML = `<div style="font-size:10px; font-weight:700; color:var(--primary); margin-bottom:5px">SAMPLE MESSAGE FOR: ${row[0]}</div>${text}`;
+        sampleContainer.appendChild(bubble);
+    });
+    
+    const charLen = msg.length;
+    const segs = Math.ceil(charLen / 160) || 1;
+    const totalContacts = sideRows.length;
+    
+    document.getElementById('mSender').textContent = sid;
+    document.getElementById('mChars').textContent = charLen + ' chars (' + segs + ' part' + (segs > 1 ? 's' : '') + ')';
+    document.getElementById('mContacts').textContent = totalContacts;
+    document.getElementById('mTotal').textContent = (totalContacts * segs).toFixed(2) + ' units';
+    
+    document.getElementById('confirmModal').style.display = 'flex';
+}
+
+function closeModal() { document.getElementById('confirmModal').style.display = 'none'; }
+
+function confirmAndSend() {
+    const btn = document.querySelector('#confirmModal .btn-primary');
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Dispatching...';
+    btn.disabled = true;
+
+    const csv = [sideHeaders, ...sideRows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    document.getElementById('mainCsvData').value = csv;
+    document.getElementById('sendForm').action = '/client/actions/send-from-file.php';
+    document.getElementById('sendForm').submit();
+}
+
+document.getElementById('sendForm').addEventListener('submit', function(e) {
+    if (hasFile) {
+        e.preventDefault();
+        openModal();
     }
+});
+
+// Counter
+const smsArea = document.getElementById('smsMsg');
+if (smsArea) {
+    smsArea.addEventListener('input', () => {
+        const text = smsArea.value;
+        const l = text.length;
+        const parts = Math.ceil(l / 160) || 1;
+        document.getElementById('chars').textContent = l;
+        document.getElementById('segs').textContent = parts;
+        document.getElementById('cost').textContent = parts;
+    });
 }
 
 function loadTemplate(select) {
-    const msg = select.value;
-    if (msg) {
-        const ta = document.getElementById('smsMsg');
-        ta.value = msg;
-        // Trigger input event to update counter
-        ta.dispatchEvent(new Event('input'));
+    if (select.value) {
+        smsArea.value = select.value;
+        smsArea.dispatchEvent(new Event('input'));
     }
 }
 
-const ta = document.getElementById('smsMsg');
-if (ta) {
-  const updateCounter = () => {
-    const text = ta.value;
-    const l = text.length;
-    
-    // Standard SMS is 160 chars. 
-    // Note: If multi-part (concatenated), most gateways use 153 chars per part.
-    // However, per user request, we enforce a strict 160/part rule.
-    const parts = Math.ceil(l / 160) || 1;
-    
-    const charEl = document.getElementById('chars');
-    const segEl  = document.getElementById('segs');
-    const costEl = document.getElementById('cost');
-    
-    charEl.textContent = l;
-    segEl.textContent = parts;
-    costEl.textContent = parts;
-
-    // Visual feedback
-    if (l > 160) {
-        charEl.style.color = 'var(--warning)';
-        segEl.style.color = 'var(--warning)';
-    } else {
-        charEl.style.color = 'inherit';
-        segEl.style.color = 'inherit';
-    }
-  };
-
-  ta.addEventListener('input', updateCounter);
-  // Initial run in case there's default text (e.g. from drafts)
-  updateCounter();
+// Drag & Drop
+const dz = document.getElementById('dz');
+if (dz) {
+    dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.style.borderColor = 'var(--primary)'; dz.style.background = 'var(--primary-light)'; });
+    dz.addEventListener('dragleave', (e) => { e.preventDefault(); dz.style.borderColor = 'var(--border)'; dz.style.background = 'transparent'; });
+    dz.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dz.style.borderColor = 'var(--border)';
+        dz.style.background = 'transparent';
+        if (e.dataTransfer.files.length) {
+            const input = document.getElementById('sideFileInput');
+            input.files = e.dataTransfer.files;
+            handleSideFile(input);
+        }
+    });
 }
 </script>
 JS;

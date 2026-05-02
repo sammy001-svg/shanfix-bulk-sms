@@ -14,23 +14,34 @@ if (!$user || !in_array($user['role'], ['reseller', 'client'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) {
         flash_set('danger', 'CSRF Token mismatch.');
-        redirect('/client/send-sms.php');
+        redirect('/client/send-from-file.php');
     }
 
     $senderId   = sanitize($_POST['sender_id'] ?? '');
     $msgTemplate = $_POST['message'] ?? '';
     $file       = $_FILES['csv_file'] ?? null;
+    $csvData = $_POST['csv_data'] ?? '';
+    $handle = null;
 
-    if (!$senderId || !$msgTemplate || !$file || $file['error'] !== UPLOAD_ERR_OK) {
-        flash_set('danger', 'Please provide a sender ID, message, and a valid CSV file.');
-        redirect('/client/send-sms.php');
+    if ($csvData) {
+        // Use the data sent from the client (Excel converted to CSV)
+        $handle = fopen('php://temp', 'r+');
+        fwrite($handle, $csvData);
+        rewind($handle);
+    } elseif ($file && $file['error'] === UPLOAD_ERR_OK) {
+        // Use the uploaded CSV file
+        $handle = fopen($file['tmp_name'], "r");
     }
 
-    $handle = fopen($file['tmp_name'], "r");
+    if (!$handle) {
+        flash_set('danger', 'Please provide a valid CSV or Excel file.');
+        redirect('/client/send-from-file.php');
+    }
+
     $header = fgetcsv($handle);
     if (!$header) {
-        flash_set('danger', 'CSV file is empty or invalid.');
-        redirect('/client/send-sms.php');
+        flash_set('danger', 'File data is empty or invalid.');
+        redirect('/client/send-from-file.php');
     }
 
     // Standardize headers
@@ -39,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($phoneIdx === false) {
         flash_set('danger', "CSV must contain a 'phone' column header.");
-        redirect('/client/send-sms.php');
+        redirect('/client/send-from-file.php');
     }
 
     $sent = 0; $failed = 0; $errors = [];
@@ -61,6 +72,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $personalizedMsg = $msgTemplate;
         foreach ($cleanHeaders as $idx => $headerName) {
             $value = trim($row[$idx] ?? '');
+            // Support both ##TitleCase## and {lowercase} for compatibility
+            $label = ucfirst($headerName);
+            $personalizedMsg = str_replace('##' . $label . '##', $value, $personalizedMsg);
             $personalizedMsg = str_replace('{' . $headerName . '}', $value, $personalizedMsg);
         }
 

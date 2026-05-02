@@ -23,8 +23,12 @@ $users = DB::query("SELECT id, name FROM users WHERE role!='admin' ORDER BY name
 ?>
 <div class="page-header">
   <div><h1>Reports</h1><div class="subtitle">Message log and delivery reports</div></div>
-  <a href="?export=1&from=<?=$from?>&to=<?=$to?>&user_id=<?=$userId?>" class="btn btn-secondary"><i class="fa-solid fa-download"></i> Export CSV</a>
+  <div style="display:flex;gap:8px">
+    <button onclick="downloadPDF(event)" class="btn btn-secondary"><i class="fa-solid fa-file-pdf"></i> Download PDF</button>
+    <a href="?export=1&from=<?=$from?>&to=<?=$to?>&user_id=<?=$userId?>" class="btn btn-secondary"><i class="fa-solid fa-download"></i> Export CSV</a>
+  </div>
 </div>
+<div id="report-content">
 
 <!-- Filters -->
 <div class="card" style="margin-bottom:18px">
@@ -62,7 +66,7 @@ $users = DB::query("SELECT id, name FROM users WHERE role!='admin' ORDER BY name
 </div>
 
 <!-- Table -->
-<div class="card">
+<div class="card" id="message-log-section">
   <div class="card-header">
     <h3 class="card-title"><i class="fa-solid fa-file-lines" style="color:var(--primary)"></i> Messages <span class="badge badge-muted"><?=$total?></span></h3>
   </div>
@@ -95,4 +99,43 @@ $users = DB::query("SELECT id, name FROM users WHERE role!='admin' ORDER BY name
     </div></div>
   <?php endif; ?>
 </div>
-<?php include __DIR__ . '/../includes/layout-footer.php'; ?>
+</div>
+<?php
+$extraScript = <<<JS
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+function downloadPDF(event) {
+    const element = document.getElementById('message-log-section');
+    const btn = event.currentTarget;
+    const originalContent = btn.innerHTML;
+    
+    // Use the dates from PHP
+    const fromDate = '{$from}';
+    const toDate = '{$to}';
+    
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+    btn.disabled = true;
+
+    const opt = {
+        margin:       [10, 10],
+        filename:     'Admin_Full_Report_' + fromDate + '_to_' + toDate + '.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, logging: false },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).toPdf().get('pdf').then((pdf) => {
+        window.open(pdf.output('bloburl'), '_blank');
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+    }).catch(err => {
+        console.error('PDF Error:', err);
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+        alert('Failed to generate PDF. Please try again.');
+    });
+}
+</script>
+JS;
+include __DIR__ . '/../includes/layout-footer.php';
+?>
