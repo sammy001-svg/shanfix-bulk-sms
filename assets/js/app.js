@@ -245,6 +245,172 @@ document.getElementById("refreshUnits")?.addEventListener("click", async () => {
   }
 });
 
+// ─── AJAX Navigation (Zero-Blink Experience) ──────────────────
+(function () {
+  const loader = document.getElementById("page-loader");
+  const mainContent = document.getElementById("mainContent");
+
+  // Only run if we are in a portal context
+  if (!mainContent) return;
+
+  async function navigate(url, push = true) {
+    // Don't AJAX external or specific links
+    if (url.includes("logout.php") || url.includes("download")) {
+      window.location.href = url;
+      return;
+    }
+
+    loader?.classList.add("loading");
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Network response was not ok");
+      const html = await response.text();
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, "text/html");
+
+      const newContent = doc.querySelector(".page-content");
+      const newTitle = doc.querySelector("title");
+      const currentContent = document.querySelector(".page-content");
+
+      if (newContent && currentContent) {
+        const updateDOM = () => {
+          currentContent.innerHTML = newContent.innerHTML;
+          if (newTitle) document.title = newTitle.innerText;
+          if (push) window.history.pushState({ url }, "", url);
+
+          // Update active states in sidebar
+          document.querySelectorAll(".sidebar .nav-link").forEach((link) => {
+            const linkUrl = link.getAttribute("href");
+            if (linkUrl && url.includes(linkUrl) && linkUrl !== "#" && linkUrl !== "/") {
+              link.classList.add("active");
+              // Expand parent if it's a sub-item
+              const sub = link.closest(".nav-sub");
+              if (sub) {
+                sub.classList.add("open");
+                const parentLink = document.querySelector(`[data-toggle="${sub.id.replace('sub-', '')}"]`);
+                parentLink?.classList.add("active");
+                parentLink?.setAttribute("aria-expanded", "true");
+              }
+            } else {
+              link.classList.remove("active");
+            }
+          });
+
+          // Re-initialize page-specific features
+          initPageFeatures();
+          
+          // CRITICAL: Execute scripts found in the new document
+          executeScripts(doc);
+
+          window.scrollTo(0, 0);
+        };
+
+        // Use native View Transition if supported
+        if (document.startViewTransition) {
+          document.startViewTransition(updateDOM);
+        } else {
+          updateDOM();
+        }
+      } else {
+        window.location.href = url; // Fallback
+      }
+    } catch (error) {
+      console.error("Navigation error:", error);
+      window.location.href = url; // Fallback
+    } finally {
+      setTimeout(() => loader?.classList.remove("loading"), 300);
+    }
+  }
+
+  function executeScripts(doc) {
+    // Extract scripts that are not app.js
+    const scripts = Array.from(doc.querySelectorAll("script")).filter(s => {
+        const src = s.getAttribute("src");
+        return !src || (!src.includes("app.js") && !src.includes("font-awesome") && !src.includes("sweetalert2"));
+    });
+
+    scripts.forEach(oldScript => {
+        const newScript = document.createElement("script");
+        Array.from(oldScript.attributes).forEach(attr => {
+            newScript.setAttribute(attr.name, attr.value);
+        });
+        newScript.textContent = oldScript.textContent;
+        document.body.appendChild(newScript);
+        // Remove it immediately to keep DOM clean (it already executed)
+        if (!newScript.src) newScript.remove();
+    });
+  }
+
+  function initPageFeatures() {
+    // 1. Re-init Charts if any
+    document.querySelectorAll("canvas[id]").forEach(canvas => {
+       // Note: In a real app, you'd need the specific chart data.
+       // For now, we assume pages handle their own chart init via embedded scripts.
+       // However, scripts in innerHTML don't run automatically.
+       // We'll extract and run them.
+    });
+
+    // 2. Re-init SMS Counters
+    document.querySelectorAll("textarea[data-sms-counter]").forEach((ta) => {
+      const counterId = ta.dataset.smsCounter;
+      const counter = document.getElementById(counterId);
+      if (!counter) return;
+      ta.addEventListener("input", () => {
+        const l = ta.value.length;
+        const segs = Math.ceil(l / 160) || 1;
+        counter.textContent = `${l}/160 · ${segs} SMS`;
+      });
+    });
+
+    // 3. Re-init Upload Zones
+    document.querySelectorAll(".upload-zone").forEach((zone) => {
+      zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("dragging"); });
+      zone.addEventListener("dragleave", () => zone.classList.remove("dragging"));
+      zone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        zone.classList.remove("dragging");
+        const files = e.dataTransfer.files;
+        const input = zone.parentElement.querySelector("input[type=file]");
+        if (input && files.length) { input.files = files; zone.querySelector("p").textContent = "File: " + files[0].name; }
+      });
+    });
+
+    // 4. Trigger "animate-in" again
+    const content = document.querySelector(".page-content");
+    if (content) {
+      content.classList.remove("animate-in");
+      void content.offsetWidth; // Trigger reflow
+      content.classList.add("animate-in");
+    }
+  }
+
+  // Intercept all internal link clicks
+  document.addEventListener("click", (e) => {
+    const link = e.target.closest("a");
+    if (!link) return;
+
+    const url = link.getAttribute("href");
+    if (!url || url.startsWith("#") || url.startsWith("javascript:") || link.target === "_blank") return;
+
+    // Only AJAX for same-origin portal pages
+    if (url.startsWith("/") || url.startsWith(window.location.origin)) {
+      e.preventDefault();
+      navigate(url);
+    }
+  });
+
+  // Handle browser back/forward
+  window.addEventListener("popstate", (e) => {
+    if (e.state && e.state.url) {
+      navigate(e.state.url, false);
+    } else {
+      window.location.reload();
+    }
+  });
+})();
+
 // ─── Confirm forms with data-confirm ─────────────────────────
 document.querySelectorAll("form[data-confirm]").forEach((form) => {
   form.addEventListener("submit", (e) => {

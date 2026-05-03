@@ -1648,7 +1648,46 @@ textarea.form-control {
 }
 
 .animate-in {
-  animation: fadeInUp 0.35s ease both;
+  animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* ─── Page Loader Bar ────────────────────────────────────── */
+#page-loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0%;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  z-index: 9999;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px rgba(0, 200, 150, 0.5);
+  display: none;
+}
+#page-loader.loading {
+  display: block;
+  animation: loaderProgress 2s ease-out forwards;
+}
+@keyframes loaderProgress {
+  0% { width: 0%; }
+  50% { width: 70%; }
+  100% { width: 90%; }
+}
+
+/* ─── View Transitions API ───────────────────────────────── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.4s;
+}
+
+.sidebar {
+  view-transition-name: sidebar;
+}
+.topbar {
+  view-transition-name: topbar;
+}
+.page-content {
+  view-transition-name: page-content;
 }
 
 .spinner {
