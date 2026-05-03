@@ -21,9 +21,9 @@ if (!defined('SITE_VERSION'))    define('SITE_VERSION',    '1.0.0');
 if (!defined('SESSION_TIMEOUT')) define('SESSION_TIMEOUT', 3600);
 
 class DB {
-    private static ?PDO $instance = null;
+    private static $instance = null;
 
-    public static function getInstance(): PDO {
+    public static function getInstance() {
         if (self::$instance === null) {
             $dsn = sprintf(
                 'mysql:host=%s;dbname=%s;charset=%s',
@@ -45,14 +45,14 @@ class DB {
     }
 
     /** Run a SELECT query and return all rows */
-    public static function query(string $sql, array $params = []): array {
+    public static function query($sql, $params = []) {
         $stmt = self::getInstance()->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
     /** Return a single row */
-    public static function queryOne(string $sql, array $params = []): ?array {
+    public static function queryOne($sql, $params = []) {
         $stmt = self::getInstance()->prepare($sql);
         $stmt->execute($params);
         $row = $stmt->fetch();
@@ -60,29 +60,29 @@ class DB {
     }
 
     /** Return a single value from the first column of the first row */
-    public static function queryValue(string $sql, array $params = []) {
+    public static function queryValue($sql, $params = []) {
         $stmt = self::getInstance()->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchColumn();
     }
 
     /** Execute INSERT/UPDATE/DELETE and return affected rows */
-    public static function execute(string $sql, array $params = []): int {
+    public static function execute($sql, $params = []) {
         $stmt = self::getInstance()->prepare($sql);
         $stmt->execute($params);
         return $stmt->rowCount();
     }
 
     /** INSERT and return last insert ID */
-    public static function insert(string $sql, array $params = []): string {
+    public static function insert($sql, $params = []) {
         $stmt = self::getInstance()->prepare($sql);
         $stmt->execute($params);
         return self::getInstance()->lastInsertId();
     }
 
-    public static function beginTransaction(): void  { self::getInstance()->beginTransaction(); }
-    public static function commit(): void             { self::getInstance()->commit(); }
-    public static function rollback(): void           { self::getInstance()->rollBack(); }
+    public static function beginTransaction() { self::getInstance()->beginTransaction(); }
+    public static function commit()           { self::getInstance()->commit(); }
+    public static function rollback()         { self::getInstance()->rollBack(); }
 }
 
 /**

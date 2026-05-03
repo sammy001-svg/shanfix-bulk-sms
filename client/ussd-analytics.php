@@ -15,12 +15,49 @@ if ($codeId > 0) {
     if (!$check) $codeId = 0;
 }
 
+// Fetch Real Stats
+$whereCode = $codeId > 0 ? "AND code_id = $codeId" : "";
+
+$totalReq = DB::queryValue("SELECT COUNT(*) FROM ussd_requests WHERE user_id = ? $whereCode", [$uid]) ?: 0;
+$successReq = DB::queryValue("SELECT COUNT(*) FROM ussd_requests WHERE user_id = ? AND http_status = 200 $whereCode", [$uid]) ?: 0;
+$totalSess = DB::queryValue("SELECT COUNT(*) FROM ussd_sessions WHERE user_id = ? $whereCode", [$uid]) ?: 0;
+$successSess = DB::queryValue("SELECT COUNT(*) FROM ussd_sessions WHERE user_id = ? AND status != 'timed_out' $whereCode", [$uid]) ?: 0;
+
 $stats = [
-    'total_requests' => 45280,
-    'success_rate_req' => 99.2,
-    'total_sessions' => 12450,
-    'success_rate_sess' => 97.8,
+    'total_requests'    => $totalReq,
+    'success_rate_req'  => $totalReq > 0 ? round(($successReq / $totalReq) * 100, 1) : 100,
+    'total_sessions'    => $totalSess,
+    'success_rate_sess' => $totalSess > 0 ? round(($successSess / $totalSess) * 100, 1) : 100,
 ];
+
+// Fetch Chart Data (7 Days)
+$trafficData = DB::query("
+    SELECT DATE(created_at) as day, COUNT(*) as total 
+    FROM ussd_requests 
+    WHERE user_id = ? $whereCode AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) 
+    GROUP BY day ORDER BY day ASC
+", [$uid]);
+
+$trafficLabels = json_encode(array_column($trafficData, 'day'));
+$trafficValues = json_encode(array_column($trafficData, 'total'));
+
+// Status Distribution
+$statusData = DB::query("
+    SELECT http_status, COUNT(*) as total 
+    FROM ussd_requests 
+    WHERE user_id = ? $whereCode 
+    GROUP BY http_status
+", [$uid]);
+
+// Top Sessions by Code
+$topCodes = DB::query("
+    SELECT c.requested_code, COUNT(s.id) as sessions 
+    FROM ussd_codes c 
+    LEFT JOIN ussd_sessions s ON c.id = s.code_id 
+    WHERE c.user_id = ? 
+    GROUP BY c.id 
+    ORDER BY sessions DESC LIMIT 5
+", [$uid]);
 ?>
 
 <style>
@@ -137,13 +174,13 @@ $stats = [
             <table class="clean-table">
                 <thead><tr><th>USSD CODE</th><th style="text-align:right">SESSIONS</th></tr></thead>
                 <tbody>
-                    <?php if (empty($myCodes)): ?>
+                    <?php if (empty($topCodes)): ?>
                         <tr><td colspan="2" style="text-align:center; padding:20px; color:var(--text-muted)">No active services</td></tr>
                     <?php else: ?>
-                        <?php foreach (array_slice($myCodes, 0, 4) as $c): ?>
+                        <?php foreach ($topCodes as $tc): ?>
                         <tr>
-                            <td style="font-weight:700"><?= $c['requested_code'] ?></td>
-                            <td style="text-align:right"><?= number_format(rand(1200, 5000)) ?></td>
+                            <td style="font-weight:700"><?= htmlspecialchars($tc['requested_code']) ?></td>
+                            <td style="text-align:right"><?= number_format($tc['sessions']) ?></td>
                         </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -228,10 +265,10 @@ document.addEventListener('DOMContentLoaded', function() {
     new Chart(document.getElementById('trafficReqChart'), {
         type: 'line',
         data: {
-            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            labels: <?= $trafficLabels ?> || ['No Data'],
             datasets: [{
                 label: 'Requests',
-                data: [3200, 4100, 3800, 5200, 4900, 3600, 4800],
+                data: <?= $trafficValues ?> || [0],
                 borderColor: '#3b82f6',
                 borderWidth: 3,
                 backgroundColor: (context) => {

@@ -37,7 +37,7 @@ $totalPages=ceil($total/$perPage);
   <!-- Contacts table -->
   <div class="card">
     <div class="card-header">
-      <h3 class="card-title"><i class="fa-solid fa-users" style="color:var(--primary)"></i> <?=$groupId?htmlspecialchars(array_values(array_filter($groups,fn($g)=>$g['id']===$groupId))[0]['name']??'Contacts'):'All Contacts'?></h3>
+      <h3 class="card-title"><i class="fa-solid fa-users" style="color:var(--primary)"></i> <?=$groupId?htmlspecialchars(array_values(array_filter($groups,function($g) use ($groupId) { return $g['id']===$groupId;}))[0]['name']??'Contacts'):'All Contacts'?></h3>
       <form method="GET" style="display:flex;gap:8px"><input type="hidden" name="group" value="<?=$groupId?>"><div class="input-group"><div class="input-group-text input-addon-left"><i class="fa-solid fa-magnifying-glass"></i></div><input type="text" name="q" class="form-control with-left" placeholder="Search..." value="<?=htmlspecialchars($search)?>" style="width:180px"></div><button class="btn btn-primary btn-sm"><i class="fa-solid fa-filter"></i></button></form>
     </div>
     <div class="table-wrapper">

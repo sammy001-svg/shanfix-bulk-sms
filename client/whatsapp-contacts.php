@@ -55,7 +55,7 @@ $totalPages = ceil($total/$perPage);
     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center">
       <h3 class="card-title">
         <i class="fa-solid fa-address-book" style="color:var(--primary)"></i> 
-        <?= $groupId ? htmlspecialchars(array_values(array_filter($groups, fn($g)=>$g['id']===$groupId))[0]['name']??'Contacts') : 'All Contacts' ?>
+        <?= $groupId ? htmlspecialchars(array_values(array_filter($groups, function($g) use ($groupId) { return $g['id']===$groupId; }))[0]['name']??'Contacts') : 'All Contacts' ?>
       </h3>
       <form method="GET" style="display:flex; gap:10px">
         <input type="hidden" name="group" value="<?= $groupId ?>">

@@ -4,7 +4,7 @@
  * Expects: $pageTitle (string), $breadcrumb (array of ['label'=>'', 'url'=>''])
  */
 $user = current_user();
-$initials = implode('', array_map(fn($w) => strtoupper($w[0]),
+$initials = implode('', array_map(function($w) { return strtoupper($w[0]); },
     array_slice(explode(' ', $user['name'] ?? 'U'), 0, 2)
 ));
 ?>
@@ -74,12 +74,12 @@ $initials = implode('', array_map(fn($w) => strtoupper($w[0]),
           <?php else: ?>
             <?php foreach ($notifs as $n): ?>
               <?php 
-                $icon = match($n['type']) {
-                  'success' => 'fa-check-circle',
-                  'warning' => 'fa-exclamation-triangle',
-                  'danger'  => 'fa-times-circle',
-                  default   => 'fa-info-circle'
-                };
+                switch ($n['type']) {
+                  case 'success': $icon = 'fa-check-circle'; break;
+                  case 'warning': $icon = 'fa-exclamation-triangle'; break;
+                  case 'danger':  $icon = 'fa-times-circle'; break;
+                  default:        $icon = 'fa-info-circle'; break;
+                }
                 $color = "var(--{$n['type']})";
               ?>
               <div class="dropdown-item" style="flex-direction:column; align-items:start; padding:10px 14px">
@@ -144,12 +144,12 @@ $initials = implode('', array_map(fn($w) => strtoupper($w[0]),
 
         <div style="margin-bottom:15px">
           <?php 
-            $pIcon = match($n['type']) {
-              'success' => 'fa-circle-check',
-              'warning' => 'fa-triangle-exclamation',
-              'danger'  => 'fa-circle-xmark',
-              default   => 'fa-circle-info'
-            };
+            switch ($n['type']) {
+              case 'success': $pIcon = 'fa-circle-check'; break;
+              case 'warning': $pIcon = 'fa-triangle-exclamation'; break;
+              case 'danger':  $pIcon = 'fa-circle-xmark'; break;
+              default:        $pIcon = 'fa-circle-info'; break;
+            }
           ?>
           <i class="fa-solid <?= $pIcon ?>" style="font-size:48px; color:var(--<?= $n['type'] ?>); margin-bottom:15px"></i>
           <h2 style="margin-bottom:10px"><?= htmlspecialchars($n['title']) ?></h2>

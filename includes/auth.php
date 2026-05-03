@@ -21,7 +21,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // ─── Auth Functions ───────────────────────────────────────────────────────────
 
-function auth_login(string $email, string $password): array|false {
+function auth_login($email, $password) {
     $user = DB::queryOne(
         "SELECT * FROM users WHERE email = ? AND status = 'active' LIMIT 1",
         [$email]
@@ -40,7 +40,7 @@ function auth_login(string $email, string $password): array|false {
     return false;
 }
 
-function auth_logout(): void {
+function auth_logout() {
     $_SESSION = [];
     if (ini_get("session.use_cookies")) {
         $p = session_get_cookie_params();
@@ -53,7 +53,7 @@ function auth_logout(): void {
     exit;
 }
 
-function auth_user(): ?array {
+function auth_user() {
     // Check session timeout
     if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > SESSION_TIMEOUT)) {
         auth_logout();
@@ -75,15 +75,15 @@ function auth_user(): ?array {
     return null;
 }
 
-function is_logged_in(): bool {
+function is_logged_in() {
     return auth_user() !== null;
 }
 
-function current_user(): ?array {
+function current_user() {
     return auth_user();
 }
 
-function current_role(): ?string {
+function current_role() {
     return auth_user()['role'] ?? null;
 }
 
@@ -91,7 +91,7 @@ function current_role(): ?string {
  * Require the user to be logged in AND have the given role.
  * Redirects to login if not authenticated, or to dashboard if wrong role.
  */
-function require_role(string ...$roles): void {
+function require_role(...$roles) {
     $user = auth_user();
     if (!$user) {
         header('Location: /login.php?expired=1');
@@ -113,7 +113,7 @@ function require_role(string ...$roles): void {
  * Auto-redirect logged-in user to their panel dashboard.
  * Call this on login.php to skip login if already authenticated.
  */
-function redirect_if_logged_in(): void {
+function redirect_if_logged_in() {
     $user = auth_user();
     if ($user) {
         switch ($user['role']) {
@@ -129,38 +129,38 @@ function redirect_if_logged_in(): void {
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
-function csrf_token(): string {
+function csrf_token() {
     if (empty($_SESSION['csrf_token'])) {
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     }
     return $_SESSION['csrf_token'];
 }
 
-function csrf_field(): string {
+function csrf_field() {
     return '<input type="hidden" name="csrf_token" value="' . csrf_token() . '">';
 }
 
-function csrf_verify(): bool {
+function csrf_verify() {
     $token = $_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
     return !empty($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
 }
 
-function validate_csrf(string $token): bool {
+function validate_csrf($token) {
     return !empty($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
 }
 
-function sanitize(string $str): string {
+function sanitize($str) {
     return htmlspecialchars(strip_tags(trim($str)), ENT_QUOTES, 'UTF-8');
 }
 
-function json_response(array $data, int $code = 200): void {
+function json_response($data, $code = 200) {
     http_response_code($code);
     header('Content-Type: application/json');
     echo json_encode($data);
     exit;
 }
 
-function redirect(string $url, int $code = 302): void {
+function redirect($url, $code = 302) {
     http_response_code($code);
     header("Location: $url");
     exit;
@@ -182,7 +182,7 @@ function flash_get(): ?array {
  * Create a new notification.
  * @param int|null $userId Specific user ID or NULL for all users (broadcast).
  */
-function notify(?int $userId, string $title, string $message, string $type = 'info', bool $isPopup = false, ?string $imageUrl = null): int|false {
+function notify($userId, $title, $message, $type = 'info', $isPopup = false, $imageUrl = null) {
     $res = DB::insert(
         "INSERT INTO notifications (user_id, title, message, type, is_popup, image_url, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())",
         [$userId, $title, $message, $type, $isPopup ? 1 : 0, $imageUrl]
@@ -193,7 +193,7 @@ function notify(?int $userId, string $title, string $message, string $type = 'in
 /**
  * Get all unread notifications for a user (including broadcasts not yet read).
  */
-function get_unread_notifications(int $userId): array {
+function get_unread_notifications($userId) {
     // 1. Get personal notifications not in interactions (or marked not read)
     // 2. Get broadcast (user_id IS NULL) notifications not in interactions (or marked not read)
     $sql = "SELECT n.* FROM notifications n 
@@ -208,7 +208,7 @@ function get_unread_notifications(int $userId): array {
 /**
  * Mark a notification as read for a specific user.
  */
-function mark_notification_read(int $userId, int $notificationId): bool {
+function mark_notification_read($userId, $notificationId) {
     return DB::execute(
         "INSERT INTO notification_interactions (user_id, notification_id, is_read) 
          VALUES (?, ?, 1) 
@@ -220,7 +220,7 @@ function mark_notification_read(int $userId, int $notificationId): bool {
 /**
  * Dismiss a notification (wont show up in popups or header anymore).
  */
-function dismiss_notification(int $userId, int $notificationId): bool {
+function dismiss_notification($userId, $notificationId) {
     return DB::execute(
         "INSERT INTO notification_interactions (user_id, notification_id, is_dismissed) 
          VALUES (?, ?, 1) 
@@ -233,7 +233,7 @@ function dismiss_notification(int $userId, int $notificationId): bool {
  * Get persistent popup notifications for the dashboard.
  * Ignores the dismissed/read status to ensure they show on every refresh.
  */
-function get_dashboard_popups(int $userId): array {
+function get_dashboard_popups($userId) {
     return DB::query(
         "SELECT * FROM notifications 
          WHERE is_popup = 1 
@@ -248,7 +248,7 @@ function get_dashboard_popups(int $userId): array {
 /**
  * Generate a new set of API credentials for a user.
  */
-function generate_user_api_keys(int $userId): bool {
+function generate_user_api_keys($userId) {
     // Client ID format: SHX + 5-digit padded ID + 4 random hex chars
     $clientId = 'SHX' . str_pad($userId, 5, '0', STR_PAD_LEFT) . strtoupper(bin2hex(random_bytes(2)));
     
@@ -264,7 +264,7 @@ function generate_user_api_keys(int $userId): bool {
 /**
  * Validate API credentials and return the user record if valid.
  */
-function validate_api_credentials(string $clientId, string $apiKey): ?array {
+function validate_api_credentials($clientId, $apiKey) {
     $user = DB::queryOne(
         "SELECT * FROM users WHERE api_client_id = ? AND api_key = ? AND status = 'active' LIMIT 1",
         [$clientId, $apiKey]

@@ -79,7 +79,7 @@ $rules = DB::query("
     ORDER BY r.parent_id ASC, r.trigger_count DESC, r.created_at DESC
 ", [$uid]);
 
-$menuOptions = array_filter($rules, fn($r) => $r['is_menu'] == 1);
+$menuOptions = array_filter($rules, function($r) { return $r['is_menu'] == 1; });
 
 // Fetch Dynamic Data Tables
 $dataTables = DB::query("SELECT table_name FROM whatsapp_custom_data WHERE user_id = ? GROUP BY table_name", [$uid]);
@@ -144,9 +144,9 @@ $dataTables = DB::query("SELECT table_name FROM whatsapp_custom_data WHERE user_
 
     <?php 
     // Group rules by parent to show hierarchy
-    $parentRules = array_filter($rules, fn($r) => !$r['parent_id']);
+    $parentRules = array_filter($rules, function($r) { return !$r['parent_id']; });
     foreach ($parentRules as $pr): 
-        $children = array_filter($rules, fn($r) => $r['parent_id'] == $pr['id']);
+        $children = array_filter($rules, function($r) use ($pr) { return $r['parent_id'] == $pr['id']; });
     ?>
         <div class="card automation-card" style="margin-bottom:12px">
             <div class="rule-header">
