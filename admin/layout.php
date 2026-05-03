@@ -16,7 +16,7 @@ $navItems = [
   ['type'=>'section','label'=>'MANAGEMENT'],
   [
     'id'=>'users', 'icon'=>'<i class="fa-solid fa-users"></i>', 'label'=>'Users',
-    'active'=> str_contains($_SERVER['PHP_SELF'], '/users'),
+    'active'=> (strpos($_SERVER['PHP_SELF'], '/users') !== false),
     'children'=>[
       ['icon'=>'<i class="fa-solid fa-store"></i>',      'label'=>'Resellers',       'url'=>'/admin/resellers.php'],
       ['icon'=>'<i class="fa-solid fa-user"></i>',       'label'=>'Clients',          'url'=>'/admin/clients.php'],
@@ -34,7 +34,7 @@ $navItems = [
   ['icon'=>'<i class="fa-solid fa-envelope-open-text"></i>','label'=>'Message Logs', 'url'=>'/admin/logs.php'],
   [
     'id'=>'ussd','icon'=>'<i class="fa-solid fa-hashtag"></i>','label'=>'USSD',
-    'active'=> str_contains($_SERVER['PHP_SELF'], '/ussd'),
+    'active'=> (strpos($_SERVER['PHP_SELF'], '/ussd') !== false),
     'badge'=> ($pendingUssdRequests ?? 0) > 0 ? ($pendingUssdRequests ?? 0) : null,
     'children'=>[
       ['icon'=>'<i class="fa-solid fa-plus"></i>',          'label'=>'Request USSD Code', 'url'=>'/admin/ussd-requests.php'],
@@ -46,7 +46,7 @@ $navItems = [
   ],
   [
     'id'=>'whatsapp','icon'=>'<i class="fa-brands fa-whatsapp"></i>','label'=>'WhatsApp Hub',
-    'active'=> str_contains($_SERVER['PHP_SELF'], '/whatsapp'),
+    'active'=> (strpos($_SERVER['PHP_SELF'], '/whatsapp') !== false),
     'children'=>[
       ['icon'=>'<i class="fa-solid fa-list"></i>',          'label'=>'Service Overview',  'url'=>'/admin/whatsapp-management.php'],
       ['icon'=>'<i class="fa-solid fa-tags"></i>',          'label'=>'Global Pricing',    'url'=>'/admin/whatsapp-pricing.php'],

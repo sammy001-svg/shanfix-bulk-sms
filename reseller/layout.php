@@ -12,7 +12,7 @@ $navItems = [
   ['type'=>'section','label'=>'SMS'],
   [
     'id'=>'sms', 'icon'=>'<i class="fa-solid fa-paper-plane"></i>', 'label'=>'SMS & Campaigns',
-    'active'=> str_contains($_SERVER['PHP_SELF'], '/campaign') || str_contains($_SERVER['PHP_SELF'], '/send'),
+    'active'=> (strpos($_SERVER['PHP_SELF'], '/campaign') !== false) || (strpos($_SERVER['PHP_SELF'], '/send') !== false),
     'children'=>[
       ['icon'=>'<i class="fa-solid fa-plus-circle"></i>',    'label'=>'Send SMS',        'url'=>'/reseller/send-sms.php'],
       ['icon'=>'<i class="fa-solid fa-bullhorn"></i>',       'label'=>'Campaigns',        'url'=>'/reseller/campaigns.php'],
@@ -21,7 +21,7 @@ $navItems = [
   ],
   [
     'id'=>'contacts','icon'=>'<i class="fa-solid fa-address-book"></i>','label'=>'Contacts & Groups',
-    'active'=> str_contains($_SERVER['PHP_SELF'], '/contact') || str_contains($_SERVER['PHP_SELF'], '/group'),
+    'active'=> (strpos($_SERVER['PHP_SELF'], '/contact') !== false) || (strpos($_SERVER['PHP_SELF'], '/group') !== false),
     'children'=>[
       ['icon'=>'<i class="fa-solid fa-users"></i>',  'label'=>'All Contacts', 'url'=>'/reseller/contacts.php'],
       ['icon'=>'<i class="fa-solid fa-layer-group"></i>','label'=>'Groups',  'url'=>'/reseller/groups.php'],
@@ -39,7 +39,7 @@ $navItems = [
   ['icon'=>'<i class="fa-solid fa-chart-bar"></i>',   'label'=>'Reports',        'url'=>'/reseller/reports.php'],
   [
     'id'=>'ussd','icon'=>'<i class="fa-solid fa-hashtag"></i>','label'=>'USSD',
-    'active'=> str_contains($_SERVER['PHP_SELF'], '/ussd'),
+    'active'=> (strpos($_SERVER['PHP_SELF'], '/ussd') !== false),
     'children'=>[
       ['icon'=>'<i class="fa-solid fa-plus"></i>',          'label'=>'Request USSD Code', 'url'=>'/reseller/ussd-request.php'],
       ['icon'=>'<i class="fa-solid fa-list-ol"></i>',       'label'=>'USSD Codes',        'url'=>'/reseller/ussd-codes.php'],
@@ -51,7 +51,7 @@ $navItems = [
   ],
   [
     'id'=>'whatsapp','icon'=>'<i class="fa-brands fa-whatsapp"></i>','label'=>'WhatsApp Hub',
-    'active'=> str_contains($_SERVER['PHP_SELF'], '/whatsapp'),
+    'active'=> (strpos($_SERVER['PHP_SELF'], '/whatsapp') !== false),
     'children'=>[
       ['icon'=>'<i class="fa-solid fa-link"></i>',          'label'=>'Connect Account',   'url'=>'/reseller/whatsapp-connect.php'],
       ['icon'=>'<i class="fa-solid fa-paper-plane"></i>',   'label'=>'Bulk Messaging',    'url'=>'/reseller/whatsapp-bulk.php'],

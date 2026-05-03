@@ -32,7 +32,7 @@ $selfService = DB::query("SELECT * FROM whatsapp_self_service WHERE user_id = ? 
 
 foreach ($selfService as $ss) {
     $keyword = strtoupper($ss['trigger_keyword']);
-    if (str_starts_with(strtoupper($text), $keyword)) {
+    if (strpos(strtoupper($text), $keyword) === 0) {
         handleSelfService($ss, $text, $from, $uid, $instanceId, $account['id']);
         exit;
     }
@@ -46,8 +46,8 @@ foreach ($rules as $rule) {
     $msgText = strtoupper($text);
     
     if ($rule['match_type'] === 'exact' && $msgText === $keyword) $match = true;
-    elseif ($rule['match_type'] === 'contains' && str_contains($msgText, $keyword)) $match = true;
-    elseif ($rule['match_type'] === 'starts_with' && str_starts_with($msgText, $keyword)) $match = true;
+    elseif ($rule['match_type'] === 'contains' && strpos($msgText, $keyword) !== false) $match = true;
+    elseif ($rule['match_type'] === 'starts_with' && strpos($msgText, $keyword) === 0) $match = true;
     
     if ($match) {
         $gw = new WhatsApp_Gateway($instanceId, "SIMULATED_TOKEN", $account['id']);
