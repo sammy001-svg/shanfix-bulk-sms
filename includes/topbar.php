@@ -91,8 +91,8 @@ $initials = implode('', array_map(function($w) { return strtoupper($w[0]); },
   <?php foreach ($popupNotifs as $n): ?>
     <div class="modal-overlay" id="notif-modal-<?= $n['id'] ?>">
       <div class="modal" style="max-width:500px; text-align:center; position:relative">
-        <button class="modal-close" onclick="closeModal('notif-modal-<?= $n['id'] ?>')" style="position:absolute; top:15px; right:15px; background:none; border:none; cursor:pointer; font-size:18px; color:var(--text-muted)">
-          <i class="fa-solid fa-xmark"></i>
+        <button type="button" class="modal-close" onclick="closeModal('notif-modal-<?= $n['id'] ?>')" style="position:absolute; top:15px; right:15px; background:none; border:none; cursor:pointer; font-size:20px; color:var(--text-muted); z-index:10">
+          <i class="fa-solid fa-xmark" style="pointer-events:none"></i>
         </button>
         
         <?php if ($n['image_url']): ?>
@@ -126,7 +126,9 @@ $initials = implode('', array_map(function($w) { return strtoupper($w[0]); },
   <div class="modal" style="max-width:600px">
     <div class="modal-header">
       <h3 class="modal-title"><i class="fa-solid fa-bell" style="color:var(--primary)"></i> Notifications</h3>
-      <button class="modal-close" onclick="closeModal('notificationModal')">&times;</button>
+      <button type="button" class="modal-close" onclick="closeModal('notificationModal')">
+        <i class="fa-solid fa-xmark" style="pointer-events:none"></i>
+      </button>
     </div>
     <div class="modal-body" style="max-height:60vh; overflow-y:auto; padding:0">
       <?php if (empty($notifs)): ?>
