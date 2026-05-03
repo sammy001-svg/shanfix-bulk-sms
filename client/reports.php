@@ -11,7 +11,7 @@ $to   = sanitize($_GET['to']   ?? date('Y-m-d'));
 $where  = "WHERE m.user_id=? AND DATE(m.created_at) BETWEEN ? AND ?";
 $params = [$uid, $from, $to];
 
-$summary = DB::queryOne("SELECT COUNT(*) as total, SUM(status='sent') as sent, SUM(status='delivered') as delivered, SUM(status='failed') as failed, COALESCE(SUM(units_charged),0) as units FROM messages m $where", $params);
+$summary = DB::queryOne("SELECT COUNT(*) as total, SUM(status='sent') as sent, SUM(status='sent' OR status='delivered') as delivered, SUM(status='failed') as failed, COALESCE(SUM(units_charged),0) as units FROM messages m $where", $params);
 
 $trend   = DB::query("SELECT DATE(created_at) as day, COUNT(*) as total FROM messages WHERE user_id=? AND created_at>=DATE_SUB(NOW(),INTERVAL 7 DAY) GROUP BY day ORDER BY day",[$uid]);
 $tLabels = json_encode(array_column($trend,'day'));
@@ -25,7 +25,11 @@ $totalPages=ceil($total/$perPage);
 ?>
 <div class="page-header">
   <div><h1>Reports</h1><div class="subtitle">Your message delivery reports</div></div>
-  <button onclick="downloadPDF(event)" class="btn btn-secondary"><i class="fa-solid fa-file-pdf"></i> Download PDF</button>
+  <div style="display:flex; gap:10px">
+    <a href="/client/actions/download-report.php?from=<?=$from?>&to=<?=$to?>&format=csv" class="btn btn-outline" title="Download CSV"><i class="fa-solid fa-file-csv"></i> CSV</a>
+    <a href="/client/actions/download-report.php?from=<?=$from?>&to=<?=$to?>&format=excel" class="btn btn-outline" title="Download Excel"><i class="fa-solid fa-file-excel"></i> Excel</a>
+    <button onclick="downloadPDF(event)" class="btn btn-secondary"><i class="fa-solid fa-file-pdf"></i> Download PDF</button>
+  </div>
 </div>
 <div id="report-content">
 <div class="card" style="margin-bottom:18px">
@@ -52,7 +56,7 @@ $totalPages=ceil($total/$perPage);
   <div class="card-header"><h3 class="card-title"><i class="fa-solid fa-file-lines" style="color:var(--primary)"></i> Message Log <span class="badge badge-muted"><?=$total?></span></h3></div>
   <div class="table-wrapper">
     <table class="data-table">
-      <thead><tr><th>Sender ID</th><th>Recipient</th><th>Message</th><th>Units</th><th>Status</th><th>Date</th></tr></thead>
+      <thead><tr><th>Sender ID</th><th>Recipient</th><th>Message</th><th>Units</th><th>Status</th><th>Delivered At</th><th>Created</th></tr></thead>
       <tbody>
         <?php if (empty($messages)): ?>
           <tr><td colspan="6" class="text-center text-muted" style="padding:30px">No messages found for selected period</td></tr>
@@ -64,6 +68,7 @@ $totalPages=ceil($total/$perPage);
             <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text-secondary)"><?=htmlspecialchars($m['message'])?></td>
             <td><?=$m['units_charged']?></td>
             <td><span class="badge badge-<?=$sc?>"><?=ucfirst($m['status'])?></span></td>
+            <td style="font-size:11px"><?=$m['sent_at']?date('d M Y H:i',strtotime($m['sent_at'])):'—'?></td>
             <td style="font-size:11px"><?=$m['created_at']?date('d M Y H:i',strtotime($m['created_at'])):'—'?></td>
           </tr>
         <?php endforeach; endif; ?>
