@@ -52,55 +52,12 @@ $initials = implode('', array_map(function($w) { return strtoupper($w[0]); },
     $isDashboard = (basename($_SERVER['PHP_SELF']) === 'index.php');
     $popupNotifs = $isDashboard ? get_dashboard_popups($user['id']) : [];
     ?>
-    <div class="dropdown" id="notifDropdown">
-      <div class="icon-btn" onclick="toggleDropdown('notifDropdown')" title="Notifications">
+    <div class="notifications-wrapper">
+      <div class="icon-btn" onclick="openModal('notificationModal')" title="Notifications">
         <i class="fa-regular fa-bell"></i>
         <?php if ($notifCount > 0): ?>
-          <span class="badge"><?= $notifCount ?></span>
+          <span class="badge" id="notifBadge"><?= $notifCount ?></span>
         <?php endif; ?>
-      </div>
-      <div class="dropdown-menu">
-        <div style="padding:12px 14px;border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center">
-          <strong style="font-size:13px">Notifications</strong>
-          <?php if ($notifCount > 0): ?>
-            <span style="font-size:10px; color:var(--text-secondary)"><?= $notifCount ?> Unread</span>
-          <?php endif; ?>
-        </div>
-        <div style="max-height: 300px; overflow-y: auto;">
-          <?php if (empty($notifs)): ?>
-            <div class="dropdown-item" style="justify-content:center; color:var(--text-secondary); font-size:12px; padding:20px 0">
-              No new notifications
-            </div>
-          <?php else: ?>
-            <?php foreach ($notifs as $n): ?>
-              <?php 
-                switch ($n['type']) {
-                  case 'success': $icon = 'fa-check-circle'; break;
-                  case 'warning': $icon = 'fa-exclamation-triangle'; break;
-                  case 'danger':  $icon = 'fa-times-circle'; break;
-                  default:        $icon = 'fa-info-circle'; break;
-                }
-                $color = "var(--{$n['type']})";
-              ?>
-              <div class="dropdown-item" style="flex-direction:column; align-items:start; padding:10px 14px">
-                <div style="display:flex; align-items:start; gap:10px; width:100%">
-                  <i class="fa-solid <?= $icon ?>" style="color:<?= $color ?>; margin-top:3px"></i>
-                  <div style="flex:1">
-                    <div style="font-weight:600; font-size:12.5px"><?= htmlspecialchars($n['title']) ?></div>
-                    <div style="font-size:11.5px; color:var(--text-secondary); line-height:1.4; margin-top:2px">
-                      <?= htmlspecialchars($n['message']) ?>
-                    </div>
-                    <div style="font-size:10px; color:var(--text-muted); margin-top:5px">
-                      <?= date('M j, H:i', strtotime($n['created_at'])) ?>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            <?php endforeach; ?>
-          <?php endif; ?>
-        </div>
-        <div class="dropdown-divider"></div>
-        <a href="#" class="dropdown-item text-primary-color" style="justify-content:center;font-size:12px" onclick="markAllAsRead()">Mark all as read</a>
       </div>
     </div>
 
@@ -164,6 +121,55 @@ $initials = implode('', array_map(function($w) { return strtoupper($w[0]); },
   <?php endforeach; ?>
 <?php endif; ?>
 
+<!-- Notifications Modal -->
+<div class="modal-overlay" id="notificationModal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <h3 class="modal-title"><i class="fa-solid fa-bell" style="color:var(--primary)"></i> Notifications</h3>
+      <button class="modal-close" onclick="closeModal('notificationModal')">&times;</button>
+    </div>
+    <div class="modal-body" style="max-height:60vh; overflow-y:auto; padding:0">
+      <?php if (empty($notifs)): ?>
+        <div style="text-align:center; padding:40px 20px; color:var(--text-muted)">
+          <i class="fa-regular fa-bell-slash" style="font-size:48px; margin-bottom:15px; opacity:0.3"></i>
+          <p>You have no unread notifications.</p>
+        </div>
+      <?php else: ?>
+        <div id="notifList">
+          <?php foreach ($notifs as $n): ?>
+            <?php 
+              switch ($n['type']) {
+                case 'success': $icon = 'fa-circle-check'; break;
+                case 'warning': $icon = 'fa-triangle-exclamation'; break;
+                case 'danger':  $icon = 'fa-circle-xmark'; break;
+                default:        $icon = 'fa-circle-info'; break;
+              }
+              $color = "var(--{$n['type']})";
+            ?>
+            <div style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; gap:15px">
+              <i class="fa-solid <?= $icon ?>" style="font-size:20px; color:<?= $color ?>; margin-top:3px"></i>
+              <div style="flex:1">
+                <div style="font-weight:700; font-size:14px; margin-bottom:4px"><?= htmlspecialchars($n['title']) ?></div>
+                <div style="font-size:13px; color:var(--text-secondary); line-height:1.5"><?= nl2br(htmlspecialchars($n['message'])) ?></div>
+                <div style="font-size:11px; color:var(--text-muted); margin-top:8px"><?= date('M j, Y — H:i', strtotime($n['created_at'])) ?></div>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+    <div class="modal-footer" style="padding:15px 20px; display:flex; justify-content:flex-end">
+      <?php if (!empty($notifs)): ?>
+        <button class="btn btn-primary" id="markAllBtn" onclick="markAllAsRead()">
+          <i class="fa-solid fa-check-double"></i> Mark all as read
+        </button>
+      <?php else: ?>
+        <button class="btn btn-muted" onclick="closeModal('notificationModal')">Close</button>
+      <?php endif; ?>
+    </div>
+  </div>
+</div>
+
 <script>
 function dismissNotif(id) {
     fetch('/includes/actions/notifications.php?action=dismiss&id=' + id)
@@ -173,8 +179,45 @@ function dismissNotif(id) {
 }
 
 function markAllAsRead() {
+    const btn = document.getElementById('markAllBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+    }
+
     fetch('/includes/actions/notifications.php?action=read_all')
-        .then(() => location.reload());
+        .then(response => {
+            // Hide the badge instantly
+            const badge = document.getElementById('notifBadge');
+            if (badge) badge.style.display = 'none';
+
+            // Show success in modal
+            const notifList = document.getElementById('notifList');
+            if (notifList) {
+                notifList.innerHTML = `
+                    <div style="text-align:center; padding:40px 20px; color:var(--text-muted)">
+                        <i class="fa-regular fa-bell-slash" style="font-size:48px; margin-bottom:15px; opacity:0.3"></i>
+                        <p>All notifications marked as read.</p>
+                    </div>
+                `;
+            }
+            
+            if (btn) {
+                btn.style.display = 'none';
+            }
+
+            // Optional: Close modal after a delay
+            setTimeout(() => {
+                closeModal('notificationModal');
+            }, 1500);
+        })
+        .catch(err => {
+            console.error('Error marking notifications as read:', err);
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-check-double"></i> Mark all as read';
+            }
+        });
 }
 
 // Auto-show popup modals on load
