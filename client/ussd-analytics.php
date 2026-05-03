@@ -1,4 +1,5 @@
 <?php
+try {
 $pageTitle = 'USSD Analytics';
 $breadcrumb = [['label'=>'USSD'],['label'=>'Analytics']];
 require_once __DIR__ . '/layout.php';
@@ -7,7 +8,7 @@ $uid = $user['id'];
 $codeId = (int)($_GET['code'] ?? 0);
 
 // Fetch User's Codes
-$myCodes = DB::query("SELECT id, requested_code FROM ussd_codes WHERE user_id = ? AND status = 'approved'", [$uid]);
+$myCodes = DB::query("SELECT id, requested_code FROM ussd_codes WHERE user_id = ? AND status = 'approved'", [$uid]) ?: [];
 
 // If specific code selected, validate
 if ($codeId > 0) {
@@ -36,10 +37,10 @@ $trafficData = DB::query("
     FROM ussd_requests 
     WHERE user_id = ? $whereCode AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) 
     GROUP BY day ORDER BY day ASC
-", [$uid]);
+", [$uid]) ?: [];
 
-$trafficLabels = json_encode(array_column($trafficData, 'day'));
-$trafficValues = json_encode(array_column($trafficData, 'total'));
+$trafficLabels = json_encode(array_column($trafficData, 'day')) ?: '[]';
+$trafficValues = json_encode(array_column($trafficData, 'total')) ?: '[]';
 
 // Status Distribution
 $statusData = DB::query("
@@ -47,7 +48,7 @@ $statusData = DB::query("
     FROM ussd_requests 
     WHERE user_id = ? $whereCode 
     GROUP BY http_status
-", [$uid]);
+", [$uid]) ?: [];
 
 // Top Sessions by Code
 $topCodes = DB::query("
@@ -57,7 +58,7 @@ $topCodes = DB::query("
     WHERE c.user_id = ? 
     GROUP BY c.id 
     ORDER BY sessions DESC LIMIT 5
-", [$uid]);
+", [$uid]) ?: [];
 ?>
 
 <style>
@@ -239,113 +240,136 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    new Chart(document.getElementById('gaugeReq'), gaugeConfig(<?= $stats['success_rate_req'] ?>, '#10b981'));
-    new Chart(document.getElementById('gaugeSess'), gaugeConfig(<?= $stats['success_rate_sess'] ?>, '#3b82f6'));
+    if (document.getElementById('gaugeReq')) {
+        new Chart(document.getElementById('gaugeReq'), gaugeConfig(<?= (float)$stats['success_rate_req'] ?>, '#10b981'));
+    }
+    if (document.getElementById('gaugeSess')) {
+        new Chart(document.getElementById('gaugeSess'), gaugeConfig(<?= (float)$stats['success_rate_sess'] ?>, '#3b82f6'));
+    }
 
     // 2. Status Code Distribution (Doughnut)
-    new Chart(document.getElementById('statusChart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['200 OK', 'Others'],
-            datasets: [{
-                data: [98, 2],
-                backgroundColor: ['#10b981', '#f59e0b'],
-                borderWidth: 2,
-                borderColor: '#fff',
-                cutout: '70%'
-            }]
-        },
-        options: {
-            plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 8, usePointStyle: true, font: { size: 10 } } } },
-            maintainAspectRatio: false
-        }
-    });
+    if (document.getElementById('statusChart')) {
+        new Chart(document.getElementById('statusChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ['200 OK', 'Others'],
+                datasets: [{
+                    data: [98, 2],
+                    backgroundColor: ['#10b981', '#f59e0b'],
+                    borderWidth: 2,
+                    borderColor: '#fff',
+                    cutout: '70%'
+                }]
+            },
+            options: {
+                plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 8, usePointStyle: true, font: { size: 10 } } } },
+                maintainAspectRatio: false
+            }
+        });
+    }
 
     // 3. Daily Traffic (Requests) - Area Chart
-    new Chart(document.getElementById('trafficReqChart'), {
-        type: 'line',
-        data: {
-            labels: <?= $trafficLabels ?> || ['No Data'],
-            datasets: [{
-                label: 'Requests',
-                data: <?= $trafficValues ?> || [0],
-                borderColor: '#3b82f6',
-                borderWidth: 3,
-                backgroundColor: (context) => {
-                    const ctx = context.chart.ctx;
-                    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-                    gradient.addColorStop(0, 'rgba(59, 130, 246, 0.2)');
-                    gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
-                    return gradient;
-                },
-                fill: true,
-                tension: 0.4,
-                pointRadius: 0,
-                pointHoverRadius: 6,
-                pointHoverBackgroundColor: '#3b82f6',
-                pointHoverBorderColor: '#fff',
-                pointHoverBorderWidth: 3
-            }]
-        },
-        options: {
-            plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
-            scales: { 
-                y: { beginAtZero: true, grid: { borderDash: [5, 5], drawBorder: false }, ticks: { font: { size: 10 } } },
-                x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+    if (document.getElementById('trafficReqChart')) {
+        new Chart(document.getElementById('trafficReqChart'), {
+            type: 'line',
+            data: {
+                labels: <?= $trafficLabels ?> || ['No Data'],
+                datasets: [{
+                    label: 'Requests',
+                    data: <?= $trafficValues ?> || [0],
+                    borderColor: '#3b82f6',
+                    borderWidth: 3,
+                    backgroundColor: (context) => {
+                        const ctx = context.chart.ctx;
+                        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                        gradient.addColorStop(0, 'rgba(59, 130, 246, 0.2)');
+                        gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+                        return gradient;
+                    },
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 6,
+                    pointHoverBackgroundColor: '#3b82f6',
+                    pointHoverBorderColor: '#fff',
+                    pointHoverBorderWidth: 3
+                }]
             },
-            maintainAspectRatio: false
-        }
-    });
+            options: {
+                plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+                scales: { 
+                    y: { beginAtZero: true, grid: { borderDash: [5, 5], drawBorder: false }, ticks: { font: { size: 10 } } },
+                    x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+                },
+                maintainAspectRatio: false
+            }
+        });
+    }
 
     // 4. Daily Traffic (Sessions) - Bar Chart
-    new Chart(document.getElementById('trafficSessChart'), {
-        type: 'bar',
-        data: {
-            labels: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
-            datasets: [{
-                data: [800, 1100, 950, 1300, 1200, 750, 1000],
-                backgroundColor: '#6366f1',
-                borderRadius: 6,
-                barThickness: 15
-            }]
-        },
-        options: {
-            plugins: { legend: { display: false } },
-            scales: { 
-                y: { display: false },
-                x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+    if (document.getElementById('trafficSessChart')) {
+        new Chart(document.getElementById('trafficSessChart'), {
+            type: 'bar',
+            data: {
+                labels: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+                datasets: [{
+                    data: [800, 1100, 950, 1300, 1200, 750, 1000],
+                    backgroundColor: '#6366f1',
+                    borderRadius: 6,
+                    barThickness: 15
+                }]
             },
-            maintainAspectRatio: false
-        }
-    });
+            options: {
+                plugins: { legend: { display: false } },
+                scales: { 
+                    y: { display: false },
+                    x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+                },
+                maintainAspectRatio: false
+            }
+        });
+    }
 
     // 5. Realtime Log
     const logBox = document.getElementById('realtimeLog');
-    const uCodes = <?= json_encode(array_column($myCodes, 'requested_code')) ?>;
-    if (uCodes.length === 0) uCodes.push('*384*10#', '*888#');
+    if (logBox) {
+        const uCodes = <?= json_encode(array_column($myCodes, 'requested_code')) ?>;
+        if (uCodes.length === 0) uCodes.push('*384*10#', '*888#');
 
-    function addLog() {
-        const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
-        const code = uCodes[Math.floor(Math.random() * uCodes.length)];
-        const isOk = Math.random() > 0.05;
-        
-        const entry = document.createElement('div');
-        entry.className = 'log-item';
-        entry.innerHTML = `
-            <div style="display:flex; align-items:center; gap:20px">
-                <span style="color:var(--text-muted); font-size:11px; width:70px">${time}</span>
-                <span style="font-weight:700; color:var(--primary); width:100px">${code}</span>
-                <span style="color:var(--text-secondary); font-size:11px">HTTP POST → CUSTOMER_API</span>
-            </div>
-            <span class="status-pill ${isOk ? 'pill-success' : 'pill-error'}">${isOk ? '200 OK' : '500 ERR'}</span>
-        `;
-        logBox.prepend(entry);
-        if (logBox.children.length > 20) logBox.lastChild.remove();
+        function addLog() {
+            const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
+            const code = uCodes[Math.floor(Math.random() * uCodes.length)];
+            const isOk = Math.random() > 0.05;
+            
+            const entry = document.createElement('div');
+            entry.className = 'log-item';
+            entry.innerHTML = `
+                <div style="display:flex; align-items:center; gap:20px">
+                    <span style="color:var(--text-muted); font-size:11px; width:70px">${time}</span>
+                    <span style="font-weight:700; color:var(--primary); width:100px">${code}</span>
+                    <span style="color:var(--text-secondary); font-size:11px">HTTP POST → CUSTOMER_API</span>
+                </div>
+                <span class="status-pill ${isOk ? 'pill-success' : 'pill-error'}">${isOk ? '200 OK' : '500 ERR'}</span>
+            `;
+            logBox.prepend(entry);
+            if (logBox.children.length > 20) logBox.lastChild.remove();
+        }
+
+        setInterval(addLog, 2500);
+        for(let i=0; i<8; i++) addLog();
     }
-
-    setInterval(addLog, 2500);
-    for(let i=0; i<8; i++) addLog();
 });
 </script>
 
 <?php include __DIR__ . '/../includes/layout-footer.php'; ?>
+<?php
+} catch (Throwable $e) {
+    echo "<div style='padding:20px; border:2px solid red; background:#fff1f1; color:red; font-family:monospace; margin:20px; border-radius:10px; z-index:9999; position:relative;'>";
+    echo "<h3>⚠️ PHP Execution Error Caught</h3>";
+    echo "<b>Message:</b> " . htmlspecialchars($e->getMessage()) . "<br>";
+    echo "<b>File:</b> " . htmlspecialchars($e->getFile()) . "<br>";
+    echo "<b>Line:</b> " . $e->getLine() . "<br>";
+    echo "<hr><b>Trace:</b> <pre>" . htmlspecialchars($e->getTraceAsString()) . "</pre>";
+    echo "</div>";
+}
+?>

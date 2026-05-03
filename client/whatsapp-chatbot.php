@@ -1,4 +1,5 @@
 <?php
+try {
 $pageTitle = 'WhatsApp Smart Automations';
 $breadcrumb = [['label'=>'WhatsApp'],['label'=>'Smart Automations']];
 require_once __DIR__ . '/layout.php';
@@ -77,12 +78,12 @@ $rules = DB::query("
     LEFT JOIN whatsapp_chatbots p ON r.parent_id = p.id 
     WHERE r.user_id = ? 
     ORDER BY r.parent_id ASC, r.trigger_count DESC, r.created_at DESC
-", [$uid]);
+", [$uid]) ?: [];
 
-$menuOptions = array_filter($rules, function($r) { return $r['is_menu'] == 1; });
+$menuOptions = array_filter((array)$rules, function($r) { return $r['is_menu'] == 1; });
 
 // Fetch Dynamic Data Tables
-$dataTables = DB::query("SELECT table_name FROM whatsapp_custom_data WHERE user_id = ? GROUP BY table_name", [$uid]);
+$dataTables = DB::query("SELECT table_name FROM whatsapp_custom_data WHERE user_id = ? GROUP BY table_name", [$uid]) ?: [];
 ?>
 
 <style>
@@ -114,14 +115,14 @@ $dataTables = DB::query("SELECT table_name FROM whatsapp_custom_data WHERE user_
         <div class="stat-icon" style="background:rgba(59, 130, 246, 0.1); color:var(--primary)"><i class="fa-solid fa-robot"></i></div>
         <div class="stat-details">
             <div class="stat-label">Active Rules</div>
-            <div class="stat-value"><?= count($rules) ?></div>
+            <div class="stat-value"><?= count((array)$rules) ?></div>
         </div>
     </div>
     <div class="stat-card">
         <div class="stat-icon" style="background:rgba(16, 185, 129, 0.1); color:var(--success)"><i class="fa-solid fa-bolt"></i></div>
         <div class="stat-details">
             <div class="stat-label">Total Triggers</div>
-            <div class="stat-value"><?= number_format(array_sum(array_column($rules, 'trigger_count'))) ?></div>
+            <div class="stat-value"><?= number_format(array_sum(array_column((array)$rules, 'trigger_count'))) ?></div>
         </div>
     </div>
     <div class="stat-card">
@@ -144,9 +145,9 @@ $dataTables = DB::query("SELECT table_name FROM whatsapp_custom_data WHERE user_
 
     <?php 
     // Group rules by parent to show hierarchy
-    $parentRules = array_filter($rules, function($r) { return !$r['parent_id']; });
+    $parentRules = array_filter((array)$rules, function($r) { return !$r['parent_id']; });
     foreach ($parentRules as $pr): 
-        $children = array_filter($rules, function($r) use ($pr) { return $r['parent_id'] == $pr['id']; });
+        $children = array_filter((array)$rules, function($r) use ($pr) { return $r['parent_id'] == $pr['id']; });
     ?>
         <div class="card automation-card" style="margin-bottom:12px">
             <div class="rule-header">
@@ -399,7 +400,7 @@ $dataTables = DB::query("SELECT table_name FROM whatsapp_custom_data WHERE user_
 
 <script>
 let currentMenuId = null;
-const allRules = <?= json_encode($rules) ?>;
+const allRules = <?= json_encode((array)$rules) ?>;
 
 function editRule(r) {
     document.getElementById('edit_id').value = r.id;
@@ -526,3 +527,14 @@ function compareKeyword(input, keyword, type) {
 </script>
 
 <?php include __DIR__ . '/../includes/layout-footer.php'; ?>
+<?php
+} catch (Throwable $e) {
+    echo "<div style='padding:20px; border:2px solid red; background:#fff1f1; color:red; font-family:monospace; margin:20px; border-radius:10px; z-index:9999; position:relative;'>";
+    echo "<h3>⚠️ PHP Execution Error Caught</h3>";
+    echo "<b>Message:</b> " . htmlspecialchars($e->getMessage()) . "<br>";
+    echo "<b>File:</b> " . htmlspecialchars($e->getFile()) . "<br>";
+    echo "<b>Line:</b> " . $e->getLine() . "<br>";
+    echo "<hr><b>Trace:</b> <pre>" . htmlspecialchars($e->getTraceAsString()) . "</pre>";
+    echo "</div>";
+}
+?>

@@ -56,6 +56,8 @@ $navItems = [
       ['icon'=>'<i class="fa-solid fa-link"></i>',          'label'=>'Connect Account',   'url'=>'/reseller/whatsapp-connect.php'],
       ['icon'=>'<i class="fa-solid fa-paper-plane"></i>',   'label'=>'Bulk Messaging',    'url'=>'/reseller/whatsapp-bulk.php'],
       ['icon'=>'<i class="fa-solid fa-robot"></i>',         'label'=>'Chatbot Builder',   'url'=>'/reseller/whatsapp-chatbot.php'],
+      ['icon'=>'<i class="fa-solid fa-database"></i>',      'label'=>'Dynamic Data Hub',  'url'=>'/reseller/whatsapp-data.php'],
+      ['icon'=>'<i class="fa-solid fa-user-gear"></i>',     'label'=>'Self Service',      'url'=>'/reseller/whatsapp-self-service.php'],
       ['icon'=>'<i class="fa-solid fa-message"></i>',       'label'=>'Message Logs',      'url'=>'/reseller/whatsapp-logs.php'],
     ]
   ],
