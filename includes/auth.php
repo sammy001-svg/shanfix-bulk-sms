@@ -183,10 +183,11 @@ function flash_get(): ?array {
  * @param int|null $userId Specific user ID or NULL for all users (broadcast).
  */
 function notify(?int $userId, string $title, string $message, string $type = 'info', bool $isPopup = false, ?string $imageUrl = null): int|false {
-    return DB::insert(
+    $res = DB::insert(
         "INSERT INTO notifications (user_id, title, message, type, is_popup, image_url, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())",
         [$userId, $title, $message, $type, $isPopup ? 1 : 0, $imageUrl]
     );
+    return $res ? (int)$res : false;
 }
 
 /**
@@ -226,6 +227,21 @@ function dismiss_notification(int $userId, int $notificationId): bool {
          ON DUPLICATE KEY UPDATE is_dismissed = 1, interacted_at = NOW()",
         [$userId, $notificationId]
     );
+}
+
+/**
+ * Get persistent popup notifications for the dashboard.
+ * Ignores the dismissed/read status to ensure they show on every refresh.
+ */
+function get_dashboard_popups(int $userId): array {
+    return DB::query(
+        "SELECT * FROM notifications 
+         WHERE is_popup = 1 
+         AND (user_id = ? OR user_id IS NULL) 
+         AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+         ORDER BY created_at DESC",
+        [$userId]
+    ) ?: [];
 }
 // ─── API Integration ─────────────────────────────────────────────────────────
 

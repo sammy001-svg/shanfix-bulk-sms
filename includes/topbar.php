@@ -47,6 +47,10 @@ $initials = implode('', array_map(fn($w) => strtoupper($w[0]),
     <?php 
     $notifs = get_unread_notifications($user['id']); 
     $notifCount = count($notifs);
+
+    // Dashboard-specific persistent popups
+    $isDashboard = (basename($_SERVER['PHP_SELF']) === 'index.php');
+    $popupNotifs = $isDashboard ? get_dashboard_popups($user['id']) : [];
     ?>
     <div class="dropdown" id="notifDropdown">
       <div class="icon-btn" onclick="toggleDropdown('notifDropdown')" title="Notifications">
@@ -125,9 +129,9 @@ $initials = implode('', array_map(fn($w) => strtoupper($w[0]),
   </div>
 </header>
 
-<!-- Popup Notification Modals -->
-<?php foreach ($notifs as $n): ?>
-  <?php if ($n['is_popup']): ?>
+<!-- Popup Notification Modals (Dashboard Only) -->
+<?php if ($isDashboard): ?>
+  <?php foreach ($popupNotifs as $n): ?>
     <div class="modal-overlay" id="notif-modal-<?= $n['id'] ?>">
       <div class="modal" style="max-width:500px; text-align:center; position:relative">
         <button class="modal-close" onclick="closeModal('notif-modal-<?= $n['id'] ?>')" style="position:absolute; top:15px; right:15px; background:none; border:none; cursor:pointer; font-size:18px; color:var(--text-muted)">
@@ -157,8 +161,8 @@ $initials = implode('', array_map(fn($w) => strtoupper($w[0]),
         </button>
       </div>
     </div>
-  <?php endif; ?>
-<?php endforeach; ?>
+  <?php endforeach; ?>
+<?php endif; ?>
 
 <script>
 function dismissNotif(id) {
@@ -175,12 +179,12 @@ function markAllAsRead() {
 
 // Auto-show popup modals on load
 document.addEventListener('DOMContentLoaded', () => {
-    <?php foreach ($notifs as $n): ?>
-      <?php if ($n['is_popup']): ?>
-        setTimeout(() => {
-            openModal('notif-modal-<?= $n['id'] ?>');
-        }, 300);
-      <?php endif; ?>
-    <?php endforeach; ?>
+    <?php if ($isDashboard): ?>
+        <?php foreach ($popupNotifs as $n): ?>
+            setTimeout(() => {
+                openModal('notif-modal-<?= $n['id'] ?>');
+            }, 300);
+        <?php endforeach; ?>
+    <?php endif; ?>
 });
 </script>
