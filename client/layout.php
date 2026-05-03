@@ -58,6 +58,8 @@ $navItems = [
       ['icon'=>'<i class="fa-solid fa-database"></i>',      'label'=>'Dynamic Data Hub',  'url'=>'/client/whatsapp-data.php'],
       ['icon'=>'<i class="fa-solid fa-gears"></i>',         'label'=>'Self-Service',      'url'=>'/client/whatsapp-self-service.php'],
       ['icon'=>'<i class="fa-solid fa-message"></i>',       'label'=>'Message Logs',      'url'=>'/client/whatsapp-logs.php'],
+      ['icon'=>'<i class="fa-solid fa-wallet"></i>',        'label'=>'Top-up Wallet',     'url'=>'/client/whatsapp-topup.php'],
+      ['icon'=>'<i class="fa-solid fa-inbox"></i>',         'label'=>'Conversations',     'url'=>'/client/whatsapp-inbox.php'],
     ]
   ],
   ['icon'=>'<i class="fa-solid fa-code"></i>',           'label'=>'API & Integration', 'url'=>'/client/api.php'],

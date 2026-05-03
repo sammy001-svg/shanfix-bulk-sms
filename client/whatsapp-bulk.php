@@ -1,11 +1,16 @@
 <?php
+try {
 $pageTitle = 'WhatsApp Bulk Messaging';
 $breadcrumb = [['label'=>'WhatsApp'],['label'=>'Bulk Messaging']];
 require_once __DIR__ . '/layout.php';
 
 $uid = $user['id'];
-$account = DB::queryOne("SELECT * FROM whatsapp_accounts WHERE user_id = ? AND status = 'active'", [$uid]);
-$groups = DB::query("SELECT g.*, COUNT(c.id) as cnt FROM whatsapp_contact_groups g LEFT JOIN whatsapp_contacts c ON c.group_id = g.id WHERE g.user_id = ? GROUP BY g.id ORDER BY g.name", [$uid]);
+$accounts = DB::query("SELECT * FROM whatsapp_accounts WHERE user_id = ? AND status = 'active'", [$uid]) ?: [];
+$selectedAccountId = isset($_POST['account_id']) ? (int)$_POST['account_id'] : ($accounts[0]['id'] ?? 0);
+$account = array_filter($accounts, function($a) use ($selectedAccountId) { return $a['id'] == $selectedAccountId; });
+$account = reset($account) ?: ($accounts[0] ?? null);
+
+$groups = DB::query("SELECT g.*, COUNT(c.id) as cnt FROM whatsapp_contact_groups g LEFT JOIN whatsapp_contacts c ON c.group_id = g.id WHERE g.user_id = ? GROUP BY g.id ORDER BY g.name", [$uid]) ?: [];
 
 // Handle Sending
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_whatsapp'])) {
@@ -73,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_whatsapp'])) {
         } elseif (!empty($_POST['group_id'])) {
             // Process Saved Group
             $groupId = (int)$_POST['group_id'];
-            $groupRows = DB::query("SELECT phone, name, email FROM whatsapp_contacts WHERE group_id = ? AND user_id = ?", [$groupId, $uid]);
+            $groupRows = DB::query("SELECT phone, name, email FROM whatsapp_contacts WHERE group_id = ? AND user_id = ?", [$groupId, $uid]) ?: [];
             foreach ($groupRows as $gr) {
                 $contacts[] = ['phone' => $gr['phone'], 'data' => ['name' => $gr['name'], 'email' => $gr['email']]];
             }
@@ -90,29 +95,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_whatsapp'])) {
             flash_set('danger', 'No valid recipients found.');
         } else {
             $count = 0;
-            require_once __DIR__ . '/../includes/gateways/whatsapp.php';
-            $gateway = new WhatsApp_Gateway($account['instance_id'], $account['token']);
+            $rate = (float)($user['whatsapp_rate'] ?? 1.00);
+            $totalCost = count($contacts) * $rate;
+            
+            if ($user['whatsapp_balance'] < $totalCost) {
+                flash_set('danger', "Insufficient balance. This campaign requires KES " . number_format($totalCost, 2) . " but you only have KES " . number_format($user['whatsapp_balance'], 2));
+            } else {
+                require_once __DIR__ . '/../includes/gateways/whatsapp.php';
+                $gateway = new WhatsApp_Gateway($account['instance_id'], $account['token'], $account['id']);
 
-            foreach ($contacts as $contact) {
-                $number = $contact['phone'];
-                $data = $contact['data'];
-                
-                // Replace Placeholders
-                $personalizedMsg = $msgTemplate;
-                foreach ($data as $key => $val) {
-                    $label = ucfirst($key);
-                    $personalizedMsg = str_replace('##' . $label . '##', $val, $personalizedMsg);
-                }
+                foreach ($contacts as $contact) {
+                    $number = $contact['phone'];
+                    $data = $contact['data'] ?: [];
+                    
+                    // Replace Placeholders
+                    $personalizedMsg = $msgTemplate;
+                    foreach ($data as $key => $val) {
+                        $label = ucfirst($key);
+                        $personalizedMsg = str_replace('##' . $label . '##', $val, $personalizedMsg);
+                    }
 
-                // Log Message (Status 'queued')
-                $msgId = DB::insert("
-                    INSERT INTO whatsapp_messages (user_id, account_id, recipient, message, media_url, status)
-                    VALUES (?, ?, ?, ?, ?, 'queued')
-                ", [$uid, $account['id'], $number, $personalizedMsg, $mediaUrl]);
-
-                if ($msgId) {
                     // Send via Gateway
                     $res = $gateway->sendMessage($number, $personalizedMsg, $mediaUrl);
+                    
+                    // Log Message
+                    $status = $res['success'] ? 'sent' : 'failed';
+                    $msgId = DB::insert("
+                        INSERT INTO whatsapp_messages (user_id, account_id, recipient, message, media_url, status, external_id)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ", [$uid, $account['id'], $number, $personalizedMsg, $mediaUrl, $status, $res['message_id'] ?? null]);
+
                     if ($res['success']) {
                         DB::execute("UPDATE whatsapp_messages SET status = 'sent', external_id = ? WHERE id = ?", [$res['message_id'], $msgId]);
                         $count++;
@@ -124,7 +136,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_whatsapp'])) {
 
             if ($count > 0) {
                 flash_set('success', "Campaign launched! Successfully sent $count personalized messages.");
-                redirect('whatsapp-logs.php');
+                header("Location: whatsapp-logs.php");
+                exit;
             } else {
                 flash_set('danger', 'Failed to send messages. Please check your account status.');
             }
@@ -137,13 +150,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_whatsapp'])) {
   <div><h1>Bulk WhatsApp</h1><div class="subtitle">Broadcast high-impact personalized messages to your customers</div></div>
 </div>
 
-<?php if (!$account): ?>
+<?php if (empty($accounts)): ?>
 <div class="alert alert-warning mb-24">
     <div style="display:flex; gap:15px; align-items:center">
         <i class="fa-solid fa-triangle-exclamation" style="font-size:24px"></i>
         <div>
-            <strong>Action Required:</strong> Your WhatsApp account is not active. 
-            <a href="whatsapp-connect.php" style="color:inherit; text-decoration:underline">Connect your account</a> to enable bulk messaging.
+            <strong>Action Required:</strong> No active WhatsApp accounts found. 
+            <a href="whatsapp-connect.php" style="color:inherit; text-decoration:underline">Connect an account</a> to enable bulk messaging.
         </div>
     </div>
 </div>
@@ -270,6 +283,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_whatsapp'])) {
             <div class="card">
                 <div class="card-header"><h3 class="card-title">Launch Campaign</h3></div>
                 <div class="card-body">
+                    <div class="form-group mb-20">
+                        <label class="form-label">Send From Account</label>
+                        <select name="account_id" class="form-control" required>
+                            <?php foreach ($accounts as $acc): ?>
+                                <option value="<?= $acc['id'] ?>" <?= ($acc['id'] == $selectedAccountId) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($acc['account_name'] ?: $acc['phone_number']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-hint">Choose the WhatsApp number to broadcast from.</div>
+                    </div>
+
                     <div style="background:var(--bg-muted); padding:15px; border-radius:12px; margin-bottom:20px">
                         <div style="display:flex; justify-content:space-between; margin-bottom:8px">
                             <span class="text-muted" style="font-size:12px">Recipients:</span>
@@ -277,10 +302,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_whatsapp'])) {
                         </div>
                         <div style="display:flex; justify-content:space-between">
                             <span class="text-muted" style="font-size:12px">Account Balance:</span>
-                            <span style="font-weight:700">KES <?= number_format($user['whatsapp_balance'] ?? 0, 2) ?></span>
+                            <span style="font-weight:700; color:var(--success)">KES <?= number_format($user['whatsapp_balance'] ?? 0, 2) ?></span>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-lg btn-full" <?= !$account ? 'disabled' : '' ?>>
+                    <button type="submit" class="btn btn-primary btn-lg btn-full" <?= empty($accounts) ? 'disabled' : '' ?>>
                         <i class="fa-solid fa-paper-plane"></i> Launch Campaign
                     </button>
                 </div>
@@ -289,8 +314,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_whatsapp'])) {
     </div>
 </form>
 
-<?php
-$extraScript = <<<'JS'
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 let parsedRows = [];
@@ -311,8 +334,8 @@ function switchInputMode(mode, btn) {
     if (mode === 'group') {
         const phMenu = document.getElementById('phMenu');
         phMenu.innerHTML = `
-            <a class="dropdown-item" href="javascript:void(0)" onclick="insertAtCursor('##Name##')">##Name##</a>
-            <a class="dropdown-item" href="javascript:void(0)" onclick="insertAtCursor('##Email##')">##Email##</a>
+            <div class="dropdown-item" onclick="insertPH('##Name##')">Name</div>
+            <div class="dropdown-item" onclick="insertPH('##Email##')">Email</div>
         `;
     }
     
@@ -336,7 +359,6 @@ function updateGroupRecipientCount(select) {
         return;
     }
     
-    // Quick fetch or just use group data if we had counts (which we do in $groups)
     const groups = <?= json_encode($groups) ?>;
     const group = groups.find(g => g.id == select.value);
     countSpan.textContent = group ? (group.cnt || 0) : '0';
@@ -392,7 +414,6 @@ function handleFileSelect(input) {
         
         parsedRows = json.slice(1).filter(r => r[phoneIdx]);
         
-        // Show Preview
         renderPreview();
         updateRecipientCount();
         populatePlaceholders();
@@ -434,7 +455,7 @@ function insertPH(ph) {
 }
 
 function togglePlaceholders() {
-    document.getElementById('phMenu').classList.toggle('open');
+    document.getElementById('phMenu').classList.toggle('show');
 }
 
 function updateRecipientCount() {
@@ -456,14 +477,12 @@ document.getElementById('whatsappBulkForm').addEventListener('submit', function(
             e.preventDefault();
             return;
         }
-        
-        // Prepare CSV Data for backend
         const allData = [headers, ...parsedRows];
         const csvContent = allData.map(row => 
             row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(',')
         ).join('\n');
         document.getElementById('csvDataInput').value = csvContent;
-    } else {
+    } else if (inputMode === 'manual') {
         const recips = document.getElementById('recipientsArea').value.trim();
         if (!recips) {
             alert('Please enter recipients.');
@@ -473,13 +492,22 @@ document.getElementById('whatsappBulkForm').addEventListener('submit', function(
     }
 });
 
-// Close phMenu on outside click
-window.addEventListener('click', (e) => {
+window.onclick = function(e) {
     if (!e.target.closest('#phDropdown')) {
-        document.getElementById('phMenu').classList.remove('open');
+        document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('show'));
     }
-});
+}
 </script>
-JS;
-include __DIR__ . '/../includes/layout-footer.php';
+
+<?php include __DIR__ . '/../includes/layout-footer.php'; ?>
+<?php
+} catch (Throwable $e) {
+    echo "<div style='padding:20px; border:2px solid red; background:#fff1f1; color:red; font-family:monospace; margin:20px; border-radius:10px; z-index:9999; position:relative;'>";
+    echo "<h3>⚠️ PHP Execution Error Caught</h3>";
+    echo "<b>Message:</b> " . htmlspecialchars($e->getMessage()) . "<br>";
+    echo "<b>File:</b> " . htmlspecialchars($e->getFile()) . "<br>";
+    echo "<b>Line:</b> " . $e->getLine() . "<br>";
+    echo "<hr><b>Trace:</b> <pre>" . htmlspecialchars($e->getTraceAsString()) . "</pre>";
+    echo "</div>";
+}
 ?>

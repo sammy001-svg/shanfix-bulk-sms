@@ -17,6 +17,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $parentId = $_POST['parent_id'] ? (int)$_POST['parent_id'] : null;
     $units    = (float)($_POST['sms_units'] ?? 0);
     $customPrice = $_POST['custom_unit_price'] !== '' ? (float)$_POST['custom_unit_price'] : null;
+    $waUnits = (float)($_POST['whatsapp_balance'] ?? 0);
+    $waRate  = (float)($_POST['whatsapp_rate'] ?? 1.00);
     $password = $_POST['password'] ?? '';
 
     if (!$id || !$name || !$email) {
@@ -31,8 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect($_SERVER['HTTP_REFERER'] ?? '/admin/resellers.php');
     }
 
-    $sql = "UPDATE users SET name=?, email=?, phone=?, company=?, role=?, status=?, parent_id=?, sms_units=?, custom_unit_price=? WHERE id=?";
-    $params = [$name, $email, $phone, $company, $role, $status, $parentId, $units, $customPrice, $id];
+    $sql = "UPDATE users SET name=?, email=?, phone=?, company=?, role=?, status=?, parent_id=?, sms_units=?, custom_unit_price=?, whatsapp_balance=?, whatsapp_rate=? WHERE id=?";
+    $params = [$name, $email, $phone, $company, $role, $status, $parentId, $units, $customPrice, $waUnits, $waRate, $id];
 
     $success = DB::execute($sql, $params);
 

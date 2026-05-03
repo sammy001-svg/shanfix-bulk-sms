@@ -115,6 +115,31 @@ $tables = [
         `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (`id`),
         UNIQUE KEY `idx_user_module` (`user_id`, `module_type`)
+    ) ENGINE=InnoDB",
+
+    "whatsapp_inbox" => "CREATE TABLE IF NOT EXISTS `whatsapp_inbox` (
+        `id` INT(11) NOT NULL AUTO_INCREMENT,
+        `user_id` INT(11) NOT NULL,
+        `account_id` INT(11) NOT NULL,
+        `sender` VARCHAR(20) NOT NULL,
+        `message` TEXT,
+        `direction` ENUM('in','out') DEFAULT 'in',
+        `status` VARCHAR(20) DEFAULT 'received',
+        `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (`id`)
+    ) ENGINE=InnoDB",
+
+    "whatsapp_messages" => "CREATE TABLE IF NOT EXISTS `whatsapp_messages` (
+        `id` INT(11) NOT NULL AUTO_INCREMENT,
+        `user_id` INT(11) NOT NULL,
+        `account_id` INT(11) NOT NULL,
+        `recipient` VARCHAR(20) NOT NULL,
+        `message` TEXT,
+        `media_url` VARCHAR(255) DEFAULT NULL,
+        `status` VARCHAR(20) DEFAULT 'queued',
+        `external_id` VARCHAR(100) DEFAULT NULL,
+        `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (`id`)
     ) ENGINE=InnoDB"
 ];
 
@@ -138,10 +163,19 @@ $columns = [
     ['users', 'whatsapp_balance', 'DECIMAL(12,2) NOT NULL DEFAULT 0.00'],
     ['users', 'api_client_id', 'VARCHAR(50) DEFAULT NULL'],
     ['users', 'api_key', 'VARCHAR(100) DEFAULT NULL'],
+    ['users', 'whatsapp_rate', 'DECIMAL(10,2) NOT NULL DEFAULT 1.00'],
+    ['purchases', 'type', "ENUM('sms','whatsapp') DEFAULT 'sms' AFTER `user_id`"],
     ['whatsapp_messages', 'external_id', 'VARCHAR(100) DEFAULT NULL AFTER `status`'],
+    ['whatsapp_accounts', 'phone_number', 'VARCHAR(20) DEFAULT NULL AFTER `user_id`'],
+    ['whatsapp_accounts', 'account_name', 'VARCHAR(100) DEFAULT NULL AFTER `phone_number`'],
     ['whatsapp_chatbots', 'is_menu', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER `media_url`'],
     ['whatsapp_chatbots', 'is_dynamic', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER `is_menu`'],
-    ['whatsapp_chatbots', 'data_source_table', 'VARCHAR(100) DEFAULT NULL AFTER `is_dynamic`']
+    ['whatsapp_chatbots', 'data_source_table', 'VARCHAR(100) DEFAULT NULL AFTER `is_dynamic`'],
+    ['whatsapp_chatbots', 'trigger_count', 'INT(11) NOT NULL DEFAULT 0 AFTER `data_source_table`'],
+    ['whatsapp_accounts', 'ai_enabled', 'TINYINT(1) NOT NULL DEFAULT 0'],
+    ['whatsapp_accounts', 'ai_api_key', 'VARCHAR(255) DEFAULT NULL'],
+    ['whatsapp_accounts', 'ai_model', "VARCHAR(50) DEFAULT 'gemini-1.5-flash'"],
+    ['whatsapp_accounts', 'ai_prompt', 'TEXT DEFAULT NULL']
 ];
 
 foreach ($columns as $col) {

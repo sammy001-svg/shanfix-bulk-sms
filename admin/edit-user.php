@@ -68,14 +68,31 @@ $resellers = DB::query("SELECT id,name FROM users WHERE role='reseller' AND stat
       </div>
 
       <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border)">
-        <h4 style="margin-bottom:12px"><i class="fa-solid fa-lock" style="font-size:14px;margin-right:6px"></i> Security & SMS Units</h4>
+        <h4 style="margin-bottom:12px"><i class="fa-solid fa-lock" style="font-size:14px;margin-right:6px"></i> Security & Billing Control</h4>
         <div class="form-row">
           <div class="form-group"><label class="form-label">New Password</label><input type="password" name="password" class="form-control" placeholder="Leave blank to keep current"></div>
-          <div class="form-group"><label class="form-label">Current Balance (SMS Units)</label><input type="number" name="sms_units" class="form-control" step="0.01" value="<?= (float)$u['sms_units'] ?>"></div>
+        </div>
+        
+        <div class="form-row mt-12">
           <div class="form-group">
-            <label class="form-label">Custom SMS Rate (Per Unit)</label>
-            <input type="number" name="custom_unit_price" class="form-control" step="0.0001" value="<?= $u['custom_unit_price'] ? (float)$u['custom_unit_price'] : '' ?>" placeholder="Leave blank for default/plan rate">
-            <div class="form-hint">E.g. 0.80. If set, this overrides all plan pricing for this user.</div>
+            <label class="form-label">SMS Units Balance</label>
+            <input type="number" name="sms_units" class="form-control" step="0.01" value="<?= (float)$u['sms_units'] ?>">
+          </div>
+          <div class="form-group">
+            <label class="form-label">SMS Rate (Per Unit)</label>
+            <input type="number" name="custom_unit_price" class="form-control" step="0.0001" value="<?= $u['custom_unit_price'] ? (float)$u['custom_unit_price'] : '' ?>" placeholder="Default: 0.80">
+          </div>
+        </div>
+
+        <div class="form-row mt-12">
+          <div class="form-group">
+            <label class="form-label">WhatsApp Balance (KES)</label>
+            <input type="number" name="whatsapp_balance" class="form-control" step="0.01" value="<?= (float)$u['whatsapp_balance'] ?>">
+          </div>
+          <div class="form-group">
+            <label class="form-label">WhatsApp Rate (Buying/Selling)</label>
+            <input type="number" name="whatsapp_rate" class="form-control" step="0.01" value="<?= (float)$u['whatsapp_rate'] ?>">
+            <div class="form-hint">Admin sets this for Resellers. Resellers set this for Clients.</div>
           </div>
         </div>
       </div>

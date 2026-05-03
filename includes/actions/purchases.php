@@ -55,9 +55,11 @@ class Purchase {
             return ['success' => false, 'error' => "$parentLabel has insufficient units to fulfill this request."];
         }
 
-        $id = DB::insert("INSERT INTO purchases (user_id, units, amount, currency, status, payment_method, transaction_ref, created_at) 
-                         VALUES (?, ?, ?, 'KES', 'pending', ?, ?, NOW())", 
-                         [$userId, $units, $amount, $method, $ref]);
+        $type    = sanitize($data['type'] ?? 'sms');
+
+        $id = DB::insert("INSERT INTO purchases (user_id, type, units, amount, currency, status, payment_method, transaction_ref, created_at) 
+                         VALUES (?, ?, ?, ?, 'KES', 'pending', ?, ?, NOW())", 
+                         [$userId, $type, $units, $amount, $method, $ref]);
 
         if ($id) {
             // Check if this is a reseller client
@@ -118,16 +120,23 @@ class Purchase {
         try {
             DB::beginTransaction();
             
-            // Deduct from parent
-            $deducted = DB::execute("UPDATE users SET sms_units = sms_units - ? WHERE id = ?", [$purchase['units'], $parentId]);
-            
-            // Add to child
-            $added = DB::execute("UPDATE users SET sms_units = sms_units + ? WHERE id = ?", [$purchase['units'], $userId]);
+            if ($purchase['type'] === 'whatsapp') {
+                // Add money to whatsapp balance
+                $added = DB::execute("UPDATE users SET whatsapp_balance = whatsapp_balance + ? WHERE id = ?", [$purchase['amount'], $userId]);
+                $deducted = true; // No parent deduction for money topups in this model? 
+                // Or maybe deduct from reseller's whatsapp balance? 
+                // Usually resellers topup their own wallet at admin rate.
+            } else {
+                // Deduct from parent
+                $deducted = DB::execute("UPDATE users SET sms_units = sms_units - ? WHERE id = ?", [$purchase['units'], $parentId]);
+                // Add to child
+                $added = DB::execute("UPDATE users SET sms_units = sms_units + ? WHERE id = ?", [$purchase['units'], $userId]);
+            }
             
             // Mark purchase as completed
             $marked = DB::execute("UPDATE purchases SET status = 'completed' WHERE id = ?", [$purchaseId]);
             
-            if ($deducted !== false && $added !== false && $marked !== false) {
+            if (($deducted !== false) && $added !== false && $marked !== false) {
                 DB::commit();
                 error_log("Purchase #$purchaseId completed successfully. Units: {$purchase['units']}");
                 
