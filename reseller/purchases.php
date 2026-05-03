@@ -12,7 +12,7 @@ $history    = DB::query("SELECT p.*,pp.name as plan_name FROM purchases p LEFT J
   <div><h1>Buy SMS Units</h1><div class="subtitle">Top up your account with SMS credits</div></div>
   <div style="background:var(--primary-light);border:1px solid var(--primary);padding:8px 18px;border-radius:var(--radius-md)">
     <span style="font-size:12px;color:var(--primary);font-weight:600">Balance:</span>
-    <strong style="font-size:16px;color:var(--primary);margin-left:6px"><?=number_format($user['sms_units'],2)?></strong> units
+    <strong style="font-size:16px;color:var(--primary);margin-left:6px" class="current-balance-value"><?=number_format($user['sms_units'],2)?></strong> units
   </div>
 </div>
 
@@ -83,6 +83,45 @@ function calcTotal(units, rate) {
   const total = parseFloat(units || 0) * rate;
   document.getElementById('totalCostDisplay').textContent = 'Total Cost: KES ' + total.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
 }
+
+// AJAX Form Handler
+document.querySelector('form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const form = this;
+    const btn = form.querySelector('button[type="submit"]');
+    const originalText = btn.innerHTML;
+
+    const formData = new FormData(form);
+    formData.append('ajax', '1');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+
+    try {
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            if (data.manual) {
+                Swal.fire('Submitted', 'Payment reference submitted! Your reseller will verify and approve your units shortly.', 'success');
+            } else {
+                // Trigger global STK handler
+                window.ShanfixSTK.checkStatus(data.id, 'sms');
+            }
+        } else {
+            Swal.fire('Transaction Failed', data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Purchase error:', error);
+        Swal.fire('Error', 'An unexpected error occurred. Please try again.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+});
 </script>
 JS;
 include __DIR__ . '/../includes/layout-footer.php';

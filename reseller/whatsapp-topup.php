@@ -30,6 +30,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_topup'])) {
             
             $res = Purchase::create($uid, $purchaseData);
             
+            if (isset($_POST['ajax'])) {
+                header('Content-Type: application/json');
+                echo json_encode($res);
+                exit;
+            }
+
             if ($res['success']) {
                 if ($res['manual'] ?? false) {
                     flash_set('info', 'Top-up request sent to admin. Please complete payment and wait for approval.');
@@ -62,7 +68,7 @@ $topups = DB::query("SELECT * FROM purchases WHERE user_id = ? AND type = 'whats
                 <div class="mb-24">
                     <div style="background:var(--bg-muted); padding:20px; border-radius:15px; border:1px solid var(--border); text-align:center">
                         <div style="font-size:12px; color:var(--text-muted); margin-bottom:5px">Current Balance</div>
-                        <div style="font-size:32px; font-weight:800; color:var(--primary)">KES <?= number_format($user['whatsapp_balance'], 2) ?></div>
+                        <div style="font-size:32px; font-weight:800; color:var(--primary)" class="current-balance-value">KES <?= number_format($user['whatsapp_balance'], 2) ?></div>
                         <div style="font-size:11px; color:var(--text-muted); margin-top:5px">Platform Rate: KES <?= number_format($user['whatsapp_rate'], 2) ?> per msg</div>
                     </div>
                 </div>
@@ -84,12 +90,51 @@ $topups = DB::query("SELECT * FROM purchases WHERE user_id = ? AND type = 'whats
                 </div>
             </div>
             <div class="card-footer">
-                <button type="submit" name="initiate_topup" class="btn btn-primary btn-block">
+                <button type="submit" name="initiate_topup" class="btn btn-primary btn-block" id="btnTopup">
                     <i class="fa-solid fa-paper-plane"></i> Pay Now
                 </button>
             </div>
         </form>
     </div>
+
+    <script>
+    document.querySelector('form').addEventListener('submit', async function(e) {
+        const btn = document.getElementById('btnTopup');
+        if (e.submitter !== btn) return;
+
+        e.preventDefault();
+        const formData = new FormData(this);
+        formData.append('initiate_topup', '1');
+        formData.append('ajax', '1');
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+
+        try {
+            const response = await fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                if (data.manual) {
+                    Swal.fire('Request Sent', 'Top-up request sent to admin. Please complete payment and wait for approval.', 'info');
+                } else {
+                    window.ShanfixSTK.checkStatus(data.id, 'whatsapp');
+                }
+            } else {
+                Swal.fire('Top-up Failed', data.error, 'error');
+            }
+        } catch (error) {
+            console.error('Top-up error:', error);
+            Swal.fire('Error', 'An unexpected error occurred. Please try again.', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Pay Now';
+        }
+    });
+    </script>
 
     <!-- History -->
     <div class="card">

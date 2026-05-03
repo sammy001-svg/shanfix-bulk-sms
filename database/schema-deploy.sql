@@ -161,6 +161,7 @@ CREATE TABLE IF NOT EXISTS `pricing_plans` (
 CREATE TABLE IF NOT EXISTS `purchases` (
   `id`            INT UNSIGNED  NOT NULL AUTO_INCREMENT,
   `user_id`       INT UNSIGNED  NOT NULL,
+  `type`          ENUM('sms','whatsapp') NOT NULL DEFAULT 'sms',
   `plan_id`       INT UNSIGNED  DEFAULT NULL,
   `units`         INT UNSIGNED  NOT NULL,
   `amount`        DECIMAL(10,2) NOT NULL,

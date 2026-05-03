@@ -35,7 +35,7 @@ if ($parentId) {
         <div style="position:absolute; top:-20px; right:-20px; opacity:0.1; font-size:120px"><i class="fa-solid fa-wallet"></i></div>
         <div class="card-body" style="padding:32px; position:relative; z-index:1">
             <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em; opacity:0.8">Available Balance</div>
-            <div style="font-size:42px; font-weight:800; margin:10px 0">KES <?= number_format($user['ussd_balance'] ?? 0, 2) ?></div>
+            <div style="font-size:42px; font-weight:800; margin:10px 0" class="current-balance-value">KES <?= number_format($user['ussd_balance'] ?? 0, 2) ?></div>
             <div style="display:flex; gap:10px; margin-top:20px">
                 <button class="btn btn-light btn-sm" style="background:rgba(255,255,255,0.2); border:none; color:#fff" onclick="openModal('topupModal')">
                     <i class="fa-solid fa-plus-circle"></i> Top Up Balance
@@ -139,6 +139,43 @@ if ($parentId) {
     </form>
   </div>
 </div>
+
+<script>
+document.getElementById('topupForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const form = this;
+    const btn = form.querySelector('button[type="submit"]');
+    const originalText = btn.innerHTML;
+
+    const formData = new FormData(form);
+    formData.append('ajax', '1');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+
+    try {
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            closeModal('topupModal');
+            // Trigger global STK handler
+            window.ShanfixSTK.checkStatus(data.id, 'ussd');
+        } else {
+            Swal.fire('Top-up Failed', data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Top-up error:', error);
+        Swal.fire('Error', 'An unexpected error occurred. Please try again.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+});
+</script>
 
 
 <?php include __DIR__ . '/../includes/layout-footer.php'; ?>

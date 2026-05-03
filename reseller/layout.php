@@ -74,6 +74,7 @@ $navItems = [
   <title><?= htmlspecialchars($pageTitle) ?> — <?= htmlspecialchars(Branding::get('system_name')) ?></title>
   <link rel="stylesheet" href="/assets/css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <?php Branding::renderStyles(); ?>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script>
@@ -81,6 +82,76 @@ $navItems = [
       const theme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
       if (theme === 'dark') document.documentElement.classList.add('dark-mode');
     })();
+
+    // STK PUSH GLOBAL HANDLER
+    window.ShanfixSTK = {
+        checkStatus: function(purchaseId, type) {
+            // type can be 'sms', 'whatsapp', or 'ussd'
+            const isUssd = type === 'ussd';
+            const ajaxType = isUssd ? 'ussd' : 'purchase';
+            
+            Swal.fire({
+                title: 'Waiting Confirmation',
+                text: 'Please enter your M-Pesa PIN on your phone...',
+                icon: 'info',
+                allowOutsideClick: false,
+                showConfirmButton: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            let attempts = 0;
+            const maxAttempts = 30; // 60 seconds (2s interval)
+            const interval = setInterval(async () => {
+                attempts++;
+                try {
+                    const response = await fetch(`/reseller/ajax-check-payment.php?id=${purchaseId}&type=${ajaxType}`);
+                    const data = await response.json();
+
+                    if (data.status === 'completed') {
+                        clearInterval(interval);
+                        Swal.fire({
+                            title: 'Congratulations! 🎉',
+                            text: 'Payment successful! Your account has been topped up.',
+                            icon: 'success',
+                            confirmButtonColor: 'var(--primary)'
+                        }).then(() => {
+                            // Update balance display on page if elements exist
+                            const balanceEl = document.querySelector('.current-balance-value');
+                            if (balanceEl) {
+                                let formatted = '';
+                                if (type === 'whatsapp') formatted = 'KES ' + parseFloat(data.balances.whatsapp).toFixed(2);
+                                else if (type === 'ussd') formatted = 'KES ' + parseFloat(data.balances.ussd).toFixed(2);
+                                else formatted = parseFloat(data.balances.sms).toLocaleString() + ' Units';
+                                
+                                balanceEl.innerText = formatted;
+                            } else {
+                                location.reload(); // Fallback
+                            }
+                        });
+                    } else if (data.status === 'failed') {
+                        clearInterval(interval);
+                        Swal.fire({
+                            title: 'Payment Declined 😔',
+                            text: 'The transaction was cancelled or failed. Please try again.',
+                            icon: 'error',
+                            confirmButtonColor: '#ff4d4d'
+                        });
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(interval);
+                        Swal.fire({
+                            title: 'Timeout',
+                            text: 'We haven\'t received the payment confirmation yet. Please check your history in a moment.',
+                            icon: 'warning'
+                        });
+                    }
+                } catch (e) {
+                    console.error('Polling error:', e);
+                }
+            }, 2000);
+        }
+    };
   </script>
 </head>
 <body>

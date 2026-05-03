@@ -99,6 +99,22 @@ CREATE TABLE IF NOT EXISTS `whatsapp_bot_sessions` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_acc_sender` (`account_id`, `sender_phone`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+ 
+-- WhatsApp Inbox (Conversations)
+CREATE TABLE IF NOT EXISTS `whatsapp_inbox` (
+  `id`              INT(11) NOT NULL AUTO_INCREMENT,
+  `user_id`         INT(11) NOT NULL,
+  `account_id`      INT(11) NOT NULL,
+  `sender`          VARCHAR(20)  NOT NULL,
+  `message`         TEXT         NOT NULL,
+  `direction`       ENUM('in','out') NOT NULL DEFAULT 'in',
+  `source`          ENUM('human','ai','bot') NOT NULL DEFAULT 'human',
+  `status`          ENUM('received','sent','failed') NOT NULL DEFAULT 'received',
+  `created_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_sender` (`user_id`, `sender`),
+  KEY `idx_acc_id` (`account_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 -- =============================================================================
@@ -134,11 +150,19 @@ BEGIN
     IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='users' AND COLUMN_NAME='whatsapp_balance') THEN
         ALTER TABLE `users` ADD `whatsapp_balance` DECIMAL(12,2) NOT NULL DEFAULT 0.00;
     END IF;
+    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='users' AND COLUMN_NAME='whatsapp_rate') THEN
+        ALTER TABLE `users` ADD `whatsapp_rate` DECIMAL(12,2) NOT NULL DEFAULT 1.00;
+    END IF;
     IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='users' AND COLUMN_NAME='api_client_id') THEN
         ALTER TABLE `users` ADD `api_client_id` VARCHAR(50) DEFAULT NULL;
     END IF;
     IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='users' AND COLUMN_NAME='api_key') THEN
         ALTER TABLE `users` ADD `api_key` VARCHAR(100) DEFAULT NULL;
+    END IF;
+
+    -- 4. PURCHASES TABLE FIXES
+    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='purchases' AND COLUMN_NAME='type') THEN
+        ALTER TABLE `purchases` ADD `type` ENUM('sms', 'whatsapp') DEFAULT 'sms' AFTER `user_id`;
     END IF;
 
 END //

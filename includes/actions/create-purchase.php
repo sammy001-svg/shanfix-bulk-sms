@@ -18,6 +18,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     $result = Purchase::create($user['id'], $_POST);
 
+    if (isset($_POST['ajax'])) {
+        header('Content-Type: application/json');
+        echo json_encode($result);
+        exit;
+    }
+
     if ($result['success']) {
         if (!empty($result['manual'])) {
             $_SESSION['flash'] = ['type' => 'success', 'message' => 'Payment reference submitted! Your reseller will verify and approve your units shortly.'];

@@ -157,6 +157,7 @@ CREATE TABLE IF NOT EXISTS `pricing_plans` (
 CREATE TABLE IF NOT EXISTS `purchases` (
   `id`            INT UNSIGNED  NOT NULL AUTO_INCREMENT,
   `user_id`       INT UNSIGNED  NOT NULL,
+  `type`          ENUM('sms','whatsapp') NOT NULL DEFAULT 'sms',
   `plan_id`       INT UNSIGNED  DEFAULT NULL,
   `units`         INT UNSIGNED  NOT NULL,
   `amount`        DECIMAL(10,2) NOT NULL,
@@ -169,6 +170,25 @@ CREATE TABLE IF NOT EXISTS `purchases` (
   KEY `idx_user` (`user_id`),
   CONSTRAINT `fk_purch_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_purch_plan` FOREIGN KEY (`plan_id`) REFERENCES `pricing_plans`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- Table: whatsapp_inbox
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `whatsapp_inbox` (
+  `id`              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id`         INT UNSIGNED NOT NULL,
+  `account_id`      INT UNSIGNED NOT NULL,
+  `sender`          VARCHAR(20)  NOT NULL,
+  `message`         TEXT         NOT NULL,
+  `direction`       ENUM('in','out') NOT NULL DEFAULT 'in',
+  `source`          ENUM('human','ai','bot') NOT NULL DEFAULT 'human',
+  `status`          ENUM('received','sent','failed') NOT NULL DEFAULT 'received',
+  `created_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_sender` (`user_id`, `sender`),
+  KEY `idx_acc_id` (`account_id`),
+  CONSTRAINT `fk_inbox_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================

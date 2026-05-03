@@ -38,9 +38,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $res = Payhero::initiateSTKPush($phone, $amount, $externalRef);
 
         if ($res['success']) {
+            if (isset($_POST['ajax'])) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => true, 'id' => $transId]);
+                exit;
+            }
             flash_set('success', 'STK Push initiated! Please enter your PIN on your phone.');
         } else {
             DB::execute("UPDATE ussd_transactions SET status = 'failed' WHERE id = ?", [$transId]);
+            if (isset($_POST['ajax'])) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => $res['error']]);
+                exit;
+            }
             flash_set('danger', 'Failed to initiate STK Push: ' . $res['error']);
         }
     } else {
