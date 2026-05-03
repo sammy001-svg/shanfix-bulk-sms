@@ -1,5 +1,5 @@
--- Shanfix Bulk SMS: ROBUST Setup Script (USSD & WhatsApp)
--- Optimized for cPanel / MariaDB / Older MySQL Versions
+-- Shanfix Bulk SMS: COMPREHENSIVE & ROBUST Setup Script
+-- Optimized for cPanel / MariaDB / Legacy Environments
 
 -- =============================================================================
 -- 1. CORE TABLES (Safe Creation)
@@ -102,36 +102,51 @@ CREATE TABLE IF NOT EXISTS `whatsapp_bot_sessions` (
 
 
 -- =============================================================================
--- 2. SAFE COLUMN UPDATES (Stored Procedure for Compatibility)
+-- 2. SAFE COLUMN UPDATES (Ensure existing tables have new columns)
 -- =============================================================================
 DELIMITER //
 
-CREATE PROCEDURE IF NOT EXISTS AddColumnIfMissing(
-    IN tableName VARCHAR(64),
-    IN colName VARCHAR(64),
-    IN colDef VARCHAR(255)
-)
+CREATE PROCEDURE IF NOT EXISTS SafeMigrate()
 BEGIN
-    IF NOT EXISTS (
-        SELECT * FROM information_schema.COLUMNS 
-        WHERE TABLE_SCHEMA = DATABASE() 
-        AND TABLE_NAME = tableName 
-        AND COLUMN_NAME = colName
-    ) THEN
-        SET @sql = CONCAT('ALTER TABLE `', tableName, '` ADD `', colName, '` ', colDef);
-        PREPARE stmt FROM @sql;
-        EXECUTE stmt;
-        DEALLOCATE PREPARE stmt;
+    -- Helper to add column if missing
+    SET @db = DATABASE();
+
+    -- 1. USSD REQUESTS FIXES
+    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='ussd_requests' AND COLUMN_NAME='user_id') THEN
+        ALTER TABLE `ussd_requests` ADD `user_id` INT(11) NOT NULL AFTER `id`;
     END IF;
+    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='ussd_requests' AND COLUMN_NAME='code_id') THEN
+        ALTER TABLE `ussd_requests` ADD `code_id` INT(11) NOT NULL AFTER `user_id`;
+    END IF;
+
+    -- 2. USSD SESSIONS FIXES
+    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='ussd_sessions' AND COLUMN_NAME='user_id') THEN
+        ALTER TABLE `ussd_sessions` ADD `user_id` INT(11) NOT NULL AFTER `id`;
+    END IF;
+    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='ussd_sessions' AND COLUMN_NAME='code_id') THEN
+        ALTER TABLE `ussd_sessions` ADD `code_id` INT(11) NOT NULL AFTER `user_id`;
+    END IF;
+
+    -- 3. USER TABLE FIXES
+    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='users' AND COLUMN_NAME='ussd_balance') THEN
+        ALTER TABLE `users` ADD `ussd_balance` DECIMAL(12,2) NOT NULL DEFAULT 0.00;
+    END IF;
+    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='users' AND COLUMN_NAME='whatsapp_balance') THEN
+        ALTER TABLE `users` ADD `whatsapp_balance` DECIMAL(12,2) NOT NULL DEFAULT 0.00;
+    END IF;
+    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='users' AND COLUMN_NAME='api_client_id') THEN
+        ALTER TABLE `users` ADD `api_client_id` VARCHAR(50) DEFAULT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='users' AND COLUMN_NAME='api_key') THEN
+        ALTER TABLE `users` ADD `api_key` VARCHAR(100) DEFAULT NULL;
+    END IF;
+
 END //
 
 DELIMITER ;
 
--- Execute safe additions
-CALL AddColumnIfMissing('users', 'ussd_balance', 'DECIMAL(12,2) NOT NULL DEFAULT 0.00');
-CALL AddColumnIfMissing('users', 'whatsapp_balance', 'DECIMAL(12,2) NOT NULL DEFAULT 0.00');
-CALL AddColumnIfMissing('users', 'api_client_id', 'VARCHAR(50) DEFAULT NULL');
-CALL AddColumnIfMissing('users', 'api_key', 'VARCHAR(100) DEFAULT NULL');
+-- Run Migration
+CALL SafeMigrate();
 
 -- Cleanup
-DROP PROCEDURE IF EXISTS AddColumnIfMissing;
+DROP PROCEDURE IF EXISTS SafeMigrate;
