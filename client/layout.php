@@ -116,17 +116,46 @@ $navItems = [
                             icon: 'success',
                             confirmButtonColor: 'var(--primary)'
                         }).then(() => {
-                            // Update balance display on page if elements exist
-                            const balanceEl = document.querySelector('.current-balance-value');
-                            if (balanceEl) {
-                                let formatted = '';
-                                if (type === 'whatsapp') formatted = 'KES ' + parseFloat(data.balances.whatsapp).toFixed(2);
-                                else if (type === 'ussd') formatted = 'KES ' + parseFloat(data.balances.ussd).toFixed(2);
-                                else formatted = parseFloat(data.balances.sms).toLocaleString() + ' Units';
+                            // Update ALL elements with 'current-balance-value' class intelligently
+                            const balanceEls = document.querySelectorAll('.current-balance-value');
+                            
+                            balanceEls.forEach(el => {
+                                const bType = el.dataset.balanceType;
+                                if (!bType) return;
+
+                                let newVal = 0;
+                                let prefix = '';
+                                let suffix = '';
+                                let decimals = 2;
+
+                                if (bType === 'sms') {
+                                    newVal = data.balances.sms;
+                                    // Some elements might want " Units" suffix, others not.
+                                    // If it's the sidebar (units-value), no suffix.
+                                    if (!el.classList.contains('units-value')) {
+                                        // Check if it's the one in purchases.php which has " units" outside the tag
+                                        // or if we should add it. For now, let's look at the existing content.
+                                        if (el.innerText.toLowerCase().includes('units')) suffix = ' Units';
+                                    }
+                                } else if (bType === 'whatsapp') {
+                                    newVal = data.balances.whatsapp;
+                                    prefix = 'KES ';
+                                } else if (bType === 'ussd') {
+                                    newVal = data.balances.ussd;
+                                    prefix = 'KES ';
+                                }
+
+                                const formatted = prefix + parseFloat(newVal).toLocaleString(undefined, {
+                                    minimumFractionDigits: decimals, 
+                                    maximumFractionDigits: decimals
+                                }) + suffix;
                                 
-                                balanceEl.innerText = formatted;
-                            } else {
-                                location.reload(); // Fallback
+                                el.innerText = formatted;
+                            });
+
+                            // If no elements were updated, fallback to reload
+                            if (balanceEls.length === 0) {
+                                location.reload();
                             }
                         });
                     } else if (data.status === 'failed') {

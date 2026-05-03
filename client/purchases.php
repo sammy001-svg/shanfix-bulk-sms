@@ -42,7 +42,7 @@ if ($customRate) {
   </div>
   <div style="background:var(--primary-light);border:1px solid var(--primary);padding:8px 18px;border-radius:var(--radius-md)">
     <span style="font-size:12px;color:var(--primary);font-weight:600">Balance:</span>
-    <strong style="font-size:16px;color:var(--primary);margin-left:6px" class="current-balance-value"><?=number_format($user['sms_units'],2)?></strong> units
+    <strong style="font-size:16px;color:var(--primary);margin-left:6px" class="current-balance-value" data-balance-type="sms"><?=number_format($user['sms_units'],2)?></strong> units
   </div>
 </div>
 

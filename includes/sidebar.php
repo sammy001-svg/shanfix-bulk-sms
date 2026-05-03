@@ -45,7 +45,7 @@ $initials = implode('', array_map(fn($w) => strtoupper($w[0]),
     <div class="units-icon">💰</div>
     <div>
       <div class="units-label">SMS Units</div>
-      <div class="units-value"><?= $units ?></div>
+      <div class="units-value current-balance-value" data-balance-type="sms"><?= $units ?></div>
     </div>
     <div style="margin-left:auto;color:rgba(255,255,255,0.4)"><i class="fa-solid fa-rotate-right" style="font-size:12px" id="refreshUnits"></i></div>
   </div>

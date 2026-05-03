@@ -68,7 +68,7 @@ $topups = DB::query("SELECT * FROM purchases WHERE user_id = ? AND type = 'whats
                 <div class="mb-24">
                     <div style="background:var(--bg-muted); padding:20px; border-radius:15px; border:1px solid var(--border); text-align:center">
                         <div style="font-size:12px; color:var(--text-muted); margin-bottom:5px">Current Balance</div>
-                        <div style="font-size:32px; font-weight:800; color:var(--primary)" class="current-balance-value">KES <?= number_format($user['whatsapp_balance'], 2) ?></div>
+                        <div style="font-size:32px; font-weight:800; color:var(--primary)" class="current-balance-value" data-balance-type="whatsapp">KES <?= number_format($user['whatsapp_balance'], 2) ?></div>
                         <div style="font-size:11px; color:var(--text-muted); margin-top:5px">Platform Rate: KES <?= number_format($user['whatsapp_rate'], 2) ?> per msg</div>
                     </div>
                 </div>
