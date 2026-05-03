@@ -93,6 +93,28 @@ $tables = [
         `data_value` LONGTEXT NOT NULL, 
         `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (`id`)
+    ) ENGINE=InnoDB",
+
+    "whatsapp_data_schemas" => "CREATE TABLE IF NOT EXISTS `whatsapp_data_schemas` (
+        `id` INT(11) NOT NULL AUTO_INCREMENT,
+        `user_id` INT(11) NOT NULL,
+        `table_name` VARCHAR(100) NOT NULL,
+        `columns` TEXT NOT NULL,
+        `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `idx_user_table` (`user_id`, `table_name`)
+    ) ENGINE=InnoDB",
+
+    "whatsapp_self_service" => "CREATE TABLE IF NOT EXISTS `whatsapp_self_service` (
+        `id` INT(11) NOT NULL AUTO_INCREMENT,
+        `user_id` INT(11) NOT NULL,
+        `module_type` VARCHAR(50) NOT NULL,
+        `trigger_keyword` VARCHAR(50) NOT NULL,
+        `response_template` TEXT NOT NULL,
+        `is_enabled` TINYINT(1) NOT NULL DEFAULT 1,
+        `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `idx_user_module` (`user_id`, `module_type`)
     ) ENGINE=InnoDB"
 ];
 
@@ -109,13 +131,17 @@ foreach ($tables as $name => $sql) {
 $columns = [
     ['ussd_requests', 'user_id', 'INT(11) NOT NULL AFTER `id`'],
     ['ussd_requests', 'code_id', 'INT(11) NOT NULL AFTER `user_id`'],
+    ['ussd_requests', 'http_status', 'SMALLINT(6) DEFAULT 200 AFTER `response`'],
     ['ussd_sessions', 'user_id', 'INT(11) NOT NULL AFTER `id`'],
     ['ussd_sessions', 'code_id', 'INT(11) NOT NULL AFTER `user_id`'],
     ['users', 'ussd_balance', 'DECIMAL(12,2) NOT NULL DEFAULT 0.00'],
     ['users', 'whatsapp_balance', 'DECIMAL(12,2) NOT NULL DEFAULT 0.00'],
     ['users', 'api_client_id', 'VARCHAR(50) DEFAULT NULL'],
     ['users', 'api_key', 'VARCHAR(100) DEFAULT NULL'],
-    ['whatsapp_messages', 'external_id', 'VARCHAR(100) DEFAULT NULL AFTER `status`']
+    ['whatsapp_messages', 'external_id', 'VARCHAR(100) DEFAULT NULL AFTER `status`'],
+    ['whatsapp_chatbots', 'is_menu', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER `media_url`'],
+    ['whatsapp_chatbots', 'is_dynamic', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER `is_menu`'],
+    ['whatsapp_chatbots', 'data_source_table', 'VARCHAR(100) DEFAULT NULL AFTER `is_dynamic`']
 ];
 
 foreach ($columns as $col) {
