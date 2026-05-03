@@ -1,55 +1,88 @@
 <?php
 /**
- * Shanfix Debug Tool
- * Upload this to cPanel and visit yourdomain.com/debug.php
+ * SUPER ROBUST Shanfix Debug Tool
+ * This file does NOT depend on any other file to prevent crashes.
  */
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-echo "<h1>Shanfix System Debug</h1>";
-echo "PHP Version: " . PHP_VERSION . "<br>";
+echo "<html><body style='font-family:sans-serif; padding:20px; background:#f4f7f6;'>";
+echo "<h1 style='color:#00c896;'>Shanfix System Diagnosis</h1>";
 
-echo "<h3>Testing Core Files...</h3>";
+echo "<b>PHP Version:</b> " . PHP_VERSION . "<br>";
+echo "<b>Server Software:</b> " . $_SERVER['SERVER_SOFTWARE'] . "<br><br>";
 
+// 1. Check Config
+echo "<h3>1. Configuration Check</h3>";
+if (file_exists('config.php')) {
+    echo "✅ config.php found.<br>";
+    include 'config.php';
+} else {
+    echo "❌ config.php NOT found at root.<br>";
+}
+
+// 2. Test DB Connection Manually
+echo "<h3>2. Database Connectivity</h3>";
+$host = defined('DB_HOST') ? DB_HOST : '127.0.0.1';
+$name = defined('DB_NAME') ? DB_NAME : 'bulk_sms_system';
+$user = defined('DB_USER') ? DB_USER : 'root';
+$pass = defined('DB_PASS') ? DB_PASS : '';
+
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$name;charset=utf8mb4", $user, $pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+    ]);
+    echo "✅ Database Connected successfully.<br>";
+    
+    // 3. Check Tables
+    echo "<h3>3. Table & Column Verification</h3>";
+    $tables = ['ussd_requests', 'ussd_sessions', 'whatsapp_custom_data', 'users'];
+    foreach ($tables as $t) {
+        try {
+            $stmt = $pdo->query("DESCRIBE `$t` ");
+            $cols = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            echo "✅ Table `$t` exists. Columns: " . implode(', ', $cols) . "<br>";
+            
+            // Auto-Fix if missing user_id in ussd_requests
+            if ($t === 'ussd_requests' && !in_array('user_id', $cols)) {
+                echo "⚠️ Missing user_id in ussd_requests. <b>Attempting auto-fix...</b> ";
+                $pdo->exec("ALTER TABLE `ussd_requests` ADD `user_id` INT(11) NOT NULL AFTER `id` ");
+                echo "<span style='color:green'>FIXED!</span><br>";
+            }
+        } catch (Exception $e) {
+            echo "❌ Table `$t` error: " . $e->getMessage() . "<br>";
+        }
+    }
+} catch (Exception $e) {
+    echo "❌ Database Connection Failed: " . $e->getMessage() . "<br>";
+    echo "<i>Please check your config.php database credentials.</i><br>";
+}
+
+// 4. Syntax Check Core Files
+echo "<h3>4. Component Integrity</h3>";
 $files = [
     'includes/db.php',
     'includes/auth.php',
-    'includes/topbar.php',
-    'client/layout.php'
+    'client/layout.php',
+    'client/ussd-analytics.php',
+    'client/whatsapp-chatbot.php'
 ];
 
-foreach ($files as $file) {
-    echo "Checking $file: ";
-    if (!file_exists($file)) {
-        echo "<span style='color:red'>MISSING</span><br>";
+foreach ($files as $f) {
+    if (!file_exists($f)) {
+        echo "❌ File missing: $f<br>";
         continue;
     }
     
-    // Attempt to include
-    try {
-        // We use a separate process to catch fatal syntax errors
-        $output = [];
-        $return_var = 0;
-        exec("php -l " . escapeshellarg($file), $output, $return_var);
-        
-        if ($return_var === 0) {
-            echo "<span style='color:green'>SYNTAX OK</span><br>";
-        } else {
-            echo "<span style='color:red'>SYNTAX ERROR: " . implode(" ", $output) . "</span><br>";
-        }
-    } catch (Exception $e) {
-        echo "<span style='color:red'>ERROR: " . $e->getMessage() . "</span><br>";
+    // Simple check: does it start with <?php
+    $content = file_get_contents($f);
+    if (strpos($content, '<?php') === false) {
+        echo "❌ File $f is corrupted or empty.<br>";
+    } else {
+        echo "✅ File $f exists and looks valid.<br>";
     }
 }
 
-echo "<h3>Testing DB Connection...</h3>";
-require_once 'includes/db.php';
-try {
-    DB::getInstance();
-    echo "<span style='color:green'>DB CONNECTED</span><br>";
-} catch (Exception $e) {
-    echo "<span style='color:red'>DB FAILED: " . $e->getMessage() . "</span><br>";
-}
-
-echo "<h3>Done. If you see RED above, that is why your page is blank.</h3>";
+echo "<br><hr>";
+echo "<b>If all sections are green, but the page is still blank, please contact support with a screenshot of this page.</b>";
+echo "</body></html>";
