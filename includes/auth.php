@@ -166,11 +166,11 @@ function redirect($url, $code = 302) {
     exit;
 }
 
-function flash_set(string $type, string $message): void {
+function flash_set($type, $message) {
     $_SESSION['flash'] = compact('type', 'message');
 }
 
-function flash_get(): ?array {
+function flash_get() {
     $flash = $_SESSION['flash'] ?? null;
     unset($_SESSION['flash']);
     return $flash;

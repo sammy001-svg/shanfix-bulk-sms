@@ -1,88 +1,62 @@
 <?php
 /**
- * SUPER ROBUST Shanfix Debug Tool
- * This file does NOT depend on any other file to prevent crashes.
+ * Advanced Debug & Error Revealer for Shanfix Bulk SMS
+ * This script will show you EXACTLY why pages are blank.
  */
+
+// 1. Force Error Reporting
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
 
-echo "<html><body style='font-family:sans-serif; padding:20px; background:#f4f7f6;'>";
-echo "<h1 style='color:#00c896;'>Shanfix System Diagnosis</h1>";
+echo "<div style='font-family:monospace; background:#000; color:#0f0; padding:20px; border-radius:10px; line-height:1.5;'>";
+echo "<h2>--- SHANFIX ADVANCED DEBUG ---</h2>";
 
-echo "<b>PHP Version:</b> " . PHP_VERSION . "<br>";
-echo "<b>Server Software:</b> " . $_SERVER['SERVER_SOFTWARE'] . "<br><br>";
+// 2. Environment Check
+echo "PHP Version: " . PHP_VERSION . "<br>";
+echo "Current File: " . __FILE__ . "<br>";
+echo "Server Software: " . ($_SERVER['SERVER_SOFTWARE'] ?? 'Unknown') . "<br><br>";
 
-// 1. Check Config
-echo "<h3>1. Configuration Check</h3>";
-if (file_exists('config.php')) {
-    echo "✅ config.php found.<br>";
-    include 'config.php';
-} else {
-    echo "❌ config.php NOT found at root.<br>";
-}
-
-// 2. Test DB Connection Manually
-echo "<h3>2. Database Connectivity</h3>";
-$host = defined('DB_HOST') ? DB_HOST : '127.0.0.1';
-$name = defined('DB_NAME') ? DB_NAME : 'bulk_sms_system';
-$user = defined('DB_USER') ? DB_USER : 'root';
-$pass = defined('DB_PASS') ? DB_PASS : '';
-
+// 3. Test Connection
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$name;charset=utf8mb4", $user, $pass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
-    ]);
-    echo "✅ Database Connected successfully.<br>";
+    require_once __DIR__ . '/includes/db.php';
+    echo "[PASS] includes/db.php loaded.<br>";
     
-    // 3. Check Tables
-    echo "<h3>3. Table & Column Verification</h3>";
-    $tables = ['ussd_requests', 'ussd_sessions', 'whatsapp_custom_data', 'users'];
-    foreach ($tables as $t) {
-        try {
-            $stmt = $pdo->query("DESCRIBE `$t` ");
-            $cols = $stmt->fetchAll(PDO::FETCH_COLUMN);
-            echo "✅ Table `$t` exists. Columns: " . implode(', ', $cols) . "<br>";
-            
-            // Auto-Fix if missing user_id in ussd_requests
-            if ($t === 'ussd_requests' && !in_array('user_id', $cols)) {
-                echo "⚠️ Missing user_id in ussd_requests. <b>Attempting auto-fix...</b> ";
-                $pdo->exec("ALTER TABLE `ussd_requests` ADD `user_id` INT(11) NOT NULL AFTER `id` ");
-                echo "<span style='color:green'>FIXED!</span><br>";
-            }
-        } catch (Exception $e) {
-            echo "❌ Table `$t` error: " . $e->getMessage() . "<br>";
-        }
-    }
-} catch (Exception $e) {
-    echo "❌ Database Connection Failed: " . $e->getMessage() . "<br>";
-    echo "<i>Please check your config.php database credentials.</i><br>";
-}
-
-// 4. Syntax Check Core Files
-echo "<h3>4. Component Integrity</h3>";
-$files = [
-    'includes/db.php',
-    'includes/auth.php',
-    'client/layout.php',
-    'client/ussd-analytics.php',
-    'client/whatsapp-chatbot.php'
-];
-
-foreach ($files as $f) {
-    if (!file_exists($f)) {
-        echo "❌ File missing: $f<br>";
-        continue;
-    }
+    $pdo = DB::getInstance();
+    echo "[PASS] Database connected successfully.<br>";
     
-    // Simple check: does it start with <?php
-    $content = file_get_contents($f);
-    if (strpos($content, '<?php') === false) {
-        echo "❌ File $f is corrupted or empty.<br>";
+    // 4. Test USSD Analytics Queries
+    echo "<br>Testing USSD Analytics Queries:<br>";
+    try {
+        $count = DB::queryValue("SELECT COUNT(*) FROM ussd_requests");
+        echo "[PASS] ussd_requests table accessible. Count: $count<br>";
+    } catch (Exception $e) {
+        echo "[FAIL] ussd_requests error: " . $e->getMessage() . "<br>";
+    }
+
+    // 5. Test WhatsApp Chatbot Queries
+    echo "<br>Testing WhatsApp Chatbot Queries:<br>";
+    try {
+        $count = DB::queryValue("SELECT COUNT(*) FROM whatsapp_chatbots");
+        echo "[PASS] whatsapp_chatbots table accessible. Count: $count<br>";
+    } catch (Exception $e) {
+        echo "[FAIL] whatsapp_chatbots error: " . $e->getMessage() . "<br>";
+    }
+
+    // 6. Check for PHP Incompatibilities
+    echo "<br>Checking for PHP syntax blockers:<br>";
+    if (version_compare(PHP_VERSION, '7.4.0', '<')) {
+        echo "[WARN] Your PHP version is below 7.4. Some features like arrow functions or typed properties might crash. I have refactored most of them, but please consider upgrading to 7.4 or 8.0+.<br>";
     } else {
-        echo "✅ File $f exists and looks valid.<br>";
+        echo "[PASS] PHP version is modern enough.<br>";
     }
+
+} catch (Throwable $e) {
+    echo "<br><span style='color:red; font-weight:bold;'>CRITICAL ERROR CAUGHT:</span><br>";
+    echo "Message: " . $e->getMessage() . "<br>";
+    echo "File: " . $e->getFile() . "<br>";
+    echo "Line: " . $e->getLine() . "<br>";
 }
 
-echo "<br><hr>";
-echo "<b>If all sections are green, but the page is still blank, please contact support with a screenshot of this page.</b>";
-echo "</body></html>";
+echo "<br>--- DEBUG END ---";
+echo "</div>";
