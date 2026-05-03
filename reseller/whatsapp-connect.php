@@ -1,13 +1,13 @@
 <?php
 try {
-$pageTitle = 'WhatsApp Account Hub';
-$breadcrumb = [['label'=>'WhatsApp'],['label'=>'Account Hub']];
-require_once __DIR__ . '/layout.php';
+require_once __DIR__ . '/../includes/db.php'; // Ensure DB is available before user session
 
-$uid = $user['id'];
-
-// Handle Actions
+// Handle Actions BEFORE layout output
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    // Need user context for actions
+    require_once __DIR__ . '/../includes/auth.php';
+    $uid = $_SESSION['user_id'];
+
     if (!csrf_verify()) {
         flash_set('danger', 'Invalid security token.');
     } else {
@@ -48,6 +48,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     header("Location: whatsapp-connect.php");
     exit;
 }
+
+$pageTitle = 'WhatsApp Account Hub';
+$breadcrumb = [['label'=>'WhatsApp'],['label'=>'Account Hub']];
+require_once __DIR__ . '/layout.php';
+
+$uid = $user['id'];
 
 // Fetch all accounts
 $accounts = DB::query("SELECT * FROM whatsapp_accounts WHERE user_id = ? ORDER BY created_at DESC", [$uid]) ?: [];

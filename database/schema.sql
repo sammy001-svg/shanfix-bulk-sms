@@ -237,7 +237,7 @@ INSERT INTO `system_settings` (`key`, `value`) VALUES
   -- Payhero Kenya
   ('payhero_api_username',   ''),
   ('payhero_api_password',   ''),
-  ('payhero_api_channel_id', '3197'),
+  ('payhero_channel_id',     '3197'),
   -- Onfon Media
   ('onfon_api_key',     ''),
   ('onfon_user_id',     ''),

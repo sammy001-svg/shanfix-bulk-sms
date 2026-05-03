@@ -144,7 +144,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_reply'])) {
                 <?php foreach ($chatHistory as $chat): ?>
                     <div class="bubble <?= $chat['direction'] ?>">
                         <?= nl2br(htmlspecialchars($chat['message'])) ?>
-                        <span class="bubble-time"><?= date('H:i', strtotime($chat['created_at'])) ?></span>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px; opacity:0.7; font-size:10px">
+                            <span class="source-tag">
+                                <?php if($chat['direction'] === 'out'): ?>
+                                    <i class="fa-solid <?= $chat['source'] === 'ai' ? 'fa-brain' : ($chat['source'] === 'bot' ? 'fa-robot' : 'fa-user') ?>" style="margin-right:3px"></i>
+                                    <?= strtoupper($chat['source']) ?>
+                                <?php endif; ?>
+                            </span>
+                            <span><?= date('H:i', strtotime($chat['created_at'])) ?></span>
+                        </div>
                     </div>
                 <?php endforeach; ?>
             </div>

@@ -21,7 +21,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_topup'])) {
             
             $purchaseData = [
                 'type' => 'whatsapp',
-                'custom_units' => 0, // Not used for whatsapp money topups
+                'amount' => $amount,
+                'custom_units' => 0, 
                 'payment_method' => 'mpesa',
                 'payment_ref' => $phone,
                 'plan_id' => 0

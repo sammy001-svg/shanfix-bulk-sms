@@ -132,6 +132,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_whatsapp'])) {
                         DB::execute("UPDATE whatsapp_messages SET status = 'failed' WHERE id = ?", [$msgId]);
                     }
                 }
+
+                // Deduct balance
+                if ($count > 0) {
+                    $deductCost = $count * $rate;
+                    DB::execute("UPDATE users SET whatsapp_balance = whatsapp_balance - ? WHERE id = ?", [$deductCost, $uid]);
+                }
             }
 
             if ($count > 0) {

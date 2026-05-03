@@ -124,6 +124,7 @@ $tables = [
         `sender` VARCHAR(20) NOT NULL,
         `message` TEXT,
         `direction` ENUM('in','out') DEFAULT 'in',
+        `source` ENUM('human','bot','ai') DEFAULT 'human',
         `status` VARCHAR(20) DEFAULT 'received',
         `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (`id`)
@@ -175,7 +176,8 @@ $columns = [
     ['whatsapp_accounts', 'ai_enabled', 'TINYINT(1) NOT NULL DEFAULT 0'],
     ['whatsapp_accounts', 'ai_api_key', 'VARCHAR(255) DEFAULT NULL'],
     ['whatsapp_accounts', 'ai_model', "VARCHAR(50) DEFAULT 'gemini-1.5-flash'"],
-    ['whatsapp_accounts', 'ai_prompt', 'TEXT DEFAULT NULL']
+    ['whatsapp_accounts', 'ai_prompt', 'TEXT DEFAULT NULL'],
+    ['whatsapp_inbox', 'source', "ENUM('human','bot','ai') DEFAULT 'human' AFTER `direction`"]
 ];
 
 foreach ($columns as $col) {

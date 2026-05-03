@@ -1,66 +1,73 @@
 <?php
 try {
-$pageTitle = 'WhatsApp Smart Automations';
-$breadcrumb = [['label'=>'WhatsApp'],['label'=>'Smart Automations']];
-require_once __DIR__ . '/layout.php';
+require_once __DIR__ . '/../includes/db.php';
 
-$uid = $user['id'];
+// Handle Actions BEFORE layout output
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_once __DIR__ . '/../includes/auth.php';
+    $uid = $_SESSION['user_id'];
 
-// Handle New Rule
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_rule'])) {
     if (!csrf_verify()) {
         flash_set('danger', 'Invalid security token.');
     } else {
-        $keyword = sanitize($_POST['keyword']);
-        $matchType = $_POST['match_type'];
-        $response = sanitize($_POST['response']);
-        $mediaUrl = sanitize($_POST['media_url'] ?? '');
-        $parentId = !empty($_POST['parent_id']) ? (int)$_POST['parent_id'] : null;
-        $isMenu = isset($_POST['is_menu']) ? 1 : 0;
-        $isDynamic = isset($_POST['is_dynamic']) ? 1 : 0;
-        $dataSource = sanitize($_POST['data_source_table'] ?? '');
-        
-        DB::execute("
-            INSERT INTO whatsapp_chatbots (user_id, parent_id, keyword, match_type, response, media_url, is_menu, is_dynamic, data_source_table) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ", [$uid, $parentId, $keyword, $matchType, $response, $mediaUrl, $isMenu, $isDynamic, $dataSource]);
-        flash_set('success', 'Automation rule deployed.');
-    }
-}
+        // Handle New Rule
+        if (isset($_POST['save_rule'])) {
+            $keyword = sanitize($_POST['keyword']);
+            $matchType = $_POST['match_type'];
+            $response = sanitize($_POST['response']);
+            $mediaUrl = sanitize($_POST['media_url'] ?? '');
+            $parentId = !empty($_POST['parent_id']) ? (int)$_POST['parent_id'] : null;
+            $isMenu = isset($_POST['is_menu']) ? 1 : 0;
+            $isDynamic = isset($_POST['is_dynamic']) ? 1 : 0;
+            $dataSource = sanitize($_POST['data_source_table'] ?? '');
+            
+            DB::execute("
+                INSERT INTO whatsapp_chatbots (user_id, parent_id, keyword, match_type, response, media_url, is_menu, is_dynamic, data_source_table) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ", [$uid, $parentId, $keyword, $matchType, $response, $mediaUrl, $isMenu, $isDynamic, $dataSource]);
+            flash_set('success', 'Automation rule deployed.');
+        }
 
-// Handle Edit Rule
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_rule'])) {
-    if (!csrf_verify()) {
-        flash_set('danger', 'Invalid security token.');
-    } else {
-        $id = (int)$_POST['id'];
-        $keyword = sanitize($_POST['keyword']);
-        $matchType = $_POST['match_type'];
-        $response = sanitize($_POST['response']);
-        $mediaUrl = sanitize($_POST['media_url'] ?? '');
-        $parentId = !empty($_POST['parent_id']) ? (int)$_POST['parent_id'] : null;
-        $isMenu = isset($_POST['is_menu']) ? 1 : 0;
-        $isDynamic = isset($_POST['is_dynamic']) ? 1 : 0;
-        $dataSource = sanitize($_POST['data_source_table'] ?? '');
-        
-        DB::execute("
-            UPDATE whatsapp_chatbots 
-            SET parent_id = ?, keyword = ?, match_type = ?, response = ?, media_url = ?, is_menu = ?, is_dynamic = ?, data_source_table = ?
-            WHERE id = ? AND user_id = ?
-        ", [$parentId, $keyword, $matchType, $response, $mediaUrl, $isMenu, $isDynamic, $dataSource, $id, $uid]);
-        flash_set('success', 'Automation rule updated.');
+        // Handle Edit Rule
+        if (isset($_POST['update_rule'])) {
+            $id = (int)$_POST['id'];
+            $keyword = sanitize($_POST['keyword']);
+            $matchType = $_POST['match_type'];
+            $response = sanitize($_POST['response']);
+            $mediaUrl = sanitize($_POST['media_url'] ?? '');
+            $parentId = !empty($_POST['parent_id']) ? (int)$_POST['parent_id'] : null;
+            $isMenu = isset($_POST['is_menu']) ? 1 : 0;
+            $isDynamic = isset($_POST['is_dynamic']) ? 1 : 0;
+            $dataSource = sanitize($_POST['data_source_table'] ?? '');
+            
+            DB::execute("
+                UPDATE whatsapp_chatbots 
+                SET parent_id = ?, keyword = ?, match_type = ?, response = ?, media_url = ?, is_menu = ?, is_dynamic = ?, data_source_table = ?
+                WHERE id = ? AND user_id = ?
+            ", [$parentId, $keyword, $matchType, $response, $mediaUrl, $isMenu, $isDynamic, $dataSource, $id, $uid]);
+            flash_set('success', 'Automation rule updated.');
+        }
     }
+    header("Location: whatsapp-chatbot.php");
+    exit;
 }
 
 // Handle Delete
 if (isset($_GET['delete'])) {
+    require_once __DIR__ . '/../includes/auth.php';
+    $uid = $_SESSION['user_id'];
     $id = (int)$_GET['delete'];
-    // Delete the rule (foreign key CASCADE handles children if constraint is set, otherwise we do it manually)
     DB::execute("DELETE FROM whatsapp_chatbots WHERE id = ? AND user_id = ?", [$id, $uid]);
     flash_set('success', 'Automation rule removed.');
     header("Location: whatsapp-chatbot.php");
     exit;
 }
+
+$pageTitle = 'WhatsApp Smart Automations';
+$breadcrumb = [['label'=>'WhatsApp'],['label'=>'Smart Automations']];
+require_once __DIR__ . '/layout.php';
+
+$uid = $user['id'];
 
 // Seed Default Template if empty
 $existingCount = DB::queryValue("SELECT COUNT(*) FROM whatsapp_chatbots WHERE user_id = ?", [$uid]);

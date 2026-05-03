@@ -29,8 +29,13 @@ if (empty($sender) || empty($message)) {
     die('Ignored: Empty message or sender');
 }
 
-// 2. Identify Account & User
-$account = DB::queryOne("SELECT id, user_id, token FROM whatsapp_accounts WHERE instance_id = ? AND status = 'active'", [$instanceId]);
+// 2. Identify Account & User (including billing details)
+$account = DB::queryOne("
+    SELECT a.*, u.whatsapp_balance, u.whatsapp_rate 
+    FROM whatsapp_accounts a
+    JOIN users u ON a.user_id = u.id
+    WHERE a.instance_id = ? AND a.status = 'active'
+", [$instanceId]);
 
 if (!$account) {
     die('Ignored: Account inactive or not found');
@@ -39,8 +44,13 @@ if (!$account) {
 $uid = $account['user_id'];
 $accId = $account['id'];
 
-// 3. Log Incoming Message
-DB::insert("INSERT INTO whatsapp_inbox (user_id, account_id, sender, message, direction, status) VALUES (?, ?, ?, ?, 'in', 'received')", [$uid, $accId, $sender, $message]);
+    $source = 'human';
+    if ($responseFound) {
+        $source = (isset($aiResponse)) ? 'ai' : 'bot';
+    }
+
+    // Phase 1: Incoming Message Logging
+    $inboxId = DB::insert("INSERT INTO whatsapp_inbox (user_id, account_id, sender, message, direction, status) VALUES (?, ?, ?, ?, 'in', 'received')", [$uid, $accId, $sender, $message]);
 
 // 4. Intelligent Routing
 $responseFound = false;
@@ -132,16 +142,29 @@ if (!$responseFound) {
 }
 
 // 5. Send Response
-if ($responseFound && !empty($responseText)) {
-    $gateway = new WhatsApp_Gateway($instanceId, $account['token'], $accId);
-    $res = $gateway->sendMessage($sender, $responseText, $mediaUrl);
-    
-    // Log outgoing message
-    DB::insert("INSERT INTO whatsapp_inbox (user_id, account_id, sender, message, direction, status) VALUES (?, ?, ?, ?, 'out', 'sent')", [$uid, $accId, $sender, $responseText]);
-    
-    // Also log to general messages table
-    DB::insert("INSERT INTO whatsapp_messages (user_id, account_id, recipient, message, media_url, status, external_id) VALUES (?, ?, ?, ?, ?, 'sent', ?)", 
-        [$uid, $accId, $sender, $responseText, $mediaUrl, $res['message_id'] ?? null]);
-}
+    if ($responseFound && !empty($responseText)) {
+        $rate = (float)($account['whatsapp_rate'] ?? 1.00);
+        
+        if ($account['whatsapp_balance'] < $rate) {
+            error_log("WhatsApp Webhook: Insufficient balance for User ID {$uid} to send auto-reply.");
+            die(json_encode(['success' => false, 'error' => 'Insufficient balance']));
+        }
 
+        require_once __DIR__ . '/../includes/gateways/whatsapp.php';
+        $gateway = new WhatsApp_Gateway($account['instance_id'], $account['token'], $account['id']);
+        $res = $gateway->sendMessage($sender, $responseText);
+        
+        if ($res['success']) {
+            // Deduct Balance
+            DB::execute("UPDATE users SET whatsapp_balance = whatsapp_balance - ? WHERE id = ?", [$rate, $uid]);
+
+            // Log Outgoing response to Inbox
+            DB::insert("INSERT INTO whatsapp_inbox (user_id, account_id, sender, message, direction, source, status) VALUES (?, ?, ?, ?, 'out', ?, 'sent')", 
+                [$uid, $accId, $sender, $responseText, $source]);
+            
+            // Log to general messages table
+            DB::insert("INSERT INTO whatsapp_messages (user_id, account_id, recipient, message, status, external_id) VALUES (?, ?, ?, ?, 'sent', ?)", 
+                [$uid, $accId, $sender, $responseText, $res['message_id'] ?? null]);
+        }
+    }
 echo json_encode(['success' => true, 'responded' => $responseFound]);

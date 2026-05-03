@@ -11,6 +11,7 @@ class Purchase {
     public static function create($userId, $data) {
         $planId  = (int)($data['plan_id'] ?? 0);
         $units   = (float)($data['custom_units'] ?? 0);
+        $amount  = (float)($data['amount'] ?? 0);
         $method  = sanitize($data['payment_method'] ?? 'mpesa');
         $ref     = sanitize($data['payment_ref'] ?? '');
 
@@ -37,6 +38,8 @@ class Purchase {
             }
         }
 
+        $type    = sanitize($data['type'] ?? 'sms');
+
         if ($planId) {
             $plan = DB::queryOne("SELECT * FROM pricing_plans WHERE id = ?", [$planId]);
             if (!$plan) return ['success' => false, 'error' => 'Invalid plan selected.'];
@@ -44,18 +47,22 @@ class Purchase {
             $units = $plan['units'];
             $amount = $plan['price']; // Use the fixed price of the plan
         } else {
-            if ($units <= 0) return ['success' => false, 'error' => 'Invalid unit amount.'];
-            $rate = $customRate ?? 1.00; // Use custom/reseller rate or default to 1.00
-            $amount = $units * $rate;
+            if ($type === 'whatsapp') {
+                if ($amount <= 0) return ['success' => false, 'error' => 'Invalid top-up amount.'];
+                $units = 0; // WhatsApp wallet is money-based, not unit-based
+            } else {
+                if ($units <= 0) return ['success' => false, 'error' => 'Invalid unit amount.'];
+                $rate = $customRate ?? 1.00; // Use custom/reseller rate or default to 1.00
+                $amount = $units * $rate;
+            }
         }
 
-        // Check if parent has enough units
-        if ($parentComp['sms_units'] < $units) {
+        // Check if parent has enough units (Only for SMS)
+        if ($type === 'sms' && $parentComp['sms_units'] < $units) {
             $parentLabel = ($parentComp['role'] === 'admin') ? 'The Platform' : 'Your Reseller';
             return ['success' => false, 'error' => "$parentLabel has insufficient units to fulfill this request."];
         }
 
-        $type    = sanitize($data['type'] ?? 'sms');
 
         $id = DB::insert("INSERT INTO purchases (user_id, type, units, amount, currency, status, payment_method, transaction_ref, created_at) 
                          VALUES (?, ?, ?, ?, 'KES', 'pending', ?, ?, NOW())", 

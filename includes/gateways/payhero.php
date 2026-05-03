@@ -6,7 +6,15 @@
 class Payhero {
     private static function get_setting($key) {
         $res = DB::queryOne("SELECT value FROM system_settings WHERE `key` = ?", ["payhero_$key"]);
-        return $res['value'] ?? '';
+        $val = $res['value'] ?? '';
+        
+        // Fallback for channel_id which might be stored as payhero_api_channel_id in schema
+        if ($key === 'channel_id' && empty($val)) {
+            $res = DB::queryOne("SELECT value FROM system_settings WHERE `key` = 'payhero_api_channel_id'");
+            $val = $res['value'] ?? '';
+        }
+        
+        return $val;
     }
 
     public static function initiateSTKPush($phoneNumber, $amount, $purchaseId) {
