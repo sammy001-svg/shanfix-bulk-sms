@@ -1056,6 +1056,10 @@ textarea.form-control {
   flex-direction: column;
 }
 
+.modal-md {
+  max-width: 600px;
+}
+
 /* Ensure body is the one scrolling if modal is too tall */
 .modal-body {
   padding: 22px 26px;

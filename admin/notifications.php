@@ -99,7 +99,7 @@ $users = DB::query("SELECT id, name, email, role FROM users WHERE status = 'acti
 
 <!-- New Notification Modal -->
 <div class="modal-overlay" id="newNotifModal">
-    <div class="modal" style="max-width:600px">
+    <div class="modal modal-md">
         <div class="modal-header">
             <h3 class="modal-title"><i class="fa-solid fa-plus-circle" style="color:var(--primary)"></i> Create New Notification</h3>
             <button class="modal-close" onclick="closeModal('newNotifModal')">&times;</button>
