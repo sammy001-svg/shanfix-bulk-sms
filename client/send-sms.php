@@ -9,9 +9,8 @@ $groups    = DB::query("SELECT id,name FROM contact_groups WHERE user_id=?",[$ui
 $units     = $user['sms_units'];
 ?>
 
+<style>
 /* Custom sample bubble for previews */
-.sample-msg-bubble { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 12px 15px; border-radius: 4px; font-size: 13px; color: var(--text-primary); line-height: 1.5; margin-bottom: 12px; }
-
 .sample-msg-bubble { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 12px 15px; border-radius: 4px; font-size: 13px; color: var(--text-primary); line-height: 1.5; margin-bottom: 12px; }
 
 /* Enhanced Table Styling */
