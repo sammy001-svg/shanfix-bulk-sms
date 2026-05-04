@@ -182,10 +182,10 @@ function flash_get() {
  * Create a new notification.
  * @param int|null $userId Specific user ID or NULL for all users (broadcast).
  */
-function notify($userId, $title, $message, $type = 'info', $isPopup = false, $imageUrl = null) {
+function notify($userId, $title, $message, $type = 'info', $isPopup = false, $imageUrl = null, $isBanner = false) {
     $res = DB::insert(
-        "INSERT INTO notifications (user_id, title, message, type, is_popup, image_url, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())",
-        [$userId, $title, $message, $type, $isPopup ? 1 : 0, $imageUrl]
+        "INSERT INTO notifications (user_id, title, message, type, is_popup, is_banner, image_url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())",
+        [$userId, $title, $message, $type, $isPopup ? 1 : 0, $isBanner ? 1 : 0, $imageUrl]
     );
     return $res ? (int)$res : false;
 }
@@ -239,6 +239,20 @@ function get_dashboard_popups($userId) {
          WHERE is_popup = 1 
          AND (user_id = ? OR user_id IS NULL) 
          AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+         ORDER BY created_at DESC",
+        [$userId]
+    ) ?: [];
+}
+
+/**
+ * Get active banner notifications for the dashboard.
+ */
+function get_dashboard_banners($userId) {
+    return DB::query(
+        "SELECT * FROM notifications 
+         WHERE is_banner = 1 
+         AND (user_id = ? OR user_id IS NULL) 
+         AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
          ORDER BY created_at DESC",
         [$userId]
     ) ?: [];

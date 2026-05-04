@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $type    = sanitize($_POST['type'] ?? 'info');
     $userId  = !empty($_POST['user_id']) ? (int)$_POST['user_id'] : null;
     $isPopup = isset($_POST['is_popup']) ? 1 : 0;
+    $isBanner = isset($_POST['is_banner']) ? 1 : 0;
     $imageUrl = null;
 
     // Handle Image Upload
@@ -40,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($title && $message) {
-        $success = notify($userId, $title, $message, $type, (bool)$isPopup, $imageUrl);
+        $success = notify($userId, $title, $message, $type, (bool)$isPopup, $imageUrl, (bool)$isBanner);
         if ($success) {
             flash_set('success', 'Notification created and sent successfully.');
         } else {

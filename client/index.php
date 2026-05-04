@@ -15,9 +15,41 @@ $chartLabels = json_encode(array_column($chartData,'day'));
 $chartValues = json_encode(array_column($chartData,'total'));
 
 $recentMessages = DB::query("SELECT * FROM messages WHERE user_id=? ORDER BY created_at DESC LIMIT 8",[$uid]);
+
+// Fetch Dashboard Banners
+$banners = get_dashboard_banners($uid);
 ?>
 
-<?php if ($isNewUser): ?>
+<?php if (!empty($banners)): ?>
+<div class="banner-carousel" id="notifCarousel">
+  <div class="banner-container" id="carouselContainer">
+    <?php foreach ($banners as $b): 
+      $icon = ['info'=>'fa-circle-info','success'=>'fa-circle-check','warning'=>'fa-triangle-exclamation','danger'=>'fa-circle-exclamation'][$b['type']] ?? 'fa-bell';
+    ?>
+      <div class="banner-slide <?= $b['type'] ?>">
+        <div class="banner-icon"><i class="fa-solid <?= $icon ?>"></i></div>
+        <div class="banner-text">
+          <div class="banner-title"><?= htmlspecialchars($b['title']) ?></div>
+          <div class="banner-msg"><?= htmlspecialchars($b['message']) ?></div>
+          <div class="banner-actions">
+            <a href="/client/purchases.php" class="banner-action-link"><i class="fa-solid fa-cart-shopping"></i> Buy Units</a>
+            <a href="/client/send-sms.php" class="banner-action-link"><i class="fa-solid fa-paper-plane"></i> Send SMS</a>
+            <a href="/client/sender-ids.php" class="banner-action-link"><i class="fa-solid fa-id-badge"></i> Request Sender ID</a>
+          </div>
+        </div>
+        <?php if ($b['image_url']): ?>
+          <div class="banner-img" style="height:80px; width:120px; border-radius:8px; background:url('<?= $b['image_url'] ?>') center/cover"></div>
+        <?php endif; ?>
+      </div>
+    <?php endforeach; ?>
+  </div>
+  <?php if (count($banners) > 1): ?>
+    <div class="banner-nav" id="carouselNav"></div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php if ($isNewUser && empty($banners)): ?>
 <div class="welcome-banner">
   <div class="banner-content">
     <p style="color:var(--primary);font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">GETTING STARTED</p>
@@ -148,6 +180,47 @@ $extraScript = <<<JS
   new Chart(ctx,{type:'line',data:{labels:{$chartLabels}||[],datasets:[{label:'Msgs',data:{$chartValues}||[],borderColor:'#00c896',backgroundColor:'rgba(0,200,150,0.08)',fill:true,tension:0.4,pointRadius:4,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}}});
   const ta=document.getElementById('qs');
   if(ta){ta.addEventListener('input',()=>{const l=ta.value.length;document.getElementById('cnt').textContent=l;const s=Math.ceil(l/160)||1;document.getElementById('seg').textContent=s;document.getElementById('cost').textContent=(s * (window.ShanfixConfig.smsRate || 1)).toFixed(2);});}
+
+  // Banner Carousel Logic
+  const carousel = document.getElementById('notifCarousel');
+  if (carousel) {
+      const container = document.getElementById('carouselContainer');
+      const slides = container.querySelectorAll('.banner-slide');
+      const nav = document.getElementById('carouselNav');
+      let currentIdx = 0;
+      const count = slides.length;
+
+      if (count > 1) {
+          // Create dots
+          slides.forEach((_, i) => {
+              const dot = document.createElement('div');
+              dot.className = 'banner-dot' + (i === 0 ? ' active' : '');
+              dot.onclick = () => goToSlide(i);
+              nav.appendChild(dot);
+          });
+
+          function updateDots() {
+              nav.querySelectorAll('.banner-dot').forEach((dot, i) => {
+                  dot.classList.toggle('active', i === currentIdx);
+              });
+          }
+
+          function goToSlide(idx) {
+              currentIdx = idx;
+              container.style.transform = 'translateX(-' + (currentIdx * 100) + '%)';
+              updateDots();
+          }
+
+          function nextSlide() {
+              currentIdx = (currentIdx + 1) % count;
+              goToSlide(currentIdx);
+          }
+
+          let interval = setInterval(nextSlide, 5000);
+          carousel.onmouseenter = () => clearInterval(interval);
+          carousel.onmouseleave = () => interval = setInterval(nextSlide, 5000);
+      }
+  }
 })();
 </script>
 JS;

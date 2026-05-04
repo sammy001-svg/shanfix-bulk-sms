@@ -31,7 +31,7 @@ $users = DB::query("SELECT id, name, email, role FROM users WHERE status = 'acti
                     <th>Title & Message</th>
                     <th>Target Audience</th>
                     <th>Alert Type</th>
-                    <th>Popup</th>
+                    <th>Mode</th>
                     <th>Date Sent</th>
                     <th>Actions</th>
                 </tr>
@@ -65,11 +65,17 @@ $users = DB::query("SELECT id, name, email, role FROM users WHERE status = 'acti
                         </span>
                     </td>
                     <td>
-                        <?php if($n['is_popup']): ?>
-                            <span class="badge badge-purple"><i class="fa-solid fa-window-maximize"></i> Popup</span>
-                        <?php else: ?>
-                            <span class="text-muted" style="font-size:12px">Header Only</span>
-                        <?php endif; ?>
+                        <div style="display:flex; gap:4px; flex-wrap:wrap">
+                            <?php if($n['is_popup']): ?>
+                                <span class="badge badge-purple" title="Shows as center modal"><i class="fa-solid fa-window-maximize"></i> Popup</span>
+                            <?php endif; ?>
+                            <?php if($n['is_banner']): ?>
+                                <span class="badge badge-primary" title="Shows on dashboard header"><i class="fa-solid fa-rectangle-ad"></i> Banner</span>
+                            <?php endif; ?>
+                            <?php if(!$n['is_popup'] && !$n['is_banner']): ?>
+                                <span class="text-muted" style="font-size:12px">Header Only</span>
+                            <?php endif; ?>
+                        </div>
                     </td>
                     <td style="font-size:12px; color:var(--text-secondary)">
                         <?= date('d M Y, H:i', strtotime($n['created_at'])) ?>
@@ -137,6 +143,9 @@ $users = DB::query("SELECT id, name, email, role FROM users WHERE status = 'acti
                         <div style="display:flex; gap:15px; align-items:center; height:42px">
                             <label style="display:flex; align-items:center; gap:5px; cursor:pointer">
                                 <input type="checkbox" name="is_popup" value="1"> Popup Modal
+                            </label>
+                            <label style="display:flex; align-items:center; gap:5px; cursor:pointer">
+                                <input type="checkbox" name="is_banner" value="1"> Dashboard Banner
                             </label>
                         </div>
                     </div>

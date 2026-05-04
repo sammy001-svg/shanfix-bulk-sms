@@ -62,8 +62,15 @@ $totalPages = ceil($total/$perPage);
                   <form method="POST" action="/admin/actions/toggle-status.php" style="display:inline">
                     <input type="hidden" name="id" value="<?=$u['id']?>">
                     <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
-                    <button class="btn <?=$u['status']==='active'?'btn-danger':'btn-primary'?> btn-sm btn-icon" onclick="return confirm('Are you sure?')" title="<?=$u['status']==='active'?'Suspend':'Activate'?>">
+                    <button class="btn <?=$u['status']==='active'?'btn-danger':'btn-primary'?> btn-sm btn-icon" onclick="return confirm('Are you sure you want to change this user status?')" title="<?=$u['status']==='active'?'Suspend':'Activate'?>">
                       <i class="fa-solid <?=$u['status']==='active'?'fa-ban':'fa-check'?>"></i>
+                    </button>
+                  </form>
+                  <form method="POST" action="/admin/actions/delete-user.php" style="display:inline" onsubmit="return confirm('WARNING: This will permanently delete this client and ALL their data (messages, contacts, etc). This action cannot be undone. Are you sure?')">
+                    <input type="hidden" name="id" value="<?=$u['id']?>">
+                    <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
+                    <button type="submit" class="btn btn-outline btn-sm btn-icon" style="color:var(--danger); border-color:var(--danger)" title="Delete User">
+                      <i class="fa-solid fa-trash-can"></i>
                     </button>
                   </form>
                 </div>

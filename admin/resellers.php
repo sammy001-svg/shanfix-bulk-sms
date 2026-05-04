@@ -76,8 +76,15 @@ $totalPages = ceil($total/$perPage);
                   <form method="POST" action="/admin/actions/toggle-status.php" style="display:inline">
                     <input type="hidden" name="id" value="<?=$u['id']?>">
                     <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
-                    <button type="submit" class="btn <?=$u['status']==='active'?'btn-danger':'btn-primary'?> btn-sm btn-icon" title="<?=$u['status']==='active'?'Suspend':'Activate'?>" onclick="return confirm('Are you sure?')">
+                    <button type="submit" class="btn <?=$u['status']==='active'?'btn-danger':'btn-primary'?> btn-sm btn-icon" title="<?=$u['status']==='active'?'Suspend':'Activate'?>" onclick="return confirm('Are you sure you want to change this user status?')">
                       <i class="fa-solid <?=$u['status']==='active'?'fa-ban':'fa-check'?>"></i>
+                    </button>
+                  </form>
+                  <form method="POST" action="/admin/actions/delete-user.php" style="display:inline" onsubmit="return confirm('WARNING: This will permanently delete this user and ALL their data. If this is a reseller, their clients will be transferred to direct platform management. This action cannot be undone. Are you sure?')">
+                    <input type="hidden" name="id" value="<?=$u['id']?>">
+                    <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
+                    <button type="submit" class="btn btn-outline btn-sm btn-icon" style="color:var(--danger); border-color:var(--danger)" title="Delete User">
+                      <i class="fa-solid fa-trash-can"></i>
                     </button>
                   </form>
                 </div>
