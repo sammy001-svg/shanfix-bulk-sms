@@ -115,7 +115,7 @@ $myCodes = DB::query("SELECT id, requested_code FROM ussd_codes WHERE user_id = 
 function viewSessionDetails(sessionId) {
     const modal = document.getElementById('sessionModal');
     const body = document.getElementById('sessionRequestsBody');
-    modal.style.display = 'flex';
+    openModal('sessionModal');
     body.innerHTML = '<div style="padding:40px; text-align:center"><i class="fa-solid fa-spinner fa-spin fa-2x" style="color:var(--primary)"></i></div>';
 
     fetch(`/reseller/actions/get-session-requests.php?session_id=${sessionId}`)
@@ -128,9 +128,7 @@ function viewSessionDetails(sessionId) {
         });
 }
 
-function closeModal() {
-    document.getElementById('sessionModal').style.display = 'none';
-}
+
 </script>
 
 <?php include __DIR__ . '/../includes/layout-footer.php'; ?>

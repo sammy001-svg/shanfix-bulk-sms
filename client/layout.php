@@ -83,6 +83,24 @@ $navItems = [
       if (theme === 'dark') document.documentElement.classList.add('dark-mode');
     })();
 
+    // GLOBAL CONFIG INJECTION
+    <?php
+    $effectiveSmsRate = 1.00;
+    if (($user['custom_unit_price'] ?? 0) > 0) {
+        $effectiveSmsRate = (float)$user['custom_unit_price'];
+    } elseif (!empty($user['parent_id'])) {
+        $rs = DB::queryOne("SELECT unit_price FROM reseller_settings WHERE reseller_id = ?", [$user['parent_id']]);
+        if ($rs && ($rs['unit_price'] ?? 0) > 0) {
+            $effectiveSmsRate = (float)$rs['unit_price'];
+        }
+    }
+    ?>
+    window.ShanfixConfig = {
+        smsRate: <?= json_encode($effectiveSmsRate) ?>,
+        whatsappRate: <?= json_encode((float)($user['whatsapp_rate'] ?? 1.00)) ?>,
+        siteUrl: <?= json_encode(SITE_URL) ?>
+    };
+
     // STK PUSH GLOBAL HANDLER
     window.ShanfixSTK = {
         checkStatus: function(purchaseId, type) {

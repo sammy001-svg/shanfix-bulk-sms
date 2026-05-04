@@ -147,7 +147,7 @@ $extraScript = <<<JS
   const ctx=document.getElementById('actChart');
   new Chart(ctx,{type:'line',data:{labels:{$chartLabels}||[],datasets:[{label:'Msgs',data:{$chartValues}||[],borderColor:'#00c896',backgroundColor:'rgba(0,200,150,0.08)',fill:true,tension:0.4,pointRadius:4,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}}});
   const ta=document.getElementById('qs');
-  if(ta){ta.addEventListener('input',()=>{const l=ta.value.length;document.getElementById('cnt').textContent=l;const s=Math.ceil(l/160)||1;document.getElementById('seg').textContent=s;document.getElementById('cost').textContent=s;});}
+  if(ta){ta.addEventListener('input',()=>{const l=ta.value.length;document.getElementById('cnt').textContent=l;const s=Math.ceil(l/160)||1;document.getElementById('seg').textContent=s;document.getElementById('cost').textContent=(s * (window.ShanfixConfig.smsRate || 1)).toFixed(2);});}
 })();
 </script>
 JS;

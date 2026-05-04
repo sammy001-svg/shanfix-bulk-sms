@@ -53,7 +53,7 @@ if (isset($_GET['edit'])) {
 
 <!-- Template Modal -->
 <div class="modal-overlay" id="templateModal">
-  <div class="modal-content" style="max-width:500px">
+    <div class="modal" style="max-width:500px">
     <div class="modal-header">
       <h3 id="modalTitle">Create SMS Template</h3>
       <button class="modal-close" onclick="closeModal('templateModal')">&times;</button>
@@ -86,30 +86,32 @@ if (isset($_GET['edit'])) {
 <?php
 $extraScript = <<<'JS'
 <script>
-function initCreateTemplate() {
-    document.getElementById('tplId').value = '';
-    document.getElementById('templateForm').reset();
-    document.getElementById('modalTitle').textContent = 'Create SMS Template';
-    openModal('templateModal');
-}
-function editTemplate(t) {
-    document.getElementById('tplId').value = t.id;
-    document.getElementById('tplTitle').value = t.title;
-    document.getElementById('tplMessage').value = t.message;
-    document.getElementById('modalTitle').textContent = 'Edit SMS Template';
-    openModal('templateModal');
-    updateCounter();
-}
+(function() {
+    window.initCreateTemplate = function() {
+        document.getElementById('tplId').value = '';
+        document.getElementById('templateForm').reset();
+        document.getElementById('modalTitle').textContent = 'Create SMS Template';
+        openModal('templateModal');
+    };
+    window.editTemplate = function(t) {
+        document.getElementById('tplId').value = t.id;
+        document.getElementById('tplTitle').value = t.title;
+        document.getElementById('tplMessage').value = t.message;
+        document.getElementById('modalTitle').textContent = 'Edit SMS Template';
+        openModal('templateModal');
+        updateCounter();
+    };
 
-const tplMsg = document.getElementById('tplMessage');
-function updateCounter() {
-    if (!tplMsg) return;
-    const l = tplMsg.value.length;
-    const s = Math.ceil(l/160) || 1;
-    document.getElementById('tplChars').textContent = l;
-    document.getElementById('tplSegs').textContent = s;
-}
-if(tplMsg) tplMsg.addEventListener('input', updateCounter);
+    const tplMsg = document.getElementById('tplMessage');
+    function updateCounter() {
+        if (!tplMsg) return;
+        const l = tplMsg.value.length;
+        const s = Math.ceil(l/160) || 1;
+        document.getElementById('tplChars').textContent = l;
+        document.getElementById('tplSegs').textContent = s;
+    }
+    if(tplMsg) tplMsg.addEventListener('input', updateCounter);
+})();
 </script>
 JS;
 include __DIR__ . '/../includes/layout-footer.php';

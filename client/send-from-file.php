@@ -49,7 +49,7 @@ $uid = $user['id'];
             <div style="position:relative">
               <textarea name="message" id="smsMsg" class="form-control" placeholder="Hello ##Username##, your balance is ##Balance##." style="padding-bottom:35px" rows="6" required></textarea>
               <div class="sms-counter" style="position:absolute; bottom:12px; right:15px; font-size:11px; color:var(--text-muted); pointer-events:none; background:rgba(255,255,255,0.05); padding:2px 8px; border-radius:4px">
-                <span id="chars">0</span>/160 · <span id="segs">1</span> SMS part(s) · <span id="contactCount">0</span> contacts · Est. cost: <strong id="cost" style="color:var(--primary)">1</strong> unit/recipient
+                <span id="chars">0</span>/160 · <span id="segs">1</span> SMS part(s) · <span id="contactCount">0</span> contacts · Est. cost: <strong id="cost" style="color:var(--primary)">0.00</strong> unit/recipient
               </div>
             </div>
             
@@ -152,7 +152,7 @@ $uid = $user['id'];
         <div><div style="font-size:11px; color:var(--text-muted)">Sender ID</div><div id="confSenderId" style="font-weight:700; color:var(--text-primary)">-</div></div>
         <div><div style="font-size:11px; color:var(--text-muted)">Total Numbers</div><div id="confTotalNumbers" style="font-weight:700; color:var(--text-primary)">-</div></div>
         <div><div style="font-size:11px; color:var(--text-muted)">Message Length</div><div id="confChars" style="font-weight:700; color:var(--text-primary)">-</div></div>
-        <div><div style="font-size:11px; color:var(--text-muted)">Cost per SMS</div><div style="font-weight:700; color:var(--text-primary)">1.00 unit</div></div>
+        <div><div style="font-size:11px; color:var(--text-muted)">Cost per SMS Part</div><div style="font-weight:700; color:var(--text-primary)"><span id="confRate">1.00</span> units</div></div>
         <div style="grid-column: span 2; padding-top:10px; border-top:1px solid var(--border); margin-top:5px; display:flex; justify-content:space-between; align-items:center">
            <div style="font-size:13px; font-weight:700">Estimated Total Cost</div>
            <div id="confTotalCost" style="font-size:20px; font-weight:800; color:var(--primary)">0.00 units</div>
@@ -307,10 +307,11 @@ if (ta) {
     ta.addEventListener('input', function() {
         const l = this.value.length;
         const parts = Math.ceil(l / 160) || 1;
+        const rate = window.ShanfixConfig.smsRate || 1.00;
         document.getElementById('chars').textContent = l;
         document.getElementById('segs').textContent = parts;
         const costEl = document.getElementById('cost');
-        if (costEl) costEl.textContent = parts;
+        if (costEl) costEl.textContent = (parts * rate).toFixed(2);
     });
 }
 
@@ -343,9 +344,7 @@ function insertPlaceholder(ph) {
     document.getElementById('placeholderMenu').style.display = 'none';
 }
 
-function closeModal() {
-    document.getElementById('confirmModal').style.display = 'none';
-}
+
 
 function finalSubmit() {
     const btn = document.querySelector('#confirmModal .btn-primary');
@@ -378,9 +377,11 @@ document.getElementById('sendFromFileForm').addEventListener('submit', function(
     
     const charCount = msgTemplate.length;
     const parts = Math.ceil(charCount / 160) || 1;
+    const rate = window.ShanfixConfig.smsRate || 1.00;
     document.getElementById('confChars').textContent = charCount + ' chars (' + parts + ' part' + (parts > 1 ? 's' : '') + ')';
     
-    const totalCost = (parsedRows.length * parts).toFixed(2);
+    document.getElementById('confRate').textContent = rate.toFixed(2);
+    const totalCost = (parsedRows.length * parts * rate).toFixed(2);
     document.getElementById('confTotalCost').textContent = totalCost + ' units';
 
     // Generate Samples
@@ -402,7 +403,7 @@ document.getElementById('sendFromFileForm').addEventListener('submit', function(
     });
 
     // Show Modal
-    document.getElementById('confirmModal').style.display = 'flex';
+    openModal('confirmModal');
 
     // Prepare hidden data
     const allData = [headers, ...parsedRows];

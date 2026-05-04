@@ -98,25 +98,36 @@ document.querySelectorAll(".nav-link[data-toggle]").forEach((link) => {
 
 // ─── Modal ────────────────────────────────────────────────────
 function openModal(id) {
-  const el = document.getElementById(id);
+  const el = typeof id === 'string' ? document.getElementById(id) : id;
   if (el) {
     el.classList.add("open");
     document.body.style.overflow = "hidden";
   }
 }
 function closeModal(id) {
-  const el = document.getElementById(id);
+  if (!id) {
+    // If no ID, close all open modals
+    document.querySelectorAll(".modal-overlay.open").forEach(m => {
+      m.classList.remove("open");
+    });
+    document.body.style.overflow = "";
+    return;
+  }
+  const el = typeof id === 'string' ? document.getElementById(id) : id;
   if (el) {
     el.classList.remove("open");
-    document.body.style.overflow = "";
+    if (!document.querySelector(".modal-overlay.open")) {
+      document.body.style.overflow = "";
+    }
   }
 }
-// Close on overlay click
-document.querySelectorAll(".modal-overlay").forEach((overlay) => {
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) closeModal(overlay.id);
-  });
+// Close on overlay click (using delegation for AJAX support)
+document.addEventListener("click", (e) => {
+  if (e.target.classList.contains("modal-overlay")) {
+    closeModal(e.target);
+  }
 });
+
 // Close on Escape
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {

@@ -196,7 +196,7 @@ function selectPlan(plan) {
 
 function calculateTotal(units) {
     if (document.getElementById('chkPlanId')) document.getElementById('chkPlanId').value = ''; 
-    const rate = parseFloat(document.getElementById('userRate').value);
+    const rate = window.ShanfixConfig.smsRate || 1.00;
     const total = units * rate;
     document.getElementById('totalCostDisplay').textContent = 'KES ' + total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
@@ -209,7 +209,7 @@ function startCheckout() {
     }
     
     if (document.getElementById('chkPlanId')) document.getElementById('chkPlanId').value = ''; 
-    const rate = parseFloat(document.getElementById('userRate').value);
+    const rate = window.ShanfixConfig.smsRate || 1.00;
     const total = units * rate;
     
     document.getElementById('chkUnits').value = units;

@@ -198,7 +198,7 @@ $accounts = DB::query("SELECT * FROM whatsapp_accounts WHERE user_id = ? ORDER B
       <h3 class="modal-title" id="modalTitle">Connect WhatsApp Account</h3>
       <button type="button" class="btn btn-icon" onclick="closeModal('accountModal')"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <form method="POST">
+    <form method="POST" id="accountForm">
         <div class="modal-body">
             <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
             <input type="hidden" name="action" value="save_account">
@@ -281,7 +281,7 @@ function openAccountModal(data = null) {
     }
     
     toggleAISettings();
-    modal.classList.add('active');
+    openModal('accountModal');
 }
 
 function toggleAISettings() {
@@ -296,20 +296,7 @@ function testConnection(id) {
     // In a real app, this would be an AJAX call to the gateway
 }
 
-function toggleDropdown(btn) {
-    const menu = btn.nextElementSibling;
-    menu.classList.toggle('show');
-    // Close other menus
-    document.querySelectorAll('.dropdown-menu').forEach(m => {
-        if (m !== menu) m.classList.remove('show');
-    });
-}
 
-window.onclick = function(e) {
-    if (!e.target.closest('.dropdown')) {
-        document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('show'));
-    }
-}
 </script>
 
 <?php include __DIR__ . '/../includes/layout-footer.php'; ?>

@@ -88,20 +88,15 @@ if (!empty($codeIds)) {
 async function viewSession(sessionId) {
     const timeline = document.getElementById('sessionTimeline');
     timeline.innerHTML = '<div class="text-center" style="padding:40px"><i class="fa-solid fa-spinner fa-spin"></i> Loading interaction history...</div>';
-    document.getElementById('sessionModal').style.display = 'flex';
+    openModal('sessionModal');
 
     try {
-        // Reuse the reseller action if it exists, or create a common one
         const response = await fetch(`/reseller/actions/get-session-requests.php?session_id=${sessionId}`);
         const html = await response.text();
         timeline.innerHTML = html;
     } catch (e) {
         timeline.innerHTML = '<div class="alert alert-danger">Failed to load session data.</div>';
     }
-}
-
-function closeModal() {
-    document.getElementById('sessionModal').style.display = 'none';
 }
 </script>
 

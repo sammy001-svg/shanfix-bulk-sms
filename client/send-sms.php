@@ -191,7 +191,7 @@ $units     = $user['sms_units'];
         <div><div style="font-size:11px; color:var(--text-muted)">Sender ID</div><div id="mSender" style="font-weight:700; color:var(--text-primary)">-</div></div>
         <div><div style="font-size:11px; color:var(--text-muted)">Total Numbers</div><div id="mContacts" style="font-weight:700; color:var(--text-primary)">-</div></div>
         <div><div style="font-size:11px; color:var(--text-muted)">Message Length</div><div id="mChars" style="font-weight:700; color:var(--text-primary)">-</div></div>
-        <div><div style="font-size:11px; color:var(--text-muted)">Cost per SMS</div><div style="font-weight:700; color:var(--text-primary)">1.00 unit</div></div>
+        <div><div style="font-size:11px; color:var(--text-muted)">Cost per SMS Part</div><div style="font-weight:700; color:var(--text-primary)"><span id="mRate">1.00</span> units</div></div>
         <div style="grid-column: span 2; padding-top:10px; border-top:1px solid var(--border); margin-top:5px; display:flex; justify-content:space-between; align-items:center">
            <div style="font-size:13px; font-weight:700">Estimated Total Cost</div>
            <div id="mTotal" style="font-size:20px; font-weight:800; color:var(--primary)">0.00 units</div>
@@ -313,7 +313,7 @@ function clearSideFile() {
 }
 
 // Modal Logic
-function openModal() {
+function openConfirmModal() {
     const msg = document.getElementById('smsMsg').value;
     const sid = document.getElementById('mainSenderId').value;
     
@@ -336,16 +336,17 @@ function openModal() {
     const charLen = msg.length;
     const segs = Math.ceil(charLen / 160) || 1;
     const totalContacts = sideRows.length;
+    const rate = window.ShanfixConfig.smsRate || 1.00;
     
     document.getElementById('mSender').textContent = sid;
     document.getElementById('mChars').textContent = charLen + ' chars (' + segs + ' part' + (segs > 1 ? 's' : '') + ')';
     document.getElementById('mContacts').textContent = totalContacts;
-    document.getElementById('mTotal').textContent = (totalContacts * segs).toFixed(2) + ' units';
+    document.getElementById('mRate').textContent = rate.toFixed(2);
+    document.getElementById('mTotal').textContent = (totalContacts * segs * rate).toFixed(2) + ' units';
     
-    document.getElementById('confirmModal').style.display = 'flex';
+    openModal('confirmModal');
 }
 
-function closeModal() { document.getElementById('confirmModal').style.display = 'none'; }
 
 function confirmAndSend() {
     const btn = document.querySelector('#confirmModal .btn-primary');
@@ -361,7 +362,7 @@ function confirmAndSend() {
 document.getElementById('sendForm').addEventListener('submit', function(e) {
     if (hasFile) {
         e.preventDefault();
-        openModal();
+        openConfirmModal();
     }
 });
 
@@ -372,9 +373,10 @@ if (smsArea) {
         const text = smsArea.value;
         const l = text.length;
         const parts = Math.ceil(l / 160) || 1;
+        const rate = window.ShanfixConfig.smsRate || 1.00;
         document.getElementById('chars').textContent = l;
         document.getElementById('segs').textContent = parts;
-        document.getElementById('cost').textContent = parts;
+        document.getElementById('cost').textContent = (parts * rate).toFixed(2);
     });
 }
 

@@ -116,11 +116,9 @@ function editCallback(id, code, url) {
     document.getElementById('modalCodeId').value = id;
     document.getElementById('modalCode').innerText = code;
     document.getElementById('modalUrl').value = url;
-    document.getElementById('callbackModal').style.display = 'flex';
+    openModal('callbackModal');
 }
-function closeModal() {
-    document.getElementById('callbackModal').style.display = 'none';
-}
+</script>
 </script>
 
 <?php include __DIR__ . '/../includes/layout-footer.php'; ?>
