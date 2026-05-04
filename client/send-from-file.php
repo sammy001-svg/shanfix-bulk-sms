@@ -152,10 +152,10 @@ $uid = $user['id'];
         <div><div style="font-size:11px; color:var(--text-muted)">Sender ID</div><div id="confSenderId" style="font-weight:700; color:var(--text-primary)">-</div></div>
         <div><div style="font-size:11px; color:var(--text-muted)">Total Numbers</div><div id="confTotalNumbers" style="font-weight:700; color:var(--text-primary)">-</div></div>
         <div><div style="font-size:11px; color:var(--text-muted)">Message Length</div><div id="confChars" style="font-weight:700; color:var(--text-primary)">-</div></div>
-        <div><div style="font-size:11px; color:var(--text-muted)">Cost per SMS Part</div><div style="font-weight:700; color:var(--text-primary)"><span id="confRate">1.00</span> units</div></div>
+        <div><div style="font-size:11px; color:var(--text-muted)">Units per Message</div><div style="font-weight:700; color:var(--text-primary)"><span id="confUnitsPerSms">1</span> Units</div></div>
         <div style="grid-column: span 2; padding-top:10px; border-top:1px solid var(--border); margin-top:5px; display:flex; justify-content:space-between; align-items:center">
-           <div style="font-size:13px; font-weight:700">Estimated Total Cost</div>
-           <div id="confTotalCost" style="font-size:20px; font-weight:800; color:var(--primary)">0.00 units</div>
+           <div style="font-size:13px; font-weight:700">Estimated Total Units</div>
+           <div id="confTotalUnits" style="font-size:20px; font-weight:800; color:var(--primary)">0.00 units</div>
         </div>
       </div>
 
@@ -381,9 +381,9 @@ document.getElementById('sendFromFileForm').addEventListener('submit', function(
     const rate = window.ShanfixConfig.smsRate || 1.00;
     document.getElementById('confChars').textContent = charCount + ' chars (' + parts + ' part' + (parts > 1 ? 's' : '') + ')';
     
-    document.getElementById('confRate').textContent = rate.toFixed(2);
-    const totalCost = (parsedRows.length * parts * rate).toFixed(2);
-    document.getElementById('confTotalCost').textContent = totalCost + ' units';
+    document.getElementById('confUnitsPerSms').textContent = parts;
+    const totalUnits = (parsedRows.length * parts);
+    document.getElementById('confTotalUnits').textContent = totalUnits.toFixed(2) + ' units';
 
     // Generate Samples
     const sampleContainer = document.getElementById('samplePreviews');

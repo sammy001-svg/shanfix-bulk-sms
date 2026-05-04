@@ -189,10 +189,10 @@ $units     = $user['sms_units'];
         <div><div style="font-size:11px; color:var(--text-muted)">Sender ID</div><div id="mSender" style="font-weight:700; color:var(--text-primary)">-</div></div>
         <div><div style="font-size:11px; color:var(--text-muted)">Total Numbers</div><div id="mContacts" style="font-weight:700; color:var(--text-primary)">-</div></div>
         <div><div style="font-size:11px; color:var(--text-muted)">Message Length</div><div id="mChars" style="font-weight:700; color:var(--text-primary)">-</div></div>
-        <div><div style="font-size:11px; color:var(--text-muted)">Cost per SMS Part</div><div style="font-weight:700; color:var(--text-primary)"><span id="mRate">1.00</span> units</div></div>
+        <div><div style="font-size:11px; color:var(--text-muted)">Units per Message</div><div style="font-weight:700; color:var(--text-primary)"><span id="mUnitsPerSms">1</span> Units</div></div>
         <div style="grid-column: span 2; padding-top:10px; border-top:1px solid var(--border); margin-top:5px; display:flex; justify-content:space-between; align-items:center">
-           <div style="font-size:13px; font-weight:700">Estimated Total Cost</div>
-           <div id="mTotal" style="font-size:20px; font-weight:800; color:var(--primary)">0.00 units</div>
+           <div style="font-size:13px; font-weight:700">Estimated Total Units</div>
+           <div id="mTotalUnits" style="font-size:20px; font-weight:800; color:var(--primary)">0.00 units</div>
         </div>
       </div>
 
@@ -344,8 +344,9 @@ function openConfirmModal() {
     document.getElementById('mSender').textContent = sid;
     document.getElementById('mChars').textContent = charLen + ' chars (' + segs + ' part' + (segs > 1 ? 's' : '') + ')';
     document.getElementById('mContacts').textContent = totalContacts;
-    document.getElementById('mRate').textContent = rate.toFixed(2);
-    document.getElementById('mTotal').textContent = (totalContacts * segs * rate).toFixed(2) + ' units';
+    document.getElementById('mUnitsPerSms').textContent = segs;
+    const totalUnits = (totalContacts * segs);
+    document.getElementById('mTotalUnits').textContent = totalUnits.toFixed(2) + ' units';
     
     openModal('confirmModal');
 }
