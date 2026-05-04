@@ -101,7 +101,9 @@ $units     = $user['sms_units'];
               </div>
             </div>
             <textarea name="message" id="smsMsg" class="form-control" placeholder="Type your SMS message here..." maxlength="918" required></textarea>
-            <div class="sms-counter"><span id="chars">0</span>/160 · <span id="segs">1</span> SMS part(s) · Est. cost: <strong id="cost" style="color:var(--primary)">1</strong> unit/recipient</div>
+              <div class="sms-counter" style="position:absolute; bottom:12px; right:15px; font-size:11px; color:var(--text-muted); pointer-events:none; background:rgba(255,255,255,0.05); padding:2px 8px; border-radius:4px">
+                <span id="chars">0</span> chars · <span id="segs" style="color:var(--primary); font-weight:700">1</span> Unit(s) · <span id="contactCount">0</span> contacts · Est. cost: <strong style="color:var(--primary)">KES <span id="cost">0.00</span></strong> per recipient
+              </div>
           </div>
 
           <div class="form-group">

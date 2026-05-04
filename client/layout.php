@@ -10,7 +10,7 @@ $navItems = [
   ['type'=>'section','label'=>'MAIN'],
   ['icon'=>'<i class="fa-solid fa-gauge-high"></i>',     'label'=>'Dashboard',       'url'=>'/client/index.php'],
   ['type'=>'section','label'=>'SMS'],
-  ['icon'=>'<i class="fa-solid fa-paper-plane"></i>',    'label'=>'Send SMS',         'url'=>'/client/send-sms.php'],
+  ['icon'=>'<i class="fa-solid fa-paper-plane"></i>',    'label'=>'Send SMS',         'url'=>'/client/send-sms.php', 'no_ajax'=>true],
   ['icon'=>'<i class="fa-solid fa-note-sticky"></i>',    'label'=>'SMS Templates',     'url'=>'/client/templates.php'],
   ['icon'=>'<i class="fa-solid fa-file-import"></i>',   'label'=>'Send from File',   'url'=>'/client/send-from-file.php', 'no_ajax'=>true],
   [
