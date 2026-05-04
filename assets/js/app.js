@@ -402,7 +402,7 @@ document.getElementById("refreshUnits")?.addEventListener("click", async () => {
   // Intercept all internal link clicks
   document.addEventListener("click", (e) => {
     const link = e.target.closest("a");
-    if (!link) return;
+    if (!link || link.dataset.noAjax || link.getAttribute('data-no-ajax') !== null) return;
 
     const url = link.getAttribute("href");
     if (!url || url.startsWith("#") || url.startsWith("javascript:") || link.target === "_blank") return;

@@ -12,7 +12,7 @@ $navItems = [
   ['type'=>'section','label'=>'SMS'],
   ['icon'=>'<i class="fa-solid fa-paper-plane"></i>',    'label'=>'Send SMS',         'url'=>'/client/send-sms.php'],
   ['icon'=>'<i class="fa-solid fa-note-sticky"></i>',    'label'=>'SMS Templates',     'url'=>'/client/templates.php'],
-  ['icon'=>'<i class="fa-solid fa-file-import"></i>',   'label'=>'Send from File',   'url'=>'/client/send-from-file.php'],
+  ['icon'=>'<i class="fa-solid fa-file-import"></i>',   'label'=>'Send from File',   'url'=>'/client/send-from-file.php', 'no_ajax'=>true],
   [
     'id'=>'campaigns','icon'=>'<i class="fa-solid fa-bullhorn"></i>','label'=>'Campaigns',
     'active'=> (strpos($_SERVER['PHP_SELF'], '/campaign') !== false),
@@ -72,7 +72,7 @@ $navItems = [
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($pageTitle) ?> — <?= htmlspecialchars(Branding::get('system_name')) ?></title>
   <meta name="view-transition" content="same-origin">
-  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/assets/css/style.css?v=1.1">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <?php Branding::renderStyles(); ?>
