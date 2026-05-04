@@ -248,14 +248,19 @@ function get_dashboard_popups($userId) {
  * Get active banner notifications for the dashboard.
  */
 function get_dashboard_banners($userId) {
-    return DB::query(
-        "SELECT * FROM notifications 
-         WHERE is_banner = 1 
-         AND (user_id = ? OR user_id IS NULL) 
-         AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-         ORDER BY created_at DESC",
-        [$userId]
-    ) ?: [];
+    try {
+        return DB::query(
+            "SELECT * FROM notifications 
+             WHERE is_banner = 1 
+             AND (user_id = ? OR user_id IS NULL) 
+             AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+             ORDER BY created_at DESC",
+            [$userId]
+        ) ?: [];
+    } catch (Exception $e) {
+        // Fallback if column is missing (e.g. before migration)
+        return [];
+    }
 }
 // ─── API Integration ─────────────────────────────────────────────────────────
 
