@@ -292,6 +292,11 @@ function handleSideFile(input) {
         // Main Preview Card
         document.getElementById('mainFilePreviewSection').style.display = 'block';
         document.getElementById('mainFileCountBadge').textContent = sideRows.length + ' contacts found';
+        
+        // Update the small counter next to the message box
+        const cCount = document.getElementById('contactCount');
+        if (cCount) cCount.textContent = sideRows.length;
+
         document.getElementById('mainQpHead').innerHTML = `<tr>${sideHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
         document.getElementById('mainQpBody').innerHTML = sideRows.slice(0, 5).map(r => `<tr>${sideHeaders.map((_, i) => `<td>${r[i] || ''}</td>`).join('')}</tr>`).join('');
         
