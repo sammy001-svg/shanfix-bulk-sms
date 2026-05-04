@@ -133,12 +133,12 @@ $uid = $user['id'];
   </div>
 </form>
 
-<!-- Confirmation Modal -->
-<div id="confirmModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:2000; align-items:center; justify-content:center; backdrop-filter:blur(4px)">
-  <div class="card" style="width:100%; max-width:600px; margin:20px; animation: modalSlideUp 0.3s ease-out">
+<!-- SIMPLE CONFIRMATION MODAL (Standardized) -->
+<div id="confirmModal" class="modal-overlay">
+  <div class="modal" style="max-width:600px">
     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center">
       <h3 class="card-title"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i> Confirm Campaign Dispatch</h3>
-      <button type="button" class="btn btn-icon" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="btn btn-icon" onclick="closeModal('confirmModal')"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="card-body" style="padding:25px">
       <div style="margin-bottom:20px">
@@ -160,7 +160,7 @@ $uid = $user['id'];
       </div>
 
       <div style="margin-top:25px; display:flex; gap:15px">
-        <button type="button" class="btn btn-muted" style="flex:1; height:50px" onclick="closeModal()">Cancel & Edit</button>
+        <button type="button" class="btn btn-muted" style="flex:1; height:50px" onclick="closeModal('confirmModal')">Cancel & Edit</button>
         <button type="button" class="btn btn-primary" style="flex:2; height:50px; font-weight:700" onclick="finalSubmit()">
           <i class="fa-solid fa-paper-plane" style="margin-right:8px"></i> Confirm & Send Now
         </button>
@@ -174,7 +174,8 @@ $uid = $user['id'];
   from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
-.sample-msg-bubble { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 12px 15px; border-radius: 4px; font-size: 13px; color: var(--text-primary); line-height: 1.5; }
+/* Custom sample bubble for previews */
+.sample-msg-bubble { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 12px 15px; border-radius: 4px; font-size: 13px; color: var(--text-primary); line-height: 1.5; margin-bottom: 12px; }
 </style>
 
 <?php
