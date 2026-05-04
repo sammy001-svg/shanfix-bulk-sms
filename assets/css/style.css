@@ -1027,9 +1027,9 @@ textarea.form-control {
   backdrop-filter: blur(10px) saturate(180%);
   z-index: 2000;
   display: none;
-  align-items: center;
   justify-content: center;
   padding: 24px;
+  overflow-y: auto; /* The overlay should be the scrollable container */
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -1040,12 +1040,13 @@ textarea.form-control {
 }
 
 .modal {
+  margin: auto; /* Vertically centers if small, pushes from top if large */
   background: var(--bg-card);
   border-radius: var(--radius-xl);
   width: 95%;
   max-width: 520px;
-  max-height: calc(100vh - 80px);
-  overflow-y: auto;
+  max-height: none; /* Allow it to grow naturally, the overlay will scroll */
+  overflow: visible; /* Content shouldn't be cut inside the modal */
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
   border: 1px solid var(--border);
   transform: scale(0.92) translateY(20px);
@@ -1058,8 +1059,6 @@ textarea.form-control {
 /* Ensure body is the one scrolling if modal is too tall */
 .modal-body {
   padding: 22px 26px;
-  overflow-y: auto;
-  flex: 1;
 }
 
 .modal-header, .modal-footer {
@@ -1073,9 +1072,7 @@ textarea.form-control {
 
 /* Handle forms inside modals */
 .modal form {
-  display: flex;
-  flex-direction: column;
-  max-height: inherit;
+  display: block; /* Change from flex to allow natural growth */
   width: 100%;
 }
 
