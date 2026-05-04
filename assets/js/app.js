@@ -102,6 +102,7 @@ function openModal(id) {
   if (el) {
     el.classList.add("open");
     document.body.style.overflow = "hidden";
+    document.body.classList.add("modal-open");
   }
 }
 function closeModal(id) {
@@ -118,6 +119,7 @@ function closeModal(id) {
     el.classList.remove("open");
     if (!document.querySelector(".modal-overlay.open")) {
       document.body.style.overflow = "";
+      document.body.classList.remove("modal-open");
     }
   }
 }

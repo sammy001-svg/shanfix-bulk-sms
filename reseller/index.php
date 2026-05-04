@@ -36,9 +36,18 @@ $banners = get_dashboard_banners($uid);
       $icon = ['info'=>'fa-circle-info','success'=>'fa-circle-check','warning'=>'fa-triangle-exclamation','danger'=>'fa-circle-exclamation'][$b['type']] ?? 'fa-bell';
     ?>
       <div class="banner-slide <?= $b['type'] ?>">
-        <div class="banner-icon"><i class="fa-solid <?= $icon ?>"></i></div>
         <div class="banner-text">
-          <div class="banner-title"><?= htmlspecialchars($b['title']) ?></div>
+          <div class="banner-title">
+            <?= htmlspecialchars($b['title']) ?>
+            <?php 
+              echo [
+                'info' => ' <i class="fa-solid fa-circle-info" style="font-size:0.9em; opacity:0.8"></i>',
+                'success' => ' 💐',
+                'warning' => ' 😟',
+                'danger' => ' 😭'
+              ][$b['type']] ?? '';
+            ?>
+          </div>
           <div class="banner-msg"><?= htmlspecialchars($b['message']) ?></div>
           <div class="banner-actions">
             <a href="/reseller/purchases.php" class="banner-action-link"><i class="fa-solid fa-cart-shopping"></i> Buy Units</a>

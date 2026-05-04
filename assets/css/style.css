@@ -1021,8 +1021,7 @@ textarea.form-control {
 /* ─── Modal & Overlay ─────────────────────────────────────── */
 .modal-overlay {
   position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
+  inset: 0 !important; /* Replaces top, left, right, bottom */
   width: 100vw !important;
   height: 100vh !important;
   background: rgba(10, 15, 28, 0.75) !important;
@@ -1030,7 +1029,8 @@ textarea.form-control {
   backdrop-filter: blur(12px) !important;
   z-index: 9999 !important;
   display: none;
-  place-items: center !important; /* This centers perfectly in both directions */
+  justify-content: center !important;
+  align-items: center !important;
   padding: 20px !important;
   overflow-y: auto !important;
   opacity: 0;
@@ -1038,11 +1038,12 @@ textarea.form-control {
 }
 
 .modal-overlay.open {
-  display: grid !important; /* Changed from flex to grid */
+  display: flex !important;
   opacity: 1 !important;
 }
 
 .modal {
+  margin: auto !important; /* The secret weapon for perfect centering in Flex/Grid */
   background: var(--bg-card) !important;
   border-radius: var(--radius-xl) !important;
   width: 95% !important;
@@ -1682,6 +1683,12 @@ textarea.form-control {
   animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
+/* Fix for fixed positioning when modals are open */
+body.modal-open .page-content {
+  transform: none !important;
+  animation: none !important;
+}
+
 /* ─── Page Loader Bar ────────────────────────────────────── */
 #page-loader {
   position: fixed;
@@ -1729,10 +1736,10 @@ textarea.form-control {
   overflow: hidden;
   border-radius: var(--radius-lg);
   margin-bottom: 24px;
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
-  height: 160px;
+  background: #0a1f2c;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  height: 180px; /* Increased height for better proportions */
 }
 .banner-container {
   display: flex;
@@ -1744,15 +1751,19 @@ textarea.form-control {
   flex: 1;
   display: flex;
   align-items: center;
-  padding: 20px 40px;
-  gap: 24px;
+  padding: 0 0 0 45px; /* Removed right padding to allow image to bleed to edge */
+  gap: 0; /* Gap handled by margin-left on image */
   position: relative;
+  background: linear-gradient(135deg, #0a1f2c 0%, #063a30 100%);
+  color: #fff;
+  overflow: hidden;
 }
 .banner-slide::before {
   content: '';
   position: absolute;
   left: 0; top: 0; width: 6px; height: 100%;
   background: var(--primary);
+  box-shadow: 0 0 15px var(--primary);
 }
 .banner-slide.info::before { background: #3b82f6; }
 .banner-slide.success::before { background: #10b981; }
@@ -1768,14 +1779,16 @@ textarea.form-control {
 }
 .banner-title {
   font-weight: 800;
-  font-size: 20px;
-  margin-bottom: 4px;
-  color: var(--text-primary);
+  font-size: 22px;
+  margin-bottom: 6px;
+  color: #ffffff;
+  letter-spacing: -0.01em;
 }
 .banner-msg {
-  font-size: 14px;
-  color: var(--text-secondary);
-  line-height: 1.4;
+  font-size: 14.5px;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.5;
+  max-width: 600px;
 }
 
 .banner-actions {
@@ -1784,23 +1797,36 @@ textarea.form-control {
   margin-top: 15px;
 }
 .banner-action-link {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   text-decoration: none;
-  color: var(--primary);
+  color: #fff;
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  background: rgba(0, 200, 150, 0.1);
-  border-radius: 6px;
-  border: 1px solid transparent;
-  transition: all 0.2s ease;
+  gap: 6px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: all 0.25s ease;
+  backdrop-filter: blur(4px);
 }
 .banner-action-link:hover {
   background: var(--primary);
   color: #000;
   transform: translateY(-2px);
+  border-color: var(--primary);
+  box-shadow: 0 5px 15px rgba(0, 200, 150, 0.3);
+}
+
+.banner-img {
+  height: 180px !important; /* Exactly match banner-carousel height */
+  width: 40% !important;   /* Take up a proportional 'half' of the banner */
+  flex-shrink: 0;
+  box-shadow: -10px 0 30px rgba(0,0,0,0.3);
+  border-left: 1px solid rgba(255,255,255,0.1);
+  object-fit: cover;
+  margin-left: 30px;
 }
 
 .banner-nav {
