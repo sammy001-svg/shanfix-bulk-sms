@@ -140,12 +140,12 @@ $users = DB::query("SELECT id, name, email, role FROM users WHERE status = 'acti
                     </div>
                     <div class="form-group" style="flex:1">
                         <label class="form-label">Display Mode</label>
-                        <div style="display:flex; gap:15px; align-items:center; height:42px">
-                            <label style="display:flex; align-items:center; gap:5px; cursor:pointer">
-                                <input type="checkbox" name="is_popup" value="1"> Popup Modal
+                        <div style="display:flex; gap:12px; align-items:center; height:42px; background:var(--bg-muted); border-radius:var(--radius-sm); padding:0 12px; border:1px solid var(--border)">
+                            <label style="display:flex; align-items:center; gap:5px; cursor:pointer; font-size:12px">
+                                <input type="checkbox" name="is_popup" value="1"> Popup
                             </label>
-                            <label style="display:flex; align-items:center; gap:5px; cursor:pointer">
-                                <input type="checkbox" name="is_banner" value="1"> Dashboard Banner
+                            <label style="display:flex; align-items:center; gap:5px; cursor:pointer; font-size:12px">
+                                <input type="checkbox" name="is_banner" value="1"> Banner
                             </label>
                         </div>
                     </div>

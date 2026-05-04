@@ -1071,6 +1071,14 @@ textarea.form-control {
   transform: scale(1) translateY(0);
 }
 
+/* Handle forms inside modals */
+.modal form {
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+  width: 100%;
+}
+
 .modal-header {
   padding: 22px 26px 18px;
   border-bottom: 1px solid var(--border);
