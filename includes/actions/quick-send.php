@@ -24,7 +24,7 @@ $senderId    = sanitize($_POST['sender_id'] ?? 'SHANFIX');
 $message     = sanitize($_POST['message'] ?? '');
 $scheduledAt = $_POST['scheduled_at'] ?? null;
 $groupId     = (int)($_POST['group_id'] ?? 0);
-$manualInput = $_POST['numbers'] ?? ($_POST['recipient'] ?? '');
+$manualInput = trim($_POST['numbers'] ?? '') ?: trim($_POST['recipient'] ?? '');
 
 if (!$message) {
     $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Message content is required.'];
