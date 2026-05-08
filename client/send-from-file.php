@@ -349,9 +349,34 @@ function insertPlaceholder(ph) {
 
 function finalSubmit() {
     const btn = document.querySelector('#confirmModal .btn-primary');
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Dispatching...';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Queuing campaign...';
     btn.disabled = true;
-    document.getElementById('sendFromFileForm').submit();
+
+    // Yield to the browser so it paints the button state before any heavy work
+    setTimeout(() => {
+        const fileInput  = document.getElementById('fileInput');
+        const file       = fileInput.files[0];
+        const ext        = file ? file.name.split('.').pop().toLowerCase() : '';
+
+        if (ext === 'csv') {
+            // CSV: server reads the original file directly — no serialization needed
+            document.getElementById('csvDataInput').value = '';
+        } else {
+            // Excel/XLS: server cannot parse binary format, so convert to CSV here
+            // and clear the file input so we don't upload both
+            const rows      = [headers, ...parsedRows];
+            const csvLines  = rows.map(row =>
+                row.map(cell => {
+                    const c = String(cell ?? '').replace(/"/g, '""');
+                    return /[,"\n]/.test(c) ? `"${c}"` : c;
+                }).join(',')
+            );
+            document.getElementById('csvDataInput').value = csvLines.join('\n');
+            fileInput.value = ''; // prevent double-upload of raw Excel file
+        }
+
+        document.getElementById('sendFromFileForm').submit();
+    }, 30);
 }
 
 // Close dropdown when clicking outside
@@ -403,19 +428,8 @@ document.getElementById('sendFromFileForm').addEventListener('submit', function(
         sampleContainer.appendChild(bubble);
     });
 
-    // Show Modal
+    // Show Modal — csv_data is prepared only when user actually confirms in finalSubmit()
     openModal('confirmModal');
-
-    // Prepare hidden data
-    const allData = [headers, ...parsedRows];
-    const csvContent = allData.map(row => 
-        row.map(cell => {
-            let c = String(cell || '').replace(/"/g, '""');
-            return c.includes(',') || c.includes('"') || c.includes('\n') ? `"${c}"` : c;
-        }).join(',')
-    ).join('\n');
-    
-    document.getElementById('csvDataInput').value = csvContent;
 });
 </script>
 JS;

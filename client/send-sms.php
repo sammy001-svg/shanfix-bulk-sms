@@ -38,10 +38,11 @@ $units     = $user['sms_units'];
     <div class="card">
       <div class="card-header"><h3 class="card-title"><i class="fa-solid fa-paper-plane" style="color:var(--primary)"></i> Compose Message</h3></div>
       <div class="card-body">
-        <form method="POST" action="/client/actions/quick-send.php" id="sendForm">
+        <form method="POST" action="/client/actions/quick-send.php" id="sendForm" enctype="multipart/form-data">
           <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
           <input type="hidden" name="send_mode" id="sendMode" value="single">
           <input type="hidden" name="csv_data" id="mainCsvData">
+          <input type="file"   name="csv_file" id="formCsvFile" style="display:none" accept=".csv,.xlsx,.xls">
 
           <div class="form-group">
             <label class="form-label">Sender ID <span class="required">*</span></label>
@@ -210,9 +211,10 @@ $units     = $user['sms_units'];
 $extraScript = <<<'JS'
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
-let sideHeaders = [];
-let sideRows = [];
-let hasFile = false;
+let sideHeaders  = [];
+let sideRows     = [];
+let hasFile      = false;
+let originalFile = null; // reference to the raw File object
 
 function switchSendTab(btn, tabId, mode) {
     if (hasFile && !confirm('Switching tabs will ignore the uploaded file. Continue?')) return;
@@ -243,6 +245,7 @@ function insertPlaceholder(select) {
 function handleSideFile(input) {
     const file = input.files[0];
     if (!file) return;
+    originalFile = file; // keep reference so confirmAndSend can re-attach it
 
     const reader = new FileReader();
     reader.onload = function(e) {
@@ -302,9 +305,10 @@ function handleSideFile(input) {
 }
 
 function clearSideFile() {
-    sideHeaders = [];
-    sideRows = [];
-    hasFile = false;
+    sideHeaders  = [];
+    sideRows     = [];
+    hasFile      = false;
+    originalFile = null;
     document.getElementById('sideFileInput').value = '';
     document.getElementById('sideFileInfo').style.display = 'none';
     document.getElementById('dz').style.display = 'block';
@@ -354,13 +358,35 @@ function openConfirmModal() {
 
 function confirmAndSend() {
     const btn = document.querySelector('#confirmModal .btn-primary');
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Dispatching...';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Queuing campaign...';
     btn.disabled = true;
 
-    const csv = [sideHeaders, ...sideRows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-    document.getElementById('mainCsvData').value = csv;
-    document.getElementById('sendForm').action = '/client/actions/send-from-file.php';
-    document.getElementById('sendForm').submit();
+    // Yield 30 ms so the browser paints the button state before any heavy work
+    setTimeout(() => {
+        const ext = originalFile ? originalFile.name.split('.').pop().toLowerCase() : '';
+
+        if (ext === 'csv' && originalFile) {
+            // CSV: attach the original file directly — no serialization, instant
+            const dt = new DataTransfer();
+            dt.items.add(originalFile);
+            document.getElementById('formCsvFile').files = dt.files;
+            document.getElementById('mainCsvData').value = '';
+        } else {
+            // Excel: must serialize to CSV (server can't parse .xlsx/.xls)
+            const rows     = [sideHeaders, ...sideRows];
+            const csvLines = rows.map(r =>
+                r.map(c => {
+                    const s = String(c ?? '').replace(/"/g, '""');
+                    return /[,"\n]/.test(s) ? `"${s}"` : s;
+                }).join(',')
+            );
+            document.getElementById('mainCsvData').value = csvLines.join('\n');
+            document.getElementById('formCsvFile').value = ''; // no raw file
+        }
+
+        document.getElementById('sendForm').action    = '/client/actions/send-from-file.php';
+        document.getElementById('sendForm').submit();
+    }, 30);
 }
 
 document.getElementById('sendForm').addEventListener('submit', function(e) {
