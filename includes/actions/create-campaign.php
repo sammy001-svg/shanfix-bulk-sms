@@ -91,7 +91,7 @@ if ($scheduledAt) {
     redirect($redirectTo);
 }
 
-// Immediate send: redirect browser now, process in background
+// Immediate send: redirect browser now, trigger detached background process.
 $_SESSION['flash'] = [
     'type'    => 'success',
     'message' => 'Sending ' . number_format($totalCount) . ' messages now. Live progress on this page.',
@@ -103,15 +103,13 @@ header('Location: ' . $redirectTo, true, 302);
 header('Connection: close');
 header('Content-Encoding: none');
 header('Content-Length: 0');
+if (function_exists('fastcgi_finish_request')) fastcgi_finish_request(); else flush();
 
-if (function_exists('fastcgi_finish_request')) {
-    fastcgi_finish_request();
-} else {
-    flush();
+$spawned = SMS::spawnBackground();
+
+if (!$spawned) {
+    ignore_user_abort(true);
+    set_time_limit(0);
+    ini_set('memory_limit', '512M');
+    SMS::processCampaign($campaignId);
 }
-
-ignore_user_abort(true);
-set_time_limit(0);
-ini_set('memory_limit', '512M');
-
-SMS::processCampaign($campaignId);

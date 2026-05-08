@@ -20,7 +20,7 @@ $scheduled=DB::query("SELECT * FROM campaigns WHERE user_id=? AND status='schedu
           <tr>
             <td><strong><?=htmlspecialchars($c['name'])?></strong><div style="font-size:11px;color:var(--text-secondary)"><?=htmlspecialchars(mb_strimwidth($c['message'],0,60,'...'))?></div></td>
             <td><code><?=htmlspecialchars($c['sender_id'])?></code></td>
-            <td><?=number_format($c['recipients_count']??0)?></td>
+            <td><?=number_format($c['total_count']??0)?></td>
             <td><strong style="color:var(--warning)"><?=date('d M Y H:i',strtotime($c['scheduled_at']))?></strong></td>
             <td>
               <form method="POST" action="/client/actions/cancel-campaign.php" style="display:inline">

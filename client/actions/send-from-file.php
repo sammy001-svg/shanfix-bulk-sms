@@ -67,7 +67,7 @@ if (!$sourceHandle) {
     redirect('/client/send-from-file.php');
 }
 
-// Validate header row has a 'phone' column
+// Validate header row has a phone column (accept 'phone', 'mobile', 'number', or any partial match)
 $headerRow = fgetcsv($sourceHandle);
 if (!$headerRow) {
     fclose($sourceHandle);
@@ -75,23 +75,42 @@ if (!$headerRow) {
     redirect('/client/send-from-file.php');
 }
 $cleanHeaders = array_map(fn($h) => strtolower(trim($h)), $headerRow);
-if (!in_array('phone', $cleanHeaders)) {
+$phoneColIdx  = -1;
+foreach ($cleanHeaders as $i => $h) {
+    if ($h === 'phone' || $h === 'mobile' || $h === 'number' || $h === 'contact' ||
+        strpos($h, 'phone') !== false || strpos($h, 'mobile') !== false) {
+        $phoneColIdx = $i;
+        // Normalise header to 'phone' so processCampaign always finds it
+        $headerRow[$i] = 'phone';
+        break;
+    }
+}
+if ($phoneColIdx === -1) {
     fclose($sourceHandle);
-    flash_set('danger', "Your file must have a column header named 'phone'.");
+    flash_set('danger', "Your file must have a column named 'phone' or 'mobile'.");
     redirect('/client/send-from-file.php');
 }
 
 // Save file to a permanent server path (tmp_name gets deleted after the request)
 $uploadDir = dirname(__DIR__, 2) . '/uploads/campaigns/' . $user['id'] . '/';
-if (!is_dir($uploadDir)) {
-    mkdir($uploadDir, 0755, true);
+if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
+    fclose($sourceHandle);
+    flash_set('danger', 'Server storage error: could not create upload directory. Contact support.');
+    redirect('/client/send-from-file.php');
 }
 $safeName  = preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
 $savePath  = $uploadDir . time() . '_' . $safeName;
 $outHandle = fopen($savePath, 'w');
+if ($outHandle === false) {
+    fclose($sourceHandle);
+    flash_set('danger', 'Server storage error: could not write upload file. Contact support.');
+    redirect('/client/send-from-file.php');
+}
 fputcsv($outHandle, $headerRow);
 $totalRows = 0;
 while (($row = fgetcsv($sourceHandle)) !== false) {
+    // Skip rows where the phone cell is completely empty
+    if (trim($row[$phoneColIdx] ?? '') === '') continue;
     fputcsv($outHandle, $row);
     $totalRows++;
 }
@@ -127,30 +146,31 @@ if (!$campaignId) {
 }
 
 // ------------------------------------------------------------------
-// Send the HTTP redirect to the browser NOW so the user sees the
-// campaigns page immediately, then continue processing in the background.
+// Redirect the browser immediately, then spawn a detached PHP process
+// to handle all sending. The spawned process is outside PHP-FPM's
+// request pool so it will NOT be killed by request_terminate_timeout,
+// making it safe for files with millions of contacts.
 // ------------------------------------------------------------------
 flash_set('success',
-    'Sending ' . number_format($totalRows) . ' messages now. ' .
+    'Campaign queued: sending ' . number_format($totalRows) . ' messages. ' .
     'Live progress is visible on this page — refresh to update counts.'
 );
 
-session_write_close();                    // release session lock so other pages load
-while (ob_get_level() > 0) ob_end_clean(); // discard any buffered output
+session_write_close();
+while (ob_get_level() > 0) ob_end_clean();
 header('Location: /client/campaigns.php', true, 302);
 header('Connection: close');
 header('Content-Encoding: none');
 header('Content-Length: 0');
+if (function_exists('fastcgi_finish_request')) fastcgi_finish_request(); else flush();
 
-if (function_exists('fastcgi_finish_request')) {
-    fastcgi_finish_request();             // PHP-FPM: closes connection immediately
-} else {
-    flush();                              // mod_php / CGI fallback
+$spawned = SMS::spawnBackground();
+
+// Fallback: inline processing if exec() is unavailable.
+// The cron safety-net will rescue the campaign if FPM kills this process.
+if (!$spawned) {
+    ignore_user_abort(true);
+    set_time_limit(0);
+    ini_set('memory_limit', '512M');
+    SMS::processCampaign($campaignId);
 }
-
-// Browser is gone. Process every contact now.
-ignore_user_abort(true);
-set_time_limit(0);
-ini_set('memory_limit', '512M');
-
-SMS::processCampaign($campaignId);

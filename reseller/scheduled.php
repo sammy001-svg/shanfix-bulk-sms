@@ -39,7 +39,7 @@ $totalPages= ceil($total/$perPage);
                 <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?=htmlspecialchars($c['message'])?></div>
               </td>
               <td><code><?=htmlspecialchars($c['sender_id'])?></code></td>
-              <td><?=number_format($c['recipients_count']??0)?></td>
+              <td><?=number_format($c['total_count']??0)?></td>
               <td>
                 <strong style="color:var(--warning)"><?=date('d M Y',strtotime($c['scheduled_at']))?></strong>
                 <div style="font-size:11px;color:var(--text-secondary)"><?=date('H:i',strtotime($c['scheduled_at']))?></div>

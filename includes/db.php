@@ -23,60 +23,88 @@ if (!defined('SESSION_TIMEOUT')) define('SESSION_TIMEOUT', 3600);
 class DB {
     private static $instance = null;
 
-    public static function getInstance() {
+    public static function getInstance(): PDO {
         if (self::$instance === null) {
-            $dsn = sprintf(
-                'mysql:host=%s;dbname=%s;charset=%s',
-                DB_HOST, DB_NAME, DB_CHARSET
-            );
-            $options = [
-                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES   => false,
-            ];
-            try {
-                self::$instance = new PDO($dsn, DB_USER, DB_PASS, $options);
-            } catch (PDOException $e) {
-                error_log('DB Connection Failed: ' . $e->getMessage());
-                die(json_encode(['error' => 'Database connection failed. Please try again.']));
-            }
+            self::connect();
         }
         return self::$instance;
     }
 
+    private static function connect(): void {
+        $dsn = sprintf('mysql:host=%s;dbname=%s;charset=%s', DB_HOST, DB_NAME, DB_CHARSET);
+        $options = [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+            PDO::MYSQL_ATTR_INIT_COMMAND => "SET SESSION wait_timeout=28800, SESSION interactive_timeout=28800",
+        ];
+        try {
+            self::$instance = new PDO($dsn, DB_USER, DB_PASS, $options);
+        } catch (PDOException $e) {
+            error_log('DB Connection Failed: ' . $e->getMessage());
+            die(json_encode(['error' => 'Database connection failed. Please try again.']));
+        }
+    }
+
+    /**
+     * Ping the DB and silently reconnect if the connection was dropped.
+     * Call this before each batch in long-running background processes so
+     * that MySQL's wait_timeout never kills a multi-hour campaign run.
+     */
+    public static function keepAlive(): void {
+        try {
+            self::getInstance()->query('SELECT 1');
+        } catch (PDOException $e) {
+            self::$instance = null;
+            self::connect();
+        }
+    }
+
+    /** Execute a statement, reconnecting once on "MySQL server has gone away". */
+    private static function run(string $sql, array $params, string $mode) {
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            try {
+                $stmt = self::getInstance()->prepare($sql);
+                $stmt->execute($params);
+                return $stmt;
+            } catch (PDOException $e) {
+                $gone = str_contains($e->getMessage(), 'gone away')
+                     || str_contains($e->getMessage(), 'Lost connection')
+                     || $e->errorInfo[1] === 2006;
+                if ($gone && $attempt === 0) {
+                    self::$instance = null;
+                    self::connect();
+                    continue;
+                }
+                throw $e;
+            }
+        }
+    }
+
     /** Run a SELECT query and return all rows */
     public static function query($sql, $params = []) {
-        $stmt = self::getInstance()->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll();
+        return self::run($sql, $params, 'query')->fetchAll();
     }
 
     /** Return a single row */
     public static function queryOne($sql, $params = []) {
-        $stmt = self::getInstance()->prepare($sql);
-        $stmt->execute($params);
-        $row = $stmt->fetch();
+        $row = self::run($sql, $params, 'queryOne')->fetch();
         return $row ?: null;
     }
 
     /** Return a single value from the first column of the first row */
     public static function queryValue($sql, $params = []) {
-        $stmt = self::getInstance()->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchColumn();
+        return self::run($sql, $params, 'queryValue')->fetchColumn();
     }
 
     /** Execute INSERT/UPDATE/DELETE and return affected rows */
     public static function execute($sql, $params = []) {
-        $stmt = self::getInstance()->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->rowCount();
+        return self::run($sql, $params, 'execute')->rowCount();
     }
 
     /** INSERT and return last insert ID */
     public static function insert($sql, $params = []) {
-        $stmt = self::getInstance()->prepare($sql);
-        $stmt->execute($params);
+        self::run($sql, $params, 'insert');
         return self::getInstance()->lastInsertId();
     }
 

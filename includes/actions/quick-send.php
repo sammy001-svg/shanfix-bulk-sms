@@ -117,8 +117,9 @@ $_SESSION['flash'] = [
     'message' => 'Sending ' . number_format($totalCount) . ' messages now. Track live progress in Campaigns.',
 ];
 
-// Close the browser connection so the user is redirected instantly,
-// then continue processing every message in the background.
+// Redirect the browser immediately, then trigger background processing.
+// SMS::spawnBackground() launches a detached PHP process (not part of PHP-FPM),
+// so it won't be killed by request_terminate_timeout — safe for any campaign size.
 session_write_close();
 while (ob_get_level() > 0) ob_end_clean();
 $returnTo = $_SERVER['HTTP_REFERER'] ?? '/';
@@ -126,15 +127,14 @@ header('Location: ' . $returnTo, true, 302);
 header('Connection: close');
 header('Content-Encoding: none');
 header('Content-Length: 0');
+if (function_exists('fastcgi_finish_request')) fastcgi_finish_request(); else flush();
 
-if (function_exists('fastcgi_finish_request')) {
-    fastcgi_finish_request();
-} else {
-    flush();
+$spawned = SMS::spawnBackground();
+
+// Fallback: process inline if exec() is disabled (cron will rescue if FPM kills us)
+if (!$spawned) {
+    ignore_user_abort(true);
+    set_time_limit(0);
+    ini_set('memory_limit', '512M');
+    SMS::processCampaign($campaignId);
 }
-
-ignore_user_abort(true);
-set_time_limit(0);
-ini_set('memory_limit', '512M');
-
-SMS::processCampaign($campaignId);

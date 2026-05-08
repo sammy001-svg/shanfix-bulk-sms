@@ -68,7 +68,7 @@ $groups    = DB::query("SELECT id,name FROM contact_groups WHERE user_id=?",[$ui
                 <td><strong><?=htmlspecialchars($c['name'])?></strong><div style="font-size:11px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?=htmlspecialchars($c['message'])?></div></td>
                 <td><code style="font-size:12px"><?=htmlspecialchars($c['sender_id'])?></code></td>
                 <td>
-                  <?php if ($c['status'] === 'completed' || $c['status'] === 'running'): ?>
+                  <?php if (in_array($c['status'], ['completed', 'running', 'sending'])): ?>
                     <div style="font-weight:700; color:var(--text-primary); display:flex; gap:8px">
                       <span style="color:var(--success)"><i class="fa-solid fa-check"></i> <?=$c['sent_count']?> Sent</span>
                       <?php if (($c['failed_count']??0) > 0): ?>
@@ -76,7 +76,7 @@ $groups    = DB::query("SELECT id,name FROM contact_groups WHERE user_id=?",[$ui
                       <?php endif; ?>
                     </div>
                   <?php else: ?>
-                    <div style="font-weight:700; color:var(--text-primary)"><?=number_format($c['recipients_count']??0)?> Contacts</div>
+                    <div style="font-weight:700; color:var(--text-primary)"><?=number_format($c['total_count']??0)?> Contacts</div>
                   <?php endif; ?>
                 </td>
                 <td><span class="badge badge-<?=$sc?>"><?=ucfirst($c['status'])?></span></td>

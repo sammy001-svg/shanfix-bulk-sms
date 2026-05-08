@@ -7,7 +7,26 @@ require_once __DIR__ . '/../db.php';
 
 class SMS {
 
-    private const BATCH_SIZE = 500; // Recipients per Onfon API call
+    private const BATCH_SIZE = 200; // Recipients per Onfon API call
+
+    /**
+     * Spawn a detached PHP process that runs the cron processor.
+     * The spawned process is NOT part of the PHP-FPM pool, so it won't be
+     * killed by request_terminate_timeout even for million-contact campaigns.
+     * Returns true if a process was successfully launched.
+     */
+    public static function spawnBackground(): bool {
+        if (!function_exists('exec')) return false;
+        $php  = PHP_BINARY ?: 'php';
+        $cron = realpath(__DIR__ . '/../../cron/process_campaigns.php');
+        if (!$cron) return false;
+        if (PHP_OS_FAMILY === 'Windows') {
+            @exec('start /B "' . $php . '" "' . $cron . '"');
+        } else {
+            @exec('"' . $php . '" "' . $cron . '" > /dev/null 2>&1 &');
+        }
+        return true;
+    }
 
     /**
      * Send a single SMS message (used for one-off sends only).
@@ -124,6 +143,7 @@ class SMS {
         // Flush the current batch to Onfon and reset
         $flush = function () use (&$batch, &$sent, &$failed, &$totalUnits, $userId, $senderId, $partsPerMsg, $campaignId) {
             if (empty($batch)) return;
+            DB::keepAlive(); // Reconnect if MySQL dropped the connection during a long run
             [$bs, $bf, $bu] = self::dispatchBatch($userId, $senderId, $batch, $partsPerMsg, $campaignId);
             $sent       += $bs;
             $failed     += $bf;
@@ -153,13 +173,15 @@ class SMS {
                     return;
                 }
                 while (($row = fgetcsv($fh)) !== false) {
-                    $phone = self::normalizePhone(trim($row[$phoneIdx] ?? ''));
+                    $rawPhone = trim($row[$phoneIdx] ?? '');
+                    $phone    = self::normalizePhone($rawPhone);
                     if (!$phone) { $failed++; continue; }
 
                     $msg = $msgTemplate;
                     foreach ($cleanHdr as $i => $hdr) {
                         $val = trim($row[$i] ?? '');
                         $msg = str_replace('##' . ucfirst($hdr) . '##', $val, $msg);
+                        $msg = str_replace('##' . $hdr . '##', $val, $msg);
                         $msg = str_replace('{' . $hdr . '}', $val, $msg);
                     }
                     $batch[] = ['phone' => $phone, 'message' => $msg];
@@ -167,7 +189,6 @@ class SMS {
                 }
             }
             fclose($fh);
-            @unlink($filePath);
         }
 
         // --- Source 2: Contact group (paginated, 1 000 rows at a time) ---
@@ -216,6 +237,12 @@ class SMS {
              units_used = ?, sent_at = NOW(), locked_at = NULL WHERE id = ?",
             [$sent + $failed, $sent, $failed, $totalUnits, $campaignId]
         );
+
+        // Delete the file AFTER marking completed — keeps it available for cron
+        // retry if the process was killed before reaching this line.
+        if ($filePath && file_exists($filePath)) {
+            @unlink($filePath);
+        }
     }
 
     /**
@@ -236,6 +263,7 @@ class SMS {
         );
 
         if (!$deducted) {
+            error_log("SMS Campaign #$campaignId batch skipped: insufficient balance for $count recipients × $partsPerMsg parts.");
             self::bulkLogMessages($userId, $senderId, $recipients, $partsPerMsg, $campaignId, 'failed', []);
             return [0, $count, 0.0];
         }
@@ -245,6 +273,10 @@ class SMS {
 
         $sentCount   = count($result['sent']);
         $failedCount = count($result['failed']);
+
+        if ($failedCount === $count && $sentCount === 0) {
+            error_log("SMS Campaign #$campaignId: entire batch of $count failed — check Onfon API credentials and sender ID '$senderId'.");
+        }
 
         if ($failedCount > 0) {
             DB::execute(
@@ -304,21 +336,36 @@ class SMS {
 
     /**
      * Normalize a phone number to +254XXXXXXXXX (Kenyan format).
+     * Handles scientific notation (2.54712E+11), spaces, dashes, dots.
      * Returns null if the number is unrecognizable.
      */
     public static function normalizePhone(string $phone): ?string {
+        $phone = trim($phone);
+        if ($phone === '') return null;
+
+        // Handle scientific notation (e.g. 2.54712345678E+11 from Excel number cells)
+        if (preg_match('/[eE]/', $phone)) {
+            $as_float = (float)$phone;
+            if ($as_float > 0) {
+                $phone = number_format($as_float, 0, '.', '');
+            }
+        }
+
+        // Strip everything except digits
         $n = preg_replace('/[^0-9]/', '', $phone);
         if (!$n) return null;
 
-        // Expand short local formats to full 254XXXXXXXXX
+        // Expand local Kenyan formats to full 254XXXXXXXXX
         if (strlen($n) === 9 && ($n[0] === '7' || $n[0] === '1')) {
-            $n = '254' . $n;                        // 712345678 → 254712345678
+            $n = '254' . $n;                        // 712345678  → 254712345678
         } elseif (strlen($n) === 10 && $n[0] === '0') {
             $n = '254' . substr($n, 1);             // 0712345678 → 254712345678
+        } elseif (strlen($n) === 14 && substr($n, 0, 2) === '00') {
+            $n = substr($n, 2);                     // 00254xxxxxxxxx (14) → 254xxxxxxxxx (12)
         }
 
-        // After normalization the only valid form is 12 digits starting with 254
-        if (strlen($n) !== 12 || strpos($n, '254') !== 0) {
+        // Valid form: exactly 12 digits starting with 254
+        if (strlen($n) !== 12 || substr($n, 0, 3) !== '254') {
             return null;
         }
 
