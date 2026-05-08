@@ -28,18 +28,18 @@ if (!$message) {
     redirect($_SERVER['HTTP_REFERER'] ?? '/');
 }
 
-// --- Collect all recipients ---
-$recipients = [];
+// --- Resolve recipients without loading them all into memory ---
+
+// For a single manual number (most common case) send immediately
+$recipients  = [];
+$groupCount  = 0;
 
 if ($groupId) {
-    $contacts = DB::query(
-        "SELECT phone FROM contacts WHERE group_id = ? AND user_id = ?",
+    // Just get the count — processCampaign reads contacts itself via paginated queries
+    $groupCount = (int)DB::queryValue(
+        "SELECT COUNT(*) FROM contacts WHERE group_id = ? AND user_id = ?",
         [$groupId, $user['id']]
     );
-    foreach ($contacts as $c) {
-        $n = SMS::normalizePhone($c['phone']);
-        if ($n) $recipients[] = $n;
-    }
 }
 
 if ($manualInput) {
@@ -48,18 +48,18 @@ if ($manualInput) {
         $n = SMS::normalizePhone(trim($raw));
         if ($n) $recipients[] = $n;
     }
+    $recipients = array_unique(array_filter($recipients));
 }
 
-$recipients = array_unique(array_filter($recipients));
-$count      = count($recipients);
+$totalCount = $groupCount + count($recipients);
 
-if ($count === 0) {
+if ($totalCount === 0) {
     $_SESSION['flash'] = ['type' => 'danger', 'message' => 'No valid recipients found.'];
     redirect($_SERVER['HTTP_REFERER'] ?? '/');
 }
 
-// Single immediate send (no campaign overhead needed)
-if ($count === 1 && !$scheduledAt) {
+// Single manual number with no group and no schedule: send immediately
+if (!$groupId && count($recipients) === 1 && !$scheduledAt) {
     $result = SMS::send($user['id'], $recipients[0], $message, $senderId);
     if ($result['success']) {
         $_SESSION['flash'] = ['type' => 'success', 'message' => 'Message sent successfully!'];
@@ -69,9 +69,9 @@ if ($count === 1 && !$scheduledAt) {
     redirect($_SERVER['HTTP_REFERER'] ?? '/');
 }
 
-// Multi-recipient or scheduled: create campaign and let cron handle it
-$status      = $scheduledAt ? 'scheduled' : 'queued';
-$campaignId  = DB::insert(
+// Everything else: queue a campaign and let the cron dispatch it in bulk
+$status     = $scheduledAt ? 'scheduled' : 'queued';
+$campaignId = DB::insert(
     "INSERT INTO campaigns
      (user_id, sender_id, name, message, group_id, recipients, total_count, status, scheduled_at, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
@@ -81,8 +81,9 @@ $campaignId  = DB::insert(
         'Quick Broadcast ' . date('Y-m-d H:i'),
         $message,
         $groupId ?: null,
-        $groupId ? null : implode(',', $recipients), // store numbers only when no group
-        $count,
+        // Store manual numbers only when there's no group
+        (!$groupId && $recipients) ? implode(',', $recipients) : null,
+        $totalCount,
         $status,
         $scheduledAt ?: null,
     ]

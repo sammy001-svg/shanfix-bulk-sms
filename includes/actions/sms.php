@@ -68,12 +68,13 @@ class SMS {
      * Sends up to 500 recipients per Onfon API call; bulk-inserts message logs.
      */
     public static function processCampaign($campaignId) {
-        // Atomic lock: only one process can claim this campaign
+        // Atomic lock: stamp locked_at so the cron can detect if we die mid-way
         $locked = DB::execute(
-            "UPDATE campaigns SET status = 'sending' WHERE id = ? AND status IN ('queued', 'scheduled', 'running')",
+            "UPDATE campaigns SET status = 'sending', locked_at = NOW()
+             WHERE id = ? AND status IN ('queued', 'scheduled', 'running')",
             [$campaignId]
         );
-        if (!$locked) return;
+        if (!$locked) return; // Another process already claimed it
 
         $campaign = DB::queryOne("SELECT * FROM campaigns WHERE id = ?", [$campaignId]);
         if (!$campaign) return;
@@ -81,6 +82,23 @@ class SMS {
         set_time_limit(0);
         ini_set('memory_limit', '256M');
 
+        try {
+            self::runCampaign($campaign);
+        } catch (Throwable $e) {
+            // Log the error and mark the campaign failed so it surfaces to the user
+            error_log("processCampaign #$campaignId crashed: " . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+            DB::execute(
+                "UPDATE campaigns SET status = 'failed', locked_at = NULL WHERE id = ?",
+                [$campaignId]
+            );
+        }
+    }
+
+    /**
+     * Inner implementation — called by processCampaign inside a try-catch.
+     */
+    private static function runCampaign(array $campaign): void {
+        $campaignId  = $campaign['id'];
         $userId      = $campaign['user_id'];
         $senderId    = $campaign['sender_id'];
         $msgTemplate = $campaign['message'];
@@ -94,7 +112,7 @@ class SMS {
             [$userId, $senderId]
         );
         if (!$validSender) {
-            DB::execute("UPDATE campaigns SET status = 'failed' WHERE id = ?", [$campaignId]);
+            DB::execute("UPDATE campaigns SET status = 'failed', locked_at = NULL WHERE id = ?", [$campaignId]);
             return;
         }
         $senderId = $validSender['sender_id'];
@@ -104,48 +122,55 @@ class SMS {
         $batch = [];
 
         // Flush the current batch to Onfon and reset
-        $flush = function () use (&$batch, &$sent, &$failed, &$totalUnits, $userId, $senderId, $partsPerMsg, $campaignId, &$flush) {
+        $flush = function () use (&$batch, &$sent, &$failed, &$totalUnits, $userId, $senderId, $partsPerMsg, $campaignId) {
             if (empty($batch)) return;
             [$bs, $bf, $bu] = self::dispatchBatch($userId, $senderId, $batch, $partsPerMsg, $campaignId);
             $sent       += $bs;
             $failed     += $bf;
             $totalUnits += $bu;
             $batch = [];
-            // Live progress update so campaigns page reflects real-time counts
+            // Live progress so campaigns page shows real-time counts
             DB::execute(
                 "UPDATE campaigns SET sent_count = ?, failed_count = ? WHERE id = ?",
                 [$sent, $failed, $campaignId]
             );
         };
 
-        // --- Source 1: Uploaded CSV file (streamed row by row) ---
+        // --- Source 1: Uploaded CSV file (streamed row by row, no memory spike) ---
         if ($filePath && file_exists($filePath)) {
-            $fh      = fopen($filePath, 'r');
+            $fh = fopen($filePath, 'r');
+            if ($fh === false) {
+                throw new \RuntimeException("Cannot open campaign file: $filePath");
+            }
             $headers = fgetcsv($fh);
             if ($headers) {
                 $cleanHdr = array_map(fn($h) => strtolower(trim($h)), $headers);
                 $phoneIdx = array_search('phone', $cleanHdr);
-                if ($phoneIdx !== false) {
-                    while (($row = fgetcsv($fh)) !== false) {
-                        $phone = self::normalizePhone(trim($row[$phoneIdx] ?? ''));
-                        if (!$phone) { $failed++; continue; }
+                if ($phoneIdx === false) {
+                    fclose($fh);
+                    @unlink($filePath);
+                    DB::execute("UPDATE campaigns SET status = 'failed', locked_at = NULL WHERE id = ?", [$campaignId]);
+                    return;
+                }
+                while (($row = fgetcsv($fh)) !== false) {
+                    $phone = self::normalizePhone(trim($row[$phoneIdx] ?? ''));
+                    if (!$phone) { $failed++; continue; }
 
-                        $msg = $msgTemplate;
-                        foreach ($cleanHdr as $i => $hdr) {
-                            $val = trim($row[$i] ?? '');
-                            $msg = str_replace('##' . ucfirst($hdr) . '##', $val, $msg);
-                            $msg = str_replace('{' . $hdr . '}', $val, $msg);
-                        }
-                        $batch[] = ['phone' => $phone, 'message' => $msg];
-                        if (count($batch) >= self::BATCH_SIZE) $flush();
+                    $msg = $msgTemplate;
+                    foreach ($cleanHdr as $i => $hdr) {
+                        $val = trim($row[$i] ?? '');
+                        $msg = str_replace('##' . ucfirst($hdr) . '##', $val, $msg);
+                        $msg = str_replace('{' . $hdr . '}', $val, $msg);
                     }
+                    $batch[] = ['phone' => $phone, 'message' => $msg];
+                    if (count($batch) >= self::BATCH_SIZE) $flush();
                 }
             }
             fclose($fh);
             @unlink($filePath);
         }
 
-        // --- Source 2: Contact group (paginated to avoid memory overload) ---
+        // --- Source 2: Contact group (paginated, 1 000 rows at a time) ---
         if ($groupId) {
             $offset = 0;
             do {
@@ -184,10 +209,11 @@ class SMS {
             }
         }
 
-        $flush(); // Send any remaining recipients
+        $flush(); // Dispatch any remaining recipients
 
         DB::execute(
-            "UPDATE campaigns SET status = 'completed', total_count = ?, sent_count = ?, failed_count = ?, units_used = ?, sent_at = NOW() WHERE id = ?",
+            "UPDATE campaigns SET status = 'completed', total_count = ?, sent_count = ?, failed_count = ?,
+             units_used = ?, sent_at = NOW(), locked_at = NULL WHERE id = ?",
             [$sent + $failed, $sent, $failed, $totalUnits, $campaignId]
         );
     }
@@ -284,16 +310,18 @@ class SMS {
         $n = preg_replace('/[^0-9]/', '', $phone);
         if (!$n) return null;
 
+        // Expand short local formats to full 254XXXXXXXXX
         if (strlen($n) === 9 && ($n[0] === '7' || $n[0] === '1')) {
-            $n = '254' . $n;
+            $n = '254' . $n;                        // 712345678 → 254712345678
         } elseif (strlen($n) === 10 && $n[0] === '0') {
-            $n = '254' . substr($n, 1);
-        } elseif (strlen($n) === 12 && strpos($n, '254') === 0) {
-            // already correct
-        } elseif (strlen($n) < 9) {
+            $n = '254' . substr($n, 1);             // 0712345678 → 254712345678
+        }
+
+        // After normalization the only valid form is 12 digits starting with 254
+        if (strlen($n) !== 12 || strpos($n, '254') !== 0) {
             return null;
         }
 
-        return strpos($n, '254') === 0 ? '+' . $n : '+' . $n;
+        return '+' . $n;
     }
 }
