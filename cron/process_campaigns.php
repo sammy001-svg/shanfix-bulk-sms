@@ -1,14 +1,14 @@
 <?php
 /**
- * Cron: Process Queued & Scheduled Campaigns - Shanfix Technology
+ * Cron: Safety-Net Campaign Processor - Shanfix Technology
+ *
+ * NOTE: Immediate sends are now processed directly in the web request via
+ * background flush (no cron dependency). This cron handles two remaining cases:
+ *   - Scheduled campaigns (user chose a future send time)
+ *   - Any campaign left 'queued' if the web process was killed prematurely
  *
  * Set up in cPanel (every minute):
  *   * * * * * php /home/user/public_html/cron/process_campaigns.php >> /home/user/logs/cron.log 2>&1
- *
- * What this does each run:
- *  1. Rescues campaigns stuck in 'sending' for > 10 minutes (process died mid-run)
- *  2. Picks up newly queued campaigns and scheduled campaigns whose time has come
- *  3. Processes each in fast bulk batches (500 recipients per Onfon API call)
  */
 set_time_limit(0);
 ini_set('memory_limit', '256M');

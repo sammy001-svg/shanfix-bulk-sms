@@ -1,8 +1,11 @@
 <?php
 /**
  * Action: Quick Send SMS - Shanfix Technology
- * Single-number sends go immediately; multi-recipient campaigns are queued
- * so the cron processes them in fast bulk batches without HTTP timeouts.
+ *
+ * Single number  → sent immediately in this request (fast).
+ * Scheduled      → stored as 'scheduled', cron fires it at the right time.
+ * Multi-recipient / group → browser is redirected instantly, then PHP
+ *                           keeps running to send every message in the background.
  */
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/actions/sms.php';
@@ -29,13 +32,11 @@ if (!$message) {
 }
 
 // --- Resolve recipients without loading them all into memory ---
-
-// For a single manual number (most common case) send immediately
-$recipients  = [];
-$groupCount  = 0;
+$recipients = [];
+$groupCount = 0;
 
 if ($groupId) {
-    // Just get the count — processCampaign reads contacts itself via paginated queries
+    // Only fetch the count — processCampaign reads contacts in paginated batches
     $groupCount = (int)DB::queryValue(
         "SELECT COUNT(*) FROM contacts WHERE group_id = ? AND user_id = ?",
         [$groupId, $user['id']]
@@ -43,8 +44,7 @@ if ($groupId) {
 }
 
 if ($manualInput) {
-    $nums = preg_split('/[\n,;]+/', $manualInput);
-    foreach ($nums as $raw) {
+    foreach (preg_split('/[\n,;]+/', $manualInput) as $raw) {
         $n = SMS::normalizePhone(trim($raw));
         if ($n) $recipients[] = $n;
     }
@@ -58,7 +58,7 @@ if ($totalCount === 0) {
     redirect($_SERVER['HTTP_REFERER'] ?? '/');
 }
 
-// Single manual number with no group and no schedule: send immediately
+// --- Single number, no schedule: send inline and return immediately ---
 if (!$groupId && count($recipients) === 1 && !$scheduledAt) {
     $result = SMS::send($user['id'], $recipients[0], $message, $senderId);
     if ($result['success']) {
@@ -69,34 +69,72 @@ if (!$groupId && count($recipients) === 1 && !$scheduledAt) {
     redirect($_SERVER['HTTP_REFERER'] ?? '/');
 }
 
-// Everything else: queue a campaign and let the cron dispatch it in bulk
-$status     = $scheduledAt ? 'scheduled' : 'queued';
+// --- Scheduled send: store and let cron fire it at the right time ---
+if ($scheduledAt) {
+    $campaignId = DB::insert(
+        "INSERT INTO campaigns
+         (user_id, sender_id, name, message, group_id, recipients, total_count, status, scheduled_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, NOW())",
+        [
+            $user['id'], $senderId,
+            'Scheduled Broadcast ' . date('Y-m-d H:i'),
+            $message,
+            $groupId ?: null,
+            (!$groupId && $recipients) ? implode(',', $recipients) : null,
+            $totalCount,
+            $scheduledAt,
+        ]
+    );
+    $_SESSION['flash'] = $campaignId
+        ? ['type' => 'success', 'message' => 'Broadcast scheduled for ' . date('d M Y H:i', strtotime($scheduledAt)) . '.']
+        : ['type' => 'danger',  'message' => 'Failed to schedule broadcast. Please try again.'];
+    redirect($_SERVER['HTTP_REFERER'] ?? '/');
+}
+
+// --- Multi-recipient immediate send ---
+// Create the campaign record, redirect the browser, then send everything in the background.
 $campaignId = DB::insert(
     "INSERT INTO campaigns
-     (user_id, sender_id, name, message, group_id, recipients, total_count, status, scheduled_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
+     (user_id, sender_id, name, message, group_id, recipients, total_count, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', NOW())",
     [
-        $user['id'],
-        $senderId,
+        $user['id'], $senderId,
         'Quick Broadcast ' . date('Y-m-d H:i'),
         $message,
         $groupId ?: null,
-        // Store manual numbers only when there's no group
         (!$groupId && $recipients) ? implode(',', $recipients) : null,
         $totalCount,
-        $status,
-        $scheduledAt ?: null,
     ]
 );
 
-if ($campaignId) {
-    if ($scheduledAt) {
-        $_SESSION['flash'] = ['type' => 'success', 'message' => "Broadcast scheduled for " . date('d M Y H:i', strtotime($scheduledAt)) . '.'];
-    } else {
-        $_SESSION['flash'] = ['type' => 'success', 'message' => number_format($count) . " recipients queued. Messages will be sent shortly — track progress in Campaigns."];
-    }
-} else {
+if (!$campaignId) {
     $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Failed to initiate broadcast. Please try again.'];
+    redirect($_SERVER['HTTP_REFERER'] ?? '/');
 }
 
-redirect($_SERVER['HTTP_REFERER'] ?? '/');
+$_SESSION['flash'] = [
+    'type'    => 'success',
+    'message' => 'Sending ' . number_format($totalCount) . ' messages now. Track live progress in Campaigns.',
+];
+
+// Close the browser connection so the user is redirected instantly,
+// then continue processing every message in the background.
+session_write_close();
+while (ob_get_level() > 0) ob_end_clean();
+$returnTo = $_SERVER['HTTP_REFERER'] ?? '/';
+header('Location: ' . $returnTo, true, 302);
+header('Connection: close');
+header('Content-Encoding: none');
+header('Content-Length: 0');
+
+if (function_exists('fastcgi_finish_request')) {
+    fastcgi_finish_request();
+} else {
+    flush();
+}
+
+ignore_user_abort(true);
+set_time_limit(0);
+ini_set('memory_limit', '512M');
+
+SMS::processCampaign($campaignId);

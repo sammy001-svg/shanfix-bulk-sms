@@ -1,11 +1,18 @@
 <?php
 /**
- * Action: Queue File-Based SMS Campaign - Shanfix Technology
- * Saves the uploaded file to disk and creates a queued campaign.
- * The cron job picks it up and sends in fast bulk batches.
+ * Action: Send File-Based SMS Campaign - Shanfix Technology
+ *
+ * Flow:
+ *  1. Validate input and save file to disk.
+ *  2. Create campaign record.
+ *  3. Close the browser connection (user gets redirected instantly).
+ *  4. PHP keeps running in the background and sends every message.
+ *
+ * No cron job required — messages are sent immediately regardless of file size.
  */
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/actions/sms.php';
 
 $user = auth_user();
 if (!$user || !in_array($user['role'], ['reseller', 'client'])) {
@@ -31,7 +38,7 @@ if (!$senderId || !$msgTemplate) {
     redirect('/client/send-from-file.php');
 }
 
-// Validate sender ID belongs to this user and is approved
+// Validate sender ID is approved for this user
 $validSender = DB::queryOne(
     "SELECT sender_id FROM sender_ids WHERE user_id = ? AND BINARY sender_id = ? AND status = 'approved'",
     [$user['id'], $senderId]
@@ -41,7 +48,7 @@ if (!$validSender) {
     redirect('/client/send-from-file.php');
 }
 
-// Open data source: either posted CSV string (from JS Excel parser) or raw file upload
+// Open data source: raw CSV file upload OR Excel-converted CSV string from JS
 $sourceHandle = null;
 $originalName = 'upload.csv';
 
@@ -60,7 +67,7 @@ if (!$sourceHandle) {
     redirect('/client/send-from-file.php');
 }
 
-// Validate the header row contains a 'phone' column
+// Validate header row has a 'phone' column
 $headerRow = fgetcsv($sourceHandle);
 if (!$headerRow) {
     fclose($sourceHandle);
@@ -74,17 +81,15 @@ if (!in_array('phone', $cleanHeaders)) {
     redirect('/client/send-from-file.php');
 }
 
-// Save file to a permanent location on disk (not /tmp which gets wiped)
+// Save file to a permanent server path (tmp_name gets deleted after the request)
 $uploadDir = dirname(__DIR__, 2) . '/uploads/campaigns/' . $user['id'] . '/';
 if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0755, true);
 }
-
 $safeName  = preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
 $savePath  = $uploadDir . time() . '_' . $safeName;
 $outHandle = fopen($savePath, 'w');
-
-fputcsv($outHandle, $headerRow); // preserve header
+fputcsv($outHandle, $headerRow);
 $totalRows = 0;
 while (($row = fgetcsv($sourceHandle)) !== false) {
     fputcsv($outHandle, $row);
@@ -99,7 +104,7 @@ if ($totalRows === 0) {
     redirect('/client/send-from-file.php');
 }
 
-// Check user has at least some units (rough guard — exact deduction happens in cron)
+// Quick balance guard (exact deduction happens per-batch inside processCampaign)
 $unitBalance = (float)DB::queryValue("SELECT sms_units FROM users WHERE id = ?", [$user['id']]);
 if ($unitBalance < 1) {
     @unlink($savePath);
@@ -107,9 +112,9 @@ if ($unitBalance < 1) {
     redirect('/client/send-from-file.php');
 }
 
-// Create campaign as 'queued' — the cron will process it in batches
+// Create the campaign record
 $campaignName = 'File: ' . sanitize(pathinfo($originalName, PATHINFO_FILENAME)) . ' (' . date('d M Y H:i') . ')';
-$campaignId = DB::insert(
+$campaignId   = DB::insert(
     "INSERT INTO campaigns (user_id, name, sender_id, message, file_path, total_count, status, created_at)
      VALUES (?, ?, ?, ?, ?, ?, 'queued', NOW())",
     [$user['id'], $campaignName, $senderId, $msgTemplate, $savePath, $totalRows]
@@ -121,8 +126,31 @@ if (!$campaignId) {
     redirect('/client/send-from-file.php');
 }
 
+// ------------------------------------------------------------------
+// Send the HTTP redirect to the browser NOW so the user sees the
+// campaigns page immediately, then continue processing in the background.
+// ------------------------------------------------------------------
 flash_set('success',
-    number_format($totalRows) . ' contacts queued successfully. ' .
-    'Messages will be sent in the background — you can track progress on the Campaigns page.'
+    'Sending ' . number_format($totalRows) . ' messages now. ' .
+    'Live progress is visible on this page — refresh to update counts.'
 );
-redirect('/client/campaigns.php');
+
+session_write_close();                    // release session lock so other pages load
+while (ob_get_level() > 0) ob_end_clean(); // discard any buffered output
+header('Location: /client/campaigns.php', true, 302);
+header('Connection: close');
+header('Content-Encoding: none');
+header('Content-Length: 0');
+
+if (function_exists('fastcgi_finish_request')) {
+    fastcgi_finish_request();             // PHP-FPM: closes connection immediately
+} else {
+    flush();                              // mod_php / CGI fallback
+}
+
+// Browser is gone. Process every contact now.
+ignore_user_abort(true);
+set_time_limit(0);
+ini_set('memory_limit', '512M');
+
+SMS::processCampaign($campaignId);

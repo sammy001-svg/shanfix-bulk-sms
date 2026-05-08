@@ -12,74 +12,106 @@ if (!$user) {
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name        = sanitize($_POST['name'] ?? '');
-    $senderId    = sanitize($_POST['sender_id'] ?? 'SHANFIX');
-    $message     = sanitize($_POST['message'] ?? '');
-    $scheduledAt = $_POST['scheduled_at'] ?? null;
-    $groupId     = (int)($_POST['group_id'] ?? 0);
-    $rawNumbers  = sanitize($_POST['numbers'] ?? '');
-    
-    // 1. Identify recipients
-    $recipients = [];
-    if ($groupId) {
-        $contacts = DB::query("SELECT phone FROM contacts WHERE group_id = ? AND user_id = ?", [$groupId, $user['id']]);
-        foreach ($contacts as $c) $recipients[] = $c['phone'];
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    redirect($_SERVER['HTTP_REFERER'] ?? '/');
+}
+
+$name        = sanitize($_POST['name'] ?? '');
+$senderId    = sanitize($_POST['sender_id'] ?? 'SHANFIX');
+$message     = sanitize($_POST['message'] ?? '');
+$scheduledAt = $_POST['scheduled_at'] ?? null;
+$groupId     = (int)($_POST['group_id'] ?? 0);
+$rawNumbers  = sanitize($_POST['numbers'] ?? '');
+
+// --- Resolve recipients ---
+// For groups: only fetch the count; processCampaign reads contacts in paginated batches.
+// For manual numbers: normalize and deduplicate here.
+$groupCount  = 0;
+$manualNums  = [];
+
+if ($groupId) {
+    $groupCount = (int)DB::queryValue(
+        "SELECT COUNT(*) FROM contacts WHERE group_id = ? AND user_id = ?",
+        [$groupId, $user['id']]
+    );
+}
+
+if ($rawNumbers) {
+    foreach (preg_split('/[\n,;]+/', $rawNumbers) as $raw) {
+        $n = SMS::normalizePhone(trim($raw));
+        if ($n) $manualNums[] = $n;
     }
-    if ($rawNumbers) {
-        $nums = preg_split('/[\n,;]+/', $rawNumbers);
-        foreach ($nums as $n) {
-            $n = preg_replace('/[^0-9]/', '', $n); // Remove non-numeric
-            if (!$n) continue;
+    $manualNums = array_unique(array_filter($manualNums));
+}
 
-            // Smart Kenyan Normalization
-            if (strlen($n) === 9 && ($n[0] === '7' || $n[0] === '1')) { // 711222333 -> 254711222333
-                $n = '254' . $n;
-            } elseif (strlen($n) === 10 && $n[0] === '0') { // 0711222333 -> 254711222333
-                $n = '254' . substr($n, 1);
-            }
-            
-            // Ensure 254 prefix and + sign
-            if (strpos($n, '254') === 0) {
-                $n = '+' . $n;
-            } elseif (strpos($n, '+') !== 0) {
-                $n = '+' . $n;
-            }
-            
-            $recipients[] = $n;
-        }
-    }
-    // (CSV handling would be added here or in a separate step)
+$totalCount = $groupCount + count($manualNums);
+if ($totalCount === 0) {
+    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'No valid recipients found.'];
+    redirect($_SERVER['HTTP_REFERER'] ?? '/');
+}
 
-    $count = count(array_unique($recipients));
-    if ($count === 0) {
-        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'No recipients found.'];
-        redirect($_SERVER['HTTP_REFERER']);
-    }
+$status = $scheduledAt ? 'scheduled' : 'queued';
 
-    $id = (int)($_POST['id'] ?? 0);
-    $status = $scheduledAt ? 'scheduled' : 'queued';
+// Store group_id OR manual numbers — never both, or processCampaign double-sends
+$dbGroupId    = $groupId ?: null;
+$dbRecipients = (!$groupId && $manualNums) ? implode(',', $manualNums) : null;
 
-    if ($id) {
-        // Update existing draft
-        DB::execute("UPDATE campaigns SET sender_id = ?, name = ?, message = ?, group_id = ?, recipients = ?, total_count = ?, status = ?, scheduled_at = ? WHERE id = ? AND user_id = ?", 
-                    [$senderId, $name, $message, $groupId ?: null, implode(',', $recipients), $count, $status, $scheduledAt ?: null, $id, $user['id']]);
-    } else {
-        // Create new
-        $id = DB::insert("INSERT INTO campaigns (user_id, sender_id, name, message, group_id, recipients, total_count, status, scheduled_at, created_at) 
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())", 
-                         [$user['id'], $senderId, $name, $message, $groupId ?: null, implode(',', $recipients), $count, $status, $scheduledAt ?: null]);
-    }
+$existingId = (int)($_POST['id'] ?? 0);
 
-    if ($id) {
-        if ($status === 'queued') {
-            // Process immediately
-            SMS::processCampaign($id);
-            $_SESSION['flash'] = ['type' => 'success', 'message' => "Campaign launched! $count messages are being processed."];
-        } else {
-            $_SESSION['flash'] = ['type' => 'success', 'message' => "Campaign scheduled for " . date('d M Y H:i', strtotime($scheduledAt))];
-        }
-    }
+if ($existingId) {
+    DB::execute(
+        "UPDATE campaigns SET sender_id=?, name=?, message=?, group_id=?, recipients=?,
+         total_count=?, status=?, scheduled_at=? WHERE id=? AND user_id=?",
+        [$senderId, $name, $message, $dbGroupId, $dbRecipients,
+         $totalCount, $status, $scheduledAt ?: null, $existingId, $user['id']]
+    );
+    $campaignId = $existingId;
+} else {
+    $campaignId = DB::insert(
+        "INSERT INTO campaigns
+         (user_id, sender_id, name, message, group_id, recipients, total_count, status, scheduled_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
+        [$user['id'], $senderId, $name, $message, $dbGroupId, $dbRecipients,
+         $totalCount, $status, $scheduledAt ?: null]
+    );
+}
 
+if (!$campaignId) {
+    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Failed to save campaign. Please try again.'];
     redirect($_SESSION['user']['role'] === 'reseller' ? '/reseller/campaigns.php' : '/client/campaigns.php');
 }
+
+$redirectTo = $_SESSION['user']['role'] === 'reseller' ? '/reseller/campaigns.php' : '/client/campaigns.php';
+
+if ($scheduledAt) {
+    $_SESSION['flash'] = [
+        'type'    => 'success',
+        'message' => 'Campaign scheduled for ' . date('d M Y H:i', strtotime($scheduledAt)) . '.',
+    ];
+    redirect($redirectTo);
+}
+
+// Immediate send: redirect browser now, process in background
+$_SESSION['flash'] = [
+    'type'    => 'success',
+    'message' => 'Sending ' . number_format($totalCount) . ' messages now. Live progress on this page.',
+];
+
+session_write_close();
+while (ob_get_level() > 0) ob_end_clean();
+header('Location: ' . $redirectTo, true, 302);
+header('Connection: close');
+header('Content-Encoding: none');
+header('Content-Length: 0');
+
+if (function_exists('fastcgi_finish_request')) {
+    fastcgi_finish_request();
+} else {
+    flush();
+}
+
+ignore_user_abort(true);
+set_time_limit(0);
+ini_set('memory_limit', '512M');
+
+SMS::processCampaign($campaignId);
