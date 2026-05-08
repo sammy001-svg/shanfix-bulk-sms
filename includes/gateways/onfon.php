@@ -97,6 +97,95 @@ class Onfon {
         return ['success' => false, 'error' => "Onfon Error: $errMsg"];
     }
 
+    /**
+     * Send SMS to many recipients in a single API call.
+     * @param array  $recipients  [['phone'=>'254...','message'=>'...'], ...]
+     * @param string $senderId
+     * @return array ['sent'=>[['idx'=>0,'msg_id'=>'...'],...], 'failed'=>[1,3,...]]
+     */
+    public static function sendBulkBatch(array $recipients, string $senderId): array {
+        $creds     = self::getSettings();
+        $apiKey    = $creds['onfon_api_key']    ?? '';
+        $clientId  = $creds['onfon_user_id']    ?? '';
+        $accessKey = $creds['onfon_access_key'] ?? '';
+        $allIndexes = range(0, count($recipients) - 1);
+
+        if (!$apiKey || !$clientId) {
+            return ['sent' => [], 'failed' => $allIndexes];
+        }
+
+        $messageParams = [];
+        foreach ($recipients as $r) {
+            $phone = preg_replace('/[^0-9]/', '', $r['phone']);
+            if (strpos($phone, '0') === 0)                              $phone = '254' . substr($phone, 1);
+            elseif (strpos($phone, '254') !== 0 && strlen($phone) == 9) $phone = '254' . $phone;
+            $messageParams[] = ['Number' => $phone, 'Text' => $r['message']];
+        }
+
+        $payload = [
+            'SenderId'          => trim($senderId),
+            'IsUnicode'         => false,
+            'IsFlash'           => false,
+            'MessageParameters' => $messageParams,
+            'ApiKey'            => $apiKey,
+            'ClientId'          => $clientId,
+            'AccessKey'         => $accessKey,
+        ];
+
+        $jsonPayload = json_encode($payload);
+        $ch = curl_init("https://api.onfonmedia.co.ke/v1/sms/SendBulkSMS");
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $jsonPayload,
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_TIMEOUT        => 120,
+            CURLOPT_RESOLVE        => [
+                "api.onfonmedia.co.ke:443:104.20.9.168",
+                "api.onfonmedia.co.ke:443:104.20.8.168",
+            ],
+        ]);
+
+        $response  = curl_exec($ch);
+        $curlError = curl_error($ch);
+        $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $logPath = __DIR__ . '/onfon_debug.log';
+        @file_put_contents($logPath,
+            "[" . date('Y-m-d H:i:s') . "] BATCH | SENDER: $senderId | COUNT: " . count($recipients) .
+            " | HTTP: $httpCode | ERR: $curlError | RESP: " . substr($response, 0, 500) . "\n",
+            FILE_APPEND
+        );
+
+        if (!$response || $httpCode !== 200) {
+            return ['sent' => [], 'failed' => $allIndexes];
+        }
+
+        $result = json_decode($response, true);
+        if (!isset($result['ErrorCode']) || $result['ErrorCode'] !== 0 || empty($result['Data'])) {
+            return ['sent' => [], 'failed' => $allIndexes];
+        }
+
+        $sent   = [];
+        $failed = [];
+        foreach ($result['Data'] as $idx => $item) {
+            if (isset($item['MessageErrorCode']) && $item['MessageErrorCode'] === 0) {
+                $sent[] = ['idx' => $idx, 'msg_id' => $item['MessageId'] ?? null];
+            } else {
+                $failed[] = $idx;
+            }
+        }
+
+        // If Onfon returned fewer rows than we sent, mark the rest failed
+        for ($i = count($result['Data']); $i < count($recipients); $i++) {
+            $failed[] = $i;
+        }
+
+        return ['sent' => $sent, 'failed' => $failed];
+    }
+
     public static function getBalance() {
         $creds = self::getSettings();
         $apiKey = $creds['onfon_api_key'] ?? '';
