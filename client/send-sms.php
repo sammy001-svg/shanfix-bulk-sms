@@ -358,33 +358,19 @@ function openConfirmModal() {
 
 function confirmAndSend() {
     const btn = document.querySelector('#confirmModal .btn-primary');
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Queuing campaign...';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading & queuing...';
     btn.disabled = true;
 
-    // Yield 30 ms so the browser paints the button state before any heavy work
+    // Server now handles CSV + XLSX natively — attach the raw file and submit.
+    // No browser-side conversion, no POST size limits, safe for any file size.
     setTimeout(() => {
-        const ext = originalFile ? originalFile.name.split('.').pop().toLowerCase() : '';
-
-        if (ext === 'csv' && originalFile) {
-            // CSV: attach the original file directly — no serialization, instant
+        if (originalFile) {
             const dt = new DataTransfer();
             dt.items.add(originalFile);
             document.getElementById('formCsvFile').files = dt.files;
-            document.getElementById('mainCsvData').value = '';
-        } else {
-            // Excel: must serialize to CSV (server can't parse .xlsx/.xls)
-            const rows     = [sideHeaders, ...sideRows];
-            const csvLines = rows.map(r =>
-                r.map(c => {
-                    const s = String(c ?? '').replace(/"/g, '""');
-                    return /[,"\n]/.test(s) ? `"${s}"` : s;
-                }).join(',')
-            );
-            document.getElementById('mainCsvData').value = csvLines.join('\n');
-            document.getElementById('formCsvFile').value = ''; // no raw file
         }
-
-        document.getElementById('sendForm').action    = '/client/actions/send-from-file.php';
+        document.getElementById('mainCsvData').value = ''; // clear legacy field
+        document.getElementById('sendForm').action   = '/client/actions/send-from-file.php';
         document.getElementById('sendForm').submit();
     }, 30);
 }

@@ -349,32 +349,13 @@ function insertPlaceholder(ph) {
 
 function finalSubmit() {
     const btn = document.querySelector('#confirmModal .btn-primary');
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Queuing campaign...';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading & queuing...';
     btn.disabled = true;
 
-    // Yield to the browser so it paints the button state before any heavy work
+    // Server now handles all file types (CSV + XLSX) natively — just submit the raw file.
+    // No browser-side conversion needed, no POST size limits, no memory issues.
     setTimeout(() => {
-        const fileInput  = document.getElementById('fileInput');
-        const file       = fileInput.files[0];
-        const ext        = file ? file.name.split('.').pop().toLowerCase() : '';
-
-        if (ext === 'csv') {
-            // CSV: server reads the original file directly — no serialization needed
-            document.getElementById('csvDataInput').value = '';
-        } else {
-            // Excel/XLS: server cannot parse binary format, so convert to CSV here
-            // and clear the file input so we don't upload both
-            const rows      = [headers, ...parsedRows];
-            const csvLines  = rows.map(row =>
-                row.map(cell => {
-                    const c = String(cell ?? '').replace(/"/g, '""');
-                    return /[,"\n]/.test(c) ? `"${c}"` : c;
-                }).join(',')
-            );
-            document.getElementById('csvDataInput').value = csvLines.join('\n');
-            fileInput.value = ''; // prevent double-upload of raw Excel file
-        }
-
+        document.getElementById('csvDataInput').value = ''; // clear legacy field
         document.getElementById('sendFromFileForm').submit();
     }, 30);
 }

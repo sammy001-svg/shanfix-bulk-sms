@@ -21,11 +21,15 @@ RewriteRule ^(includes|database|\.env|\.git)(/|$) - [F,L]
 # e.g. /admin → /admin/index.php
 DirectoryIndex index.php
 
-# ── PHP settings ──
-php_value upload_max_filesize 10M
-php_value post_max_size 12M
-php_value max_execution_time 120
-php_value memory_limit 128M
+# ── PHP settings (cPanel / Apache mod_php) ──
+# Allow large CSV/Excel uploads (1M+ contacts can be 50–100 MB)
+php_value upload_max_filesize 256M
+php_value post_max_size 260M
+# Web requests that upload files can take a few minutes for large files
+php_value max_input_time 600
+php_value max_execution_time 300
+# Background campaign processing is run via CLI/cron — not subject to this limit
+php_value memory_limit 256M
 
 # ── Security headers ──
 Header always set X-Content-Type-Options "nosniff"

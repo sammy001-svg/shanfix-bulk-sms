@@ -11,21 +11,67 @@ class SMS {
 
     /**
      * Spawn a detached PHP process that runs the cron processor.
-     * The spawned process is NOT part of the PHP-FPM pool, so it won't be
-     * killed by request_terminate_timeout even for million-contact campaigns.
+     *
+     * The spawned process is outside PHP-FPM's request pool, so it will
+     * never be killed by request_terminate_timeout — safe for 1M+ contacts.
+     *
+     * Tries exec() → shell_exec() → popen() in order; one of these is
+     * always available even on restricted cPanel shared hosting.
+     *
      * Returns true if a process was successfully launched.
      */
     public static function spawnBackground(): bool {
-        if (!function_exists('exec')) return false;
-        $php  = PHP_BINARY ?: 'php';
         $cron = realpath(__DIR__ . '/../../cron/process_campaigns.php');
         if (!$cron) return false;
-        if (PHP_OS_FAMILY === 'Windows') {
-            @exec('start /B "' . $php . '" "' . $cron . '"');
-        } else {
-            @exec('"' . $php . '" "' . $cron . '" > /dev/null 2>&1 &');
+
+        // Resolve the PHP CLI binary — try PHP_BINARY first, fall back to 'php'
+        // On cPanel the CLI binary is usually /usr/local/bin/php or /usr/bin/php
+        $php = PHP_BINARY ?: '';
+        if (!$php || !is_file($php)) {
+            foreach (['/usr/local/bin/php', '/usr/bin/php', 'php'] as $try) {
+                if ($try === 'php' || is_file($try)) { $php = $try; break; }
+            }
         }
-        return true;
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            // Windows dev environment
+            if (function_exists('exec')) {
+                @exec('start /B "' . $php . '" "' . $cron . '"');
+                return true;
+            }
+            return false;
+        }
+
+        // Linux / cPanel — build the command once
+        $cmd = '"' . $php . '" "' . $cron . '" > /dev/null 2>&1 &';
+
+        if (function_exists('exec') && !self::isFunctionDisabled('exec')) {
+            @exec($cmd);
+            return true;
+        }
+        if (function_exists('shell_exec') && !self::isFunctionDisabled('shell_exec')) {
+            @shell_exec($cmd);
+            return true;
+        }
+        if (function_exists('popen') && !self::isFunctionDisabled('popen')) {
+            $h = @popen($cmd, 'r');
+            if ($h !== false) { pclose($h); return true; }
+        }
+        if (function_exists('proc_open') && !self::isFunctionDisabled('proc_open')) {
+            $desc = [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']];
+            $p    = @proc_open($cmd, $desc, $pipes);
+            if ($p !== false) { proc_close($p); return true; }
+        }
+        return false;
+    }
+
+    /** Check if a function is in PHP's disable_functions list. */
+    private static function isFunctionDisabled(string $fn): bool {
+        static $disabled = null;
+        if ($disabled === null) {
+            $disabled = array_map('trim', explode(',', ini_get('disable_functions')));
+        }
+        return in_array($fn, $disabled, true);
     }
 
     /**
