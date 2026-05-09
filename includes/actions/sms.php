@@ -209,39 +209,91 @@ class SMS {
             );
         };
 
-        // --- Source 1: Uploaded CSV file (streamed row by row, no memory spike) ---
+        // --- Source 1: Uploaded file (CSV or raw XLSX — convert first if needed) ---
         if ($filePath && file_exists($filePath)) {
+
+            // Convert XLSX to CSV in the background worker (not in the web request)
+            $fileExt = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+            if ($fileExt === 'xlsx') {
+                require_once __DIR__ . '/../helpers/XlsxReader.php';
+                $csvPath = preg_replace('/\.xlsx$/i', '.csv', $filePath);
+                try {
+                    $rowCount = XlsxReader::toCsv($filePath, $csvPath);
+                } catch (\RuntimeException $e) {
+                    @unlink($filePath);
+                    error_log("XLSX conversion failed for campaign #$campaignId: " . $e->getMessage());
+                    DB::execute(
+                        "UPDATE campaigns SET status = 'failed', locked_at = NULL WHERE id = ?",
+                        [$campaignId]
+                    );
+                    return;
+                }
+                @unlink($filePath); // Remove raw XLSX; keep only CSV
+                $filePath = $csvPath;
+                // Update total_count now that we know it
+                DB::execute(
+                    "UPDATE campaigns SET file_path = ?, total_count = ? WHERE id = ?",
+                    [$filePath, $rowCount, $campaignId]
+                );
+            }
+
             $fh = fopen($filePath, 'r');
             if ($fh === false) {
                 throw new \RuntimeException("Cannot open campaign file: $filePath");
             }
-            $headers = fgetcsv($fh);
-            if ($headers) {
-                $cleanHdr = array_map(fn($h) => strtolower(trim($h)), $headers);
-                $phoneIdx = array_search('phone', $cleanHdr);
-                if ($phoneIdx === false) {
-                    fclose($fh);
-                    @unlink($filePath);
-                    DB::execute("UPDATE campaigns SET status = 'failed', locked_at = NULL WHERE id = ?", [$campaignId]);
-                    return;
-                }
-                while (($row = fgetcsv($fh)) !== false) {
-                    $rawPhone = trim($row[$phoneIdx] ?? '');
-                    $phone    = self::normalizePhone($rawPhone);
-                    if (!$phone) { $failed++; continue; }
 
-                    $msg = $msgTemplate;
-                    foreach ($cleanHdr as $i => $hdr) {
-                        $val = trim($row[$i] ?? '');
-                        $msg = str_replace('##' . ucfirst($hdr) . '##', $val, $msg);
-                        $msg = str_replace('##' . $hdr . '##', $val, $msg);
-                        $msg = str_replace('{' . $hdr . '}', $val, $msg);
-                    }
-                    $batch[] = ['phone' => $phone, 'message' => $msg];
-                    if (count($batch) >= self::BATCH_SIZE) $flush();
+            $headers  = fgetcsv($fh);
+            $headers  = $headers ?: [];
+            $cleanHdr = array_map(fn($h) => strtolower(trim($h)), $headers);
+
+            // Accept phone / mobile / number / contact / any header containing those words
+            $phoneIdx = -1;
+            foreach ($cleanHdr as $i => $h) {
+                if ($h === 'phone' || $h === 'mobile' || $h === 'number' || $h === 'contact'
+                    || strpos($h, 'phone') !== false || strpos($h, 'mobile') !== false) {
+                    $phoneIdx = $i;
+                    break;
                 }
             }
+            if ($phoneIdx === -1) {
+                fclose($fh);
+                @unlink($filePath);
+                error_log("Campaign #$campaignId failed: no phone column in [" . implode(', ', $cleanHdr) . "]");
+                DB::execute(
+                    "UPDATE campaigns SET status = 'failed', locked_at = NULL WHERE id = ?",
+                    [$campaignId]
+                );
+                return;
+            }
+            // Normalise header name so placeholder replacement is consistent
+            $cleanHdr[$phoneIdx] = 'phone';
+
+            $csvRowCount = 0;
+            while (($row = fgetcsv($fh)) !== false) {
+                $rawPhone = trim($row[$phoneIdx] ?? '');
+                $phone    = self::normalizePhone($rawPhone);
+                if (!$phone) { $failed++; $csvRowCount++; continue; }
+
+                $msg = $msgTemplate;
+                foreach ($cleanHdr as $i => $hdr) {
+                    $val = trim($row[$i] ?? '');
+                    $msg = str_replace('##' . ucfirst($hdr) . '##', $val, $msg);
+                    $msg = str_replace('##' . $hdr . '##', $val, $msg);
+                    $msg = str_replace('{' . $hdr . '}', $val, $msg);
+                }
+                $batch[] = ['phone' => $phone, 'message' => $msg];
+                $csvRowCount++;
+                if (count($batch) >= self::BATCH_SIZE) $flush();
+            }
             fclose($fh);
+
+            // For CSV files (no prior row count), set total_count now
+            if ($fileExt !== 'xlsx') {
+                DB::execute(
+                    "UPDATE campaigns SET total_count = ? WHERE id = ? AND total_count = 0",
+                    [$csvRowCount, $campaignId]
+                );
+            }
         }
 
         // --- Source 2: Contact group (paginated, 1 000 rows at a time) ---
@@ -306,8 +358,9 @@ class SMS {
         int $userId, string $senderId, array $recipients,
         int $partsPerMsg, int $campaignId
     ): array {
-        $count     = count($recipients);
-        $totalCost = $count * $partsPerMsg;
+        $count      = count($recipients);
+        $totalCost  = $count * $partsPerMsg;
+        $allIndexes = range(0, $count - 1);
 
         // Atomically deduct; skip API call if user has no units
         $deducted = DB::execute(
