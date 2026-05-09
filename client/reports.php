@@ -56,18 +56,19 @@ $totalPages=ceil($total/$perPage);
   <div class="card-header"><h3 class="card-title"><i class="fa-solid fa-file-lines" style="color:var(--primary)"></i> Message Log <span class="badge badge-muted"><?=$total?></span></h3></div>
   <div class="table-wrapper">
     <table class="data-table">
-      <thead><tr><th>Sender ID</th><th>Recipient</th><th>Message</th><th>Units</th><th>Status</th><th>Delivered At</th><th>Created</th></tr></thead>
+      <thead><tr><th>Sender ID</th><th>Recipient</th><th>Message</th><th>Units</th><th>Status</th><th>Failure Reason</th><th>Delivered At</th><th>Created</th></tr></thead>
       <tbody>
         <?php if (empty($messages)): ?>
-          <tr><td colspan="6" class="text-center text-muted" style="padding:30px">No messages found for selected period</td></tr>
+          <tr><td colspan="8" class="text-center text-muted" style="padding:30px">No messages found for selected period</td></tr>
         <?php else: foreach ($messages as $m):
           $sc=['sent'=>'success','delivered'=>'success','failed'=>'danger','queued'=>'warning','undelivered'=>'warning'][$m['status']]??'muted'; ?>
           <tr>
             <td><code><?=htmlspecialchars($m['sender_id'])?></code></td>
             <td><?=htmlspecialchars($m['recipient'])?></td>
-            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text-secondary)"><?=htmlspecialchars($m['message'])?></td>
+            <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text-secondary)"><?=htmlspecialchars($m['message'])?></td>
             <td><?=$m['units_charged']?></td>
             <td><span class="badge badge-<?=$sc?>"><?=ucfirst($m['status'])?></span></td>
+            <td style="font-size:11px;color:var(--danger);max-width:180px"><?=htmlspecialchars($m['failed_reason']??'')?></td>
             <td style="font-size:11px"><?=$m['sent_at']?date('d M Y H:i',strtotime($m['sent_at'])):'—'?></td>
             <td style="font-size:11px"><?=$m['created_at']?date('d M Y H:i',strtotime($m['created_at'])):'—'?></td>
           </tr>

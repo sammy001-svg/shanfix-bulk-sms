@@ -162,33 +162,49 @@ class Onfon {
 
         if (!$response || $httpCode !== 200) {
             error_log("Onfon batch failed: HTTP $httpCode, CURL: $curlError, sender=$senderId, count=" . count($recipients));
-            return ['sent' => [], 'failed' => $allIndexes];
+            // Try to pull a human-readable reason from the error body
+            $batchReason = "HTTP $httpCode";
+            if ($response) {
+                $errBody = json_decode($response, true);
+                $batchReason = $errBody['Data'][0]['MessageErrorDescription']
+                    ?? $errBody['Description']
+                    ?? $errBody['Message']
+                    ?? $batchReason;
+            }
+            return ['sent' => [], 'failed' => $allIndexes, 'reasons' => array_fill_keys($allIndexes, $batchReason)];
         }
 
         $result = json_decode($response, true);
         if (!isset($result['ErrorCode']) || $result['ErrorCode'] !== 0 || empty($result['Data'])) {
             $errCode = $result['ErrorCode'] ?? 'missing';
-            $errDesc = $result['Description'] ?? ($result['Message'] ?? 'no description');
-            error_log("Onfon batch rejected: ErrorCode=$errCode, desc=$errDesc, sender=$senderId, count=" . count($recipients));
-            return ['sent' => [], 'failed' => $allIndexes];
+            $batchReason = $result['Data'][0]['MessageErrorDescription']
+                ?? $result['Description']
+                ?? $result['Message']
+                ?? "Onfon error $errCode";
+            error_log("Onfon batch rejected: ErrorCode=$errCode, reason=$batchReason, sender=$senderId, count=" . count($recipients));
+            return ['sent' => [], 'failed' => $allIndexes, 'reasons' => array_fill_keys($allIndexes, $batchReason)];
         }
 
-        $sent   = [];
-        $failed = [];
+        $sent    = [];
+        $failed  = [];
+        $reasons = [];
         foreach ($result['Data'] as $idx => $item) {
-            if (isset($item['MessageErrorCode']) && $item['MessageErrorCode'] === 0) {
+            $errCode = $item['MessageErrorCode'] ?? -1;
+            if ($errCode === 0 || $errCode === '0') {
                 $sent[] = ['idx' => $idx, 'msg_id' => $item['MessageId'] ?? null];
             } else {
-                $failed[] = $idx;
+                $failed[]      = $idx;
+                $reasons[$idx] = $item['MessageErrorDescription'] ?? "Onfon error $errCode";
             }
         }
 
         // If Onfon returned fewer rows than we sent, mark the rest failed
         for ($i = count($result['Data']); $i < count($recipients); $i++) {
-            $failed[] = $i;
+            $failed[]      = $i;
+            $reasons[$i]   = 'No response from gateway for this recipient';
         }
 
-        return ['sent' => $sent, 'failed' => $failed];
+        return ['sent' => $sent, 'failed' => $failed, 'reasons' => $reasons];
     }
 
     public static function getBalance() {

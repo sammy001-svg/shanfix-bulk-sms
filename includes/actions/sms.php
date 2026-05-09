@@ -117,9 +117,13 @@ class SMS {
                 );
                 return ['success' => true, 'id' => $msgId, 'cost' => $cost];
             } else {
-                DB::execute("UPDATE messages SET status = 'failed' WHERE id = ?", [$msgId]);
+                $errMsg = $providerResult['error'] ?? 'Provider connection failed';
+                DB::execute(
+                    "UPDATE messages SET status = 'failed', failed_reason = ? WHERE id = ?",
+                    [$errMsg, $msgId]
+                );
                 DB::execute("UPDATE users SET sms_units = sms_units + ? WHERE id = ?", [$cost, $userId]);
-                return ['success' => false, 'error' => $providerResult['error'] ?? 'Provider connection failed'];
+                return ['success' => false, 'error' => $errMsg];
             }
 
         } catch (Exception $e) {
@@ -313,7 +317,9 @@ class SMS {
 
         if (!$deducted) {
             error_log("SMS Campaign #$campaignId batch skipped: insufficient balance for $count recipients × $partsPerMsg parts.");
-            self::bulkLogMessages($userId, $senderId, $recipients, $partsPerMsg, $campaignId, 'failed', []);
+            $allFailed  = array_flip($allIndexes);
+            $allReasons = array_fill_keys($allIndexes, 'Insufficient SMS balance');
+            self::bulkLogMessages($userId, $senderId, $recipients, $partsPerMsg, $campaignId, 'sent', [], $allFailed, $allReasons);
             return [0, $count, 0.0];
         }
 
@@ -340,19 +346,21 @@ class SMS {
             $sentMsgIds[$s['idx']] = $s['msg_id'];
         }
         $failedSet = array_flip($result['failed']);
+        $reasons   = $result['reasons'] ?? [];
 
-        self::bulkLogMessages($userId, $senderId, $recipients, $partsPerMsg, $campaignId, 'sent', $sentMsgIds, $failedSet);
+        self::bulkLogMessages($userId, $senderId, $recipients, $partsPerMsg, $campaignId, 'sent', $sentMsgIds, $failedSet, $reasons);
 
         return [$sentCount, $failedCount, $sentCount * (float)$partsPerMsg];
     }
 
     /**
      * Insert all message logs for a batch in a single SQL statement.
+     * $reasons maps recipient index → human-readable failure description.
      */
     private static function bulkLogMessages(
         int $userId, string $senderId, array $recipients,
         int $partsPerMsg, int $campaignId, string $defaultStatus,
-        array $sentMsgIds, array $failedSet = []
+        array $sentMsgIds, array $failedSet = [], array $reasons = []
     ): void {
         if (empty($recipients)) return;
 
@@ -361,23 +369,24 @@ class SMS {
         $now          = date('Y-m-d H:i:s');
 
         foreach ($recipients as $idx => $r) {
-            $isFailed = isset($failedSet[$idx]);
-            $status   = $isFailed ? 'failed' : $defaultStatus;
+            $isFailed = isset($failedSet[$idx]) || $defaultStatus === 'failed';
+            $status   = $isFailed ? 'failed' : 'sent';
             $msgId    = $sentMsgIds[$idx] ?? null;
             $sentAt   = $isFailed ? null : $now;
+            $reason   = $isFailed ? ($reasons[$idx] ?? null) : null;
 
-            $placeholders[] = "(?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $placeholders[] = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             array_push(
                 $params,
                 $userId, $campaignId, $senderId,
                 $r['phone'], $r['message'],
-                $partsPerMsg, $status, $msgId, $sentAt
+                $partsPerMsg, $status, $msgId, $sentAt, $reason
             );
         }
 
         DB::execute(
             "INSERT INTO messages
-             (user_id, campaign_id, sender_id, recipient, message, units_charged, status, gateway_msg_id, sent_at)
+             (user_id, campaign_id, sender_id, recipient, message, units_charged, status, gateway_msg_id, sent_at, failed_reason)
              VALUES " . implode(',', $placeholders),
             $params
         );
