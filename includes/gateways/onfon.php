@@ -155,16 +155,21 @@ class Onfon {
         $logPath = __DIR__ . '/onfon_debug.log';
         @file_put_contents($logPath,
             "[" . date('Y-m-d H:i:s') . "] BATCH | SENDER: $senderId | COUNT: " . count($recipients) .
-            " | HTTP: $httpCode | ERR: $curlError | RESP: " . substr($response, 0, 500) . "\n",
+            " | HTTP: $httpCode | CURL_ERR: " . ($curlError ?: 'none') .
+            " | RESP: " . substr((string)$response, 0, 2000) . "\n",
             FILE_APPEND
         );
 
         if (!$response || $httpCode !== 200) {
+            error_log("Onfon batch failed: HTTP $httpCode, CURL: $curlError, sender=$senderId, count=" . count($recipients));
             return ['sent' => [], 'failed' => $allIndexes];
         }
 
         $result = json_decode($response, true);
         if (!isset($result['ErrorCode']) || $result['ErrorCode'] !== 0 || empty($result['Data'])) {
+            $errCode = $result['ErrorCode'] ?? 'missing';
+            $errDesc = $result['Description'] ?? ($result['Message'] ?? 'no description');
+            error_log("Onfon batch rejected: ErrorCode=$errCode, desc=$errDesc, sender=$senderId, count=" . count($recipients));
             return ['sent' => [], 'failed' => $allIndexes];
         }
 

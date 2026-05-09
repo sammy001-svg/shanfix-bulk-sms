@@ -7,7 +7,7 @@ require_once __DIR__ . '/../db.php';
 
 class SMS {
 
-    private const BATCH_SIZE = 200; // Recipients per Onfon API call
+    private const BATCH_SIZE = 50; // Recipients per Onfon API call (Onfon rejects payloads > ~100)
 
     /**
      * Spawn a detached PHP process that runs the cron processor.
@@ -187,9 +187,12 @@ class SMS {
         $batch = [];
 
         // Flush the current batch to Onfon and reset
-        $flush = function () use (&$batch, &$sent, &$failed, &$totalUnits, $userId, $senderId, $partsPerMsg, $campaignId) {
+        $batchNum = 0;
+        $flush = function () use (&$batch, &$sent, &$failed, &$totalUnits, &$batchNum, $userId, $senderId, $partsPerMsg, $campaignId) {
             if (empty($batch)) return;
             DB::keepAlive(); // Reconnect if MySQL dropped the connection during a long run
+            if ($batchNum > 0) usleep(100000); // 100ms pause between batches — avoids Onfon rate-limit
+            $batchNum++;
             [$bs, $bf, $bu] = self::dispatchBatch($userId, $senderId, $batch, $partsPerMsg, $campaignId);
             $sent       += $bs;
             $failed     += $bf;

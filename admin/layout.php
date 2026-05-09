@@ -55,6 +55,7 @@ $navItems = [
   ['type'=>'section','label'=>'SYSTEM'],
   ['icon'=>'<i class="fa-solid fa-bell"></i>',      'label'=>'Notifications',  'url'=>'/admin/notifications.php'],
   ['icon'=>'<i class="fa-solid fa-gear"></i>',      'label'=>'Settings',       'url'=>'/admin/settings.php'],
+  ['icon'=>'<i class="fa-solid fa-stethoscope"></i>','label'=>'Gateway Diag',  'url'=>'/admin/gateway-diagnostics.php'],
 ];
 ?>
 <!DOCTYPE html>
