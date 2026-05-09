@@ -74,9 +74,9 @@ $approvedSenders = DB::query("SELECT DISTINCT sender_id FROM sender_ids WHERE st
 <?php
 if (isset($_GET['cleared'])): ?>
   <div class="alert alert-success"><i class="fa-solid fa-check"></i> Debug log cleared.</div>
-<?php endif;
+<?php endif; ?>
 
-if ($testResult !== null): ?>
+<?php if ($testResult !== null): ?>
   <div class="alert alert-<?=$testResult['ok']?'success':'danger'?>">
     <i class="fa-solid fa-<?=$testResult['ok']?'check':'triangle-exclamation'?>"></i>
     <?=htmlspecialchars($testResult['msg'])?>
@@ -178,7 +178,7 @@ if ($testResult !== null): ?>
             $rowStyle = $hasError ? 'background:rgba(220,53,69,.07)' : ($isBatch ? 'background:rgba(13,110,253,.04)' : '');
             ?>
             <tr style="<?=$rowStyle?>;border-bottom:1px solid var(--border-color)">
-              <td style="padding:5px 14px;white-space:pre-wrap;word-break:break-all;line-height:1.5;color:<?=$hasError?'#dc3545':'var(--text-primary)'>">
+              <td style="padding:5px 14px;white-space:pre-wrap;word-break:break-all;line-height:1.5;color:<?=$hasError?'#dc3545':'var(--text-primary)'?>">
                 <?=htmlspecialchars($line)?>
               </td>
             </tr>
