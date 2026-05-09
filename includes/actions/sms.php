@@ -7,7 +7,7 @@ require_once __DIR__ . '/../db.php';
 
 class SMS {
 
-    private const BATCH_SIZE = 50; // Recipients per Onfon API call (Onfon rejects payloads > ~100)
+    private const BATCH_SIZE = 20; // Onfon hard limit: max 20 recipients per SendBulkSMS call
 
     /**
      * Spawn a detached PHP process that runs the cron processor.
