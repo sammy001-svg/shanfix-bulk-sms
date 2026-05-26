@@ -233,7 +233,7 @@ $groups    = DB::query("SELECT id,name FROM contact_groups WHERE user_id=?",[$ui
         <div class="form-group sms-composer">
           <label class="form-label">Message <span class="required">*</span></label>
           <textarea name="message" id="cmMsg" class="form-control" placeholder="Type message…" maxlength="918" required></textarea>
-          <div class="sms-counter"><span id="cmChars">0</span>/160 · <span id="cmSegs">1</span> SMS parts</div>
+          <div class="sms-counter"><span id="cmChars">0</span>/<span id="cmLimit">160</span> · <span id="cmSegs">1</span> SMS parts<span id="cmEncoding" style="color:var(--warning);margin-left:4px"></span></div>
         </div>
       </div>
       <div class="modal-footer">
@@ -264,13 +264,39 @@ if ($view === 'campaigns') {
 $extraScript = '<script>';
 if ($editJs) $extraScript .= $editJs;
 $extraScript .= '
+// ── GSM-7 charset (matches PHP SMS::isUnicode) ────────────────────────────────
+const GSM7_SET = new Set([
+    0x40,0xA3,0x24,0xA5,0xE8,0xE9,0xF9,0xEC,0xF2,0xC7,
+    0x0A,0xD8,0xF8,0x0D,0xC5,0xE5,0x394,0x5F,0x3A6,0x393,
+    0x39B,0x3A9,0x3A0,0x3A8,0x3A3,0x398,0x39E,0x1B,0xC6,0xE6,
+    0xDF,0xC9,
+    0x20,0x21,0x22,0x23,0xA4,0x25,0x26,0x27,0x28,0x29,
+    0x2A,0x2B,0x2C,0x2D,0x2E,0x2F,
+    0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,
+    0x3A,0x3B,0x3C,0x3D,0x3E,0x3F,0xA1,
+    ...Array.from({length:26},(_,i)=>0x41+i),
+    0xC4,0xD6,0xD1,0xDC,0xA7,0xBF,
+    ...Array.from({length:26},(_,i)=>0x61+i),
+    0xE4,0xF6,0xF1,0xFC,0xE0,
+    0x7C,0x5E,0x20AC,0x7B,0x7D,0x5B,0x7E,0x5D,0x5C
+]);
+function msgIsUnicode(msg) {
+    return [...msg].some(c => !GSM7_SET.has(c.codePointAt(0)));
+}
+
 // ── SMS counter ───────────────────────────────────────────────────────────────
 const ta = document.getElementById("cmMsg");
 if (ta) ta.addEventListener("input", updateSmsCounter);
 function updateSmsCounter() {
-    const l = ta.value.length, s = Math.ceil(l / 160) || 1;
-    document.getElementById("cmChars").textContent = l;
-    document.getElementById("cmSegs").textContent  = s;
+    const msg     = ta.value;
+    const chars   = [...msg].length;
+    const unicode = msgIsUnicode(msg);
+    const limit   = unicode ? 70 : 160;
+    const segs    = chars === 0 ? 1 : Math.ceil(chars / limit);
+    document.getElementById("cmChars").textContent    = chars;
+    document.getElementById("cmLimit").textContent    = limit;
+    document.getElementById("cmSegs").textContent     = segs;
+    document.getElementById("cmEncoding").textContent = unicode ? "Unicode" : "";
 }
 
 // ── Campaign modal helpers ────────────────────────────────────────────────────

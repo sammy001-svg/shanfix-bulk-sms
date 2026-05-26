@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS `campaigns` (
   `sent_count`    INT UNSIGNED NOT NULL DEFAULT 0,
   `failed_count`  INT UNSIGNED NOT NULL DEFAULT 0,
   `units_used`    DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-  `status`        ENUM('draft','queued','sending','completed','failed') NOT NULL DEFAULT 'draft',
+  `status`        ENUM('draft','scheduled','queued','running','sending','completed','failed') NOT NULL DEFAULT 'draft',
   `scheduled_at`  DATETIME     DEFAULT NULL,
   `sent_at`       DATETIME     DEFAULT NULL,
   `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,

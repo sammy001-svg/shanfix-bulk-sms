@@ -4,16 +4,27 @@ $pageTitle = 'Reports';
 $breadcrumb = [['label'=>'Client'],['label'=>'Reports']];
 require_once __DIR__ . '/layout.php';
 
-$uid  = $user['id'];
-$from = sanitize($_GET['from'] ?? date('Y-m-01'));
-$to   = sanitize($_GET['to']   ?? date('Y-m-d'));
+$uid        = $user['id'];
+$from       = sanitize($_GET['from'] ?? date('Y-m-01'));
+$to         = sanitize($_GET['to']   ?? date('Y-m-d'));
+$campaignId = (int)($_GET['campaign_id'] ?? 0);
 
 $where  = "WHERE m.user_id=? AND DATE(m.created_at) BETWEEN ? AND ?";
 $params = [$uid, $from, $to];
 
+if ($campaignId > 0) {
+    $where  .= " AND m.campaign_id=?";
+    $params[] = $campaignId;
+    $campaignRow = DB::queryOne("SELECT name FROM campaigns WHERE id=? AND user_id=?", [$campaignId, $uid]);
+    $campaignName = $campaignRow['name'] ?? '';
+}
+
 $summary = DB::queryOne("SELECT COUNT(*) as total, SUM(status='sent') as sent, SUM(status='sent' OR status='delivered') as delivered, SUM(status='failed') as failed, COALESCE(SUM(units_charged),0) as units FROM messages m $where", $params);
 
-$trend   = DB::query("SELECT DATE(created_at) as day, COUNT(*) as total FROM messages WHERE user_id=? AND created_at>=DATE_SUB(NOW(),INTERVAL 7 DAY) GROUP BY day ORDER BY day",[$uid]);
+$trendParams = [$uid, $from, $to];
+$trendWhere  = "user_id=? AND DATE(created_at) BETWEEN ? AND ?";
+if ($campaignId > 0) { $trendWhere .= " AND campaign_id=?"; $trendParams[] = $campaignId; }
+$trend   = DB::query("SELECT DATE(created_at) as day, COUNT(*) as total FROM messages WHERE $trendWhere GROUP BY day ORDER BY day", $trendParams);
 $tLabels = json_encode(array_column($trend,'day'));
 $tValues = json_encode(array_column($trend,'total'));
 
@@ -22,12 +33,16 @@ $perPage= 25; $offset=($page-1)*$perPage;
 $messages= DB::query("SELECT m.* FROM messages m $where ORDER BY m.created_at DESC LIMIT $perPage OFFSET $offset",$params);
 $total   = DB::queryOne("SELECT COUNT(*) as c FROM messages m $where",$params)['c']??0;
 $totalPages=ceil($total/$perPage);
+$extraQs = ($campaignId > 0 ? "&campaign_id=$campaignId" : '');
 ?>
 <div class="page-header">
-  <div><h1>Reports</h1><div class="subtitle">Your message delivery reports</div></div>
+  <div>
+    <h1>Reports<?= $campaignId > 0 ? ': ' . htmlspecialchars($campaignName) : '' ?></h1>
+    <div class="subtitle"><?= $campaignId > 0 ? '<a href="/client/campaigns.php">← Back to Campaigns</a>' : 'Your message delivery reports' ?></div>
+  </div>
   <div style="display:flex; gap:10px">
-    <a href="/client/actions/download-report.php?from=<?=$from?>&to=<?=$to?>&format=csv" class="btn btn-outline" title="Download CSV"><i class="fa-solid fa-file-csv"></i> CSV</a>
-    <a href="/client/actions/download-report.php?from=<?=$from?>&to=<?=$to?>&format=excel" class="btn btn-outline" title="Download Excel"><i class="fa-solid fa-file-excel"></i> Excel</a>
+    <a href="/client/actions/download-report.php?from=<?=$from?>&to=<?=$to?><?=$extraQs?>&format=csv" class="btn btn-outline" title="Download CSV"><i class="fa-solid fa-file-csv"></i> CSV</a>
+    <a href="/client/actions/download-report.php?from=<?=$from?>&to=<?=$to?><?=$extraQs?>&format=excel" class="btn btn-outline" title="Download Excel"><i class="fa-solid fa-file-excel"></i> Excel</a>
     <button onclick="downloadPDF(event)" class="btn btn-secondary"><i class="fa-solid fa-file-pdf"></i> Download PDF</button>
   </div>
 </div>
@@ -35,6 +50,7 @@ $totalPages=ceil($total/$perPage);
 <div class="card" style="margin-bottom:18px">
   <div class="card-body" style="padding:14px 18px">
     <form method="GET" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+      <?php if ($campaignId > 0): ?><input type="hidden" name="campaign_id" value="<?=$campaignId?>"><?php endif; ?>
       <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">From</label><input type="date" name="from" class="form-control" value="<?=$from?>" style="width:150px"></div>
       <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">To</label><input type="date" name="to" class="form-control" value="<?=$to?>" style="width:150px"></div>
       <button type="submit" class="btn btn-primary" style="align-self:flex-end"><i class="fa-solid fa-filter"></i> Filter</button>
@@ -49,7 +65,7 @@ $totalPages=ceil($total/$perPage);
   <div class="stat-card"><div class="stat-icon orange"><i class="fa-solid fa-coins"></i></div><div class="stat-info"><div class="stat-label">Units Used</div><div class="stat-value"><?=number_format($summary['units']??0,2)?></div></div></div>
 </div>
 <div class="card" style="margin-bottom:20px">
-  <div class="card-header"><h3 class="card-title"><i class="fa-solid fa-chart-bar" style="color:var(--primary)"></i> Messages (Last 7 Days)</h3></div>
+  <div class="card-header"><h3 class="card-title"><i class="fa-solid fa-chart-bar" style="color:var(--primary)"></i> Messages (<?=htmlspecialchars($from)?> – <?=htmlspecialchars($to)?>)</h3></div>
   <div class="card-body"><div class="chart-container" style="height:200px"><canvas id="repChart"></canvas></div></div>
 </div>
 <div class="card" id="message-log-section">
@@ -77,7 +93,7 @@ $totalPages=ceil($total/$perPage);
     </table>
   </div>
   <?php if ($totalPages>1): ?>
-    <div class="card-footer"><div class="pagination"><?php for($p=1;$p<=$totalPages;$p++): ?><a href="?page=<?=$p?>&from=<?=$from?>&to=<?=$to?>" class="page-btn <?=$p===$page?'active':''?>"><?=$p?></a><?php endfor; ?></div></div>
+    <div class="card-footer"><div class="pagination"><?php for($p=1;$p<=$totalPages;$p++): ?><a href="?page=<?=$p?>&from=<?=$from?>&to=<?=$to?><?=$extraQs?>" class="page-btn <?=$p===$page?'active':''?>"><?=$p?></a><?php endfor; ?></div></div>
   <?php endif; ?>
 </div>
 </div>

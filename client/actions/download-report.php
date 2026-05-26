@@ -27,24 +27,33 @@ if ($toTs - $fromTs > 31 * 86400) {
 $from = date('Y-m-d', $fromTs);
 $to   = date('Y-m-d', $toTs);
 
+// Optional campaign filter
+$campaignId = (int)($_GET['campaign_id'] ?? 0);
+
 // Hard row limit — a CSV of 100k rows is ~30 MB; beyond that tell the user to narrow the range
 const MAX_ROWS = 100_000;
 
-$data = DB::query(
-    "SELECT id, sender_id, recipient, message, units_charged, status, sent_at, created_at
-     FROM messages
-     WHERE user_id = ? AND DATE(created_at) BETWEEN ? AND ?
-     ORDER BY created_at DESC
-     LIMIT " . (MAX_ROWS + 1),
-    [$uid, $from, $to]
-);
+$sql    = "SELECT id, campaign_id, sender_id, recipient, message, units_charged, status, failed_reason, sent_at, created_at
+           FROM messages
+           WHERE user_id = ? AND DATE(created_at) BETWEEN ? AND ?";
+$params = [$uid, $from, $to];
+
+if ($campaignId > 0) {
+    $sql    .= " AND campaign_id = ?";
+    $params[] = $campaignId;
+}
+
+$sql .= " ORDER BY created_at DESC LIMIT " . (MAX_ROWS + 1);
+$data = DB::query($sql, $params);
 
 $truncated = count($data) > MAX_ROWS;
 if ($truncated) {
     $data = array_slice($data, 0, MAX_ROWS);
 }
 
-$filename = "Message_Report_{$from}_to_{$to}.csv";
+$filename = $campaignId > 0
+    ? "Campaign_{$campaignId}_Report_{$from}_to_{$to}.csv"
+    : "Message_Report_{$from}_to_{$to}.csv";
 
 header('Content-Type: text/csv; charset=utf-8');
 header('Content-Disposition: attachment; filename="' . $filename . '"');
@@ -59,17 +68,19 @@ if ($truncated) {
     fputcsv($output, ["NOTE: Results capped at " . number_format(MAX_ROWS) . " rows. Narrow the date range to see all records."]);
 }
 
-fputcsv($output, ['Message ID', 'Sender ID', 'Recipient', 'Message', 'Units Charged', 'Status', 'Sent At', 'Created At']);
+fputcsv($output, ['Message ID', 'Campaign ID', 'Sender ID', 'Recipient', 'Message', 'Units Charged', 'Status', 'Failure Reason', 'Sent At', 'Created At']);
 
 foreach ($data as $row) {
     fputcsv($output, [
         $row['id'],
+        $row['campaign_id'] ?: '',
         $row['sender_id'],
         $row['recipient'],
         $row['message'],
         $row['units_charged'],
         ucfirst($row['status']),
-        $row['sent_at'] ?: '—',
+        $row['failed_reason'] ?? '',
+        $row['sent_at'] ?: '',
         $row['created_at'],
     ]);
 }
