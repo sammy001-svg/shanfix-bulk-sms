@@ -7,21 +7,69 @@ $uid  = $user['id'];
 $from = sanitize($_GET['from'] ?? date('Y-m-01'));
 $to   = sanitize($_GET['to']   ?? date('Y-m-d'));
 
-$where  = "WHERE m.user_id=? AND DATE(m.created_at) BETWEEN ? AND ?";
-$params = [$uid, $from, $to];
+$allowedPerPage = [10, 50, 100, 1000, 10000];
+$perPage = in_array((int)($_GET['per_page'] ?? 50), $allowedPerPage, true) ? (int)$_GET['per_page'] : 50;
 
-$summary = DB::queryOne("SELECT COUNT(*) as total, SUM(status='sent') as sent, SUM(status='delivered') as delivered, SUM(status='failed') as failed, COALESCE(SUM(units_charged),0) as units FROM messages m $where", $params);
+$validStatuses = ['sent', 'delivered', 'failed', 'queued', 'undelivered'];
+$statusFilter  = in_array($_GET['status'] ?? '', $validStatuses, true) ? $_GET['status'] : '';
 
-// 7-day trend
-$trend   = DB::query("SELECT DATE(created_at) as day, COUNT(*) as total FROM messages WHERE user_id=? AND created_at>=DATE_SUB(NOW(),INTERVAL 7 DAY) GROUP BY day ORDER BY day",[$uid]);
-$tLabels = json_encode(array_column($trend,'day'));
-$tValues = json_encode(array_column($trend,'total'));
+// Sargable date range — lets MySQL use the idx_user_created index
+$baseWhere  = "m.user_id = ? AND m.created_at >= ? AND m.created_at < DATE_ADD(?, INTERVAL 1 DAY)";
+$baseParams = [$uid, $from, $to];
 
-$page   = max(1,(int)($_GET['page']??1));
-$perPage= 25; $offset=($page-1)*$perPage;
-$messages= DB::query("SELECT m.* FROM messages m $where ORDER BY m.created_at DESC LIMIT $perPage OFFSET $offset",$params);
-$total   = DB::queryOne("SELECT COUNT(*) as c FROM messages m $where",$params)['c']??0;
-$totalPages=ceil($total/$perPage);
+$logWhere  = $baseWhere;
+$logParams = $baseParams;
+if ($statusFilter) {
+    $logWhere  .= " AND m.status = ?";
+    $logParams[] = $statusFilter;
+}
+
+$summary = DB::queryOne(
+    "SELECT COUNT(*) as total,
+            SUM(status='sent') as sent,
+            SUM(status='delivered') as delivered,
+            SUM(status='failed') as failed,
+            COALESCE(SUM(units_charged), 0) as units
+     FROM messages m WHERE $baseWhere",
+    $baseParams
+);
+
+// Daily trend for the selected date range
+$trend   = DB::query(
+    "SELECT DATE(created_at) as day, COUNT(*) as total
+     FROM messages
+     WHERE user_id = ? AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY)
+     GROUP BY day ORDER BY day",
+    [$uid, $from, $to]
+);
+$tLabels = json_encode(array_column($trend, 'day'));
+$tValues = json_encode(array_column($trend, 'total'));
+
+$page       = max(1, (int)($_GET['page'] ?? 1));
+$total      = (int)(DB::queryOne("SELECT COUNT(*) as c FROM messages m WHERE $logWhere", $logParams)['c'] ?? 0);
+$totalPages = $total > 0 ? (int)ceil($total / $perPage) : 1;
+$page       = min($page, $totalPages);
+$offset     = ($page - 1) * $perPage;
+
+$messages   = DB::query(
+    "SELECT m.* FROM messages m WHERE $logWhere ORDER BY m.created_at DESC LIMIT $perPage OFFSET $offset",
+    $logParams
+);
+
+$rangeStart = $total > 0 ? $offset + 1 : 0;
+$rangeEnd   = min($offset + $perPage, $total);
+
+$defaults = ['from' => date('Y-m-01'), 'to' => date('Y-m-d'), 'status' => '', 'per_page' => 50];
+$changed  = ($from !== $defaults['from'] || $to !== $defaults['to']
+          || $statusFilter !== $defaults['status'] || $perPage !== $defaults['per_page']);
+
+function resellerRptQs(array $overrides = []): string {
+    global $from, $to, $statusFilter, $perPage;
+    $base = ['from' => $from, 'to' => $to];
+    if ($statusFilter)  $base['status']   = $statusFilter;
+    if ($perPage !== 50) $base['per_page'] = $perPage;
+    return http_build_query(array_filter(array_merge($base, $overrides), fn($v) => $v !== null && $v !== ''));
+}
 ?>
 <div class="page-header">
   <div><h1>Reports</h1><div class="subtitle">Your message delivery reports</div></div>
@@ -29,13 +77,23 @@ $totalPages=ceil($total/$perPage);
 </div>
 <div id="report-content">
 
-<!-- Date filter -->
+<!-- Filters -->
 <div class="card" style="margin-bottom:18px">
   <div class="card-body" style="padding:14px 18px">
     <form method="GET" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
       <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">From</label><input type="date" name="from" class="form-control" value="<?=$from?>" style="width:150px"></div>
       <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">To</label><input type="date" name="to" class="form-control" value="<?=$to?>" style="width:150px"></div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label" style="font-size:11px">Status</label>
+        <select name="status" class="form-control" style="width:140px">
+          <option value="">All Statuses</option>
+          <?php foreach ($validStatuses as $s): ?>
+            <option value="<?=$s?>" <?=$statusFilter===$s?'selected':''?>><?=ucfirst($s)?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
       <button type="submit" class="btn btn-primary" style="align-self:flex-end"><i class="fa-solid fa-filter"></i> Filter</button>
+      <?php if ($changed): ?><a href="?" class="btn btn-secondary" style="align-self:flex-end">Clear</a><?php endif; ?>
     </form>
   </div>
 </div>
@@ -51,42 +109,76 @@ $totalPages=ceil($total/$perPage);
 
 <!-- Chart -->
 <div class="card" style="margin-bottom:20px">
-  <div class="card-header"><h3 class="card-title"><i class="fa-solid fa-chart-bar" style="color:var(--primary)"></i> Messages (Last 7 Days)</h3></div>
+  <div class="card-header"><h3 class="card-title"><i class="fa-solid fa-chart-bar" style="color:var(--primary)"></i> Daily Message Volume</h3></div>
   <div class="card-body"><div class="chart-container" style="height:200px"><canvas id="repChart"></canvas></div></div>
 </div>
 
-<!-- Table -->
+<!-- Message log -->
 <div class="card" id="message-log-section">
-  <div class="card-header">
-    <h3 class="card-title"><i class="fa-solid fa-file-lines" style="color:var(--primary)"></i> Message Log <span class="badge badge-muted"><?=$total?></span></h3>
+  <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+    <h3 class="card-title"><i class="fa-solid fa-file-lines" style="color:var(--primary)"></i> Message Log <span class="badge badge-muted"><?=number_format($total)?></span></h3>
+    <div style="display:flex;gap:4px;align-items:center">
+      <span style="font-size:11px;color:var(--text-secondary);margin-right:4px">Show:</span>
+      <?php foreach ($allowedPerPage as $pp):
+        $qs = resellerRptQs(['per_page' => $pp !== 50 ? $pp : null, 'page' => 1]);
+      ?>
+        <a href="?<?=$qs?>" class="btn btn-sm <?=$perPage===$pp?'btn-primary':'btn-secondary'?>" style="min-width:42px;text-align:center;padding:3px 8px;font-size:12px"><?=number_format($pp)?></a>
+      <?php endforeach; ?>
+    </div>
   </div>
   <div class="table-wrapper">
     <table class="data-table">
-      <thead><tr><th>Sender ID</th><th>Recipient</th><th>Message</th><th>Units</th><th>Status</th><th>Date</th></tr></thead>
+      <thead>
+        <tr>
+          <th style="width:36px">#</th>
+          <th>Sender ID</th>
+          <th>Recipient</th>
+          <th>Message</th>
+          <th>Units</th>
+          <th>Status</th>
+          <th>Date</th>
+        </tr>
+      </thead>
       <tbody>
         <?php if (empty($messages)): ?>
-          <tr><td colspan="6" class="text-center text-muted" style="padding:30px">No messages in selected date range</td></tr>
+          <tr><td colspan="7" class="text-center text-muted" style="padding:30px">No messages in selected date range</td></tr>
         <?php else: ?>
-          <?php foreach ($messages as $m): ?>
-            <?php $sc=['sent'=>'success','delivered'=>'success','failed'=>'danger','queued'=>'warning','undelivered'=>'warning'][$m['status']]??'muted'; ?>
+          <?php foreach ($messages as $i => $m):
+            $sc = ['sent'=>'success','delivered'=>'success','failed'=>'danger','queued'=>'warning','undelivered'=>'warning'][$m['status']] ?? 'muted';
+          ?>
             <tr>
+              <td style="font-size:11px;color:var(--text-secondary)"><?=$rangeStart + $i?></td>
               <td><code><?=htmlspecialchars($m['sender_id'])?></code></td>
               <td><?=htmlspecialchars($m['recipient'])?></td>
-              <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text-secondary)" title="<?=htmlspecialchars($m['message'])?>"><?=htmlspecialchars($m['message'])?></td>
+              <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text-secondary)" title="<?=htmlspecialchars($m['message'])?>">
+                <?=htmlspecialchars(mb_strimwidth($m['message'], 0, 60, '…'))?>
+              </td>
               <td><?=$m['units_charged']?></td>
               <td><span class="badge badge-<?=$sc?>"><?=ucfirst($m['status'])?></span></td>
-              <td style="font-size:11px"><?=$m['created_at']?date('d M Y H:i',strtotime($m['created_at'])):'—'?></td>
+              <td style="font-size:11px"><?=$m['created_at'] ? date('d M Y H:i', strtotime($m['created_at'])) : '—'?></td>
             </tr>
           <?php endforeach; ?>
         <?php endif; ?>
       </tbody>
     </table>
   </div>
-  <?php if ($totalPages>1): ?>
-    <div class="card-footer"><div class="pagination">
-      <?php for($p=1;$p<=$totalPages;$p++): ?><a href="?page=<?=$p?>&from=<?=$from?>&to=<?=$to?>" class="page-btn <?=$p===$page?'active':''?>"><?=$p?></a><?php endfor; ?>
-    </div></div>
-  <?php endif; ?>
+  <div class="card-footer" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <div style="font-size:12px;color:var(--text-secondary)">
+      <?php if ($total > 0): ?>
+        Showing <?=number_format($rangeStart)?> – <?=number_format($rangeEnd)?> of <?=number_format($total)?> messages &nbsp;·&nbsp; Page <?=$page?> of <?=number_format($totalPages)?>
+      <?php else: ?>
+        No messages found
+      <?php endif; ?>
+    </div>
+    <div style="display:flex;gap:6px">
+      <?php if ($page > 1): ?>
+        <a href="?<?=resellerRptQs(['page' => $page - 1])?>" class="btn btn-secondary btn-sm"><i class="fa-solid fa-chevron-left"></i> Prev</a>
+      <?php endif; ?>
+      <?php if ($page < $totalPages): ?>
+        <a href="?<?=resellerRptQs(['page' => $page + 1])?>" class="btn btn-primary btn-sm">Next <i class="fa-solid fa-chevron-right"></i></a>
+      <?php endif; ?>
+    </div>
+  </div>
 </div>
 </div>
 
@@ -95,38 +187,50 @@ $extraScript = <<<JS
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
 function downloadPDF(event) {
-    const element = document.getElementById('message-log-section');
+    const element = document.getElementById('report-content');
     const btn = event.currentTarget;
     const originalContent = btn.innerHTML;
-    
-    // Use the dates from PHP
     const fromDate = '{$from}';
     const toDate = '{$to}';
-    
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
     btn.disabled = true;
-
     const opt = {
-        margin:       [10, 10],
-        filename:     'Reseller_Report_' + fromDate + '_to_' + toDate + '.pdf',
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, logging: false },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        margin: [10, 10],
+        filename: 'Reseller_Report_' + fromDate + '_to_' + toDate + '.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
-
     html2pdf().set(opt).from(element).toPdf().get('pdf').then((pdf) => {
         window.open(pdf.output('bloburl'), '_blank');
         btn.innerHTML = originalContent;
         btn.disabled = false;
     }).catch(err => {
-        console.error('PDF Error:', err);
         btn.innerHTML = originalContent;
         btn.disabled = false;
         alert('Failed to generate PDF. Please try again.');
     });
 }
 
-new Chart(document.getElementById('repChart'),{type:'bar',data:{labels:{$tLabels}||[],datasets:[{label:'Messages',data:{$tValues}||[],backgroundColor:'rgba(0,200,150,0.7)',borderRadius:6,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}}});
+new Chart(document.getElementById('repChart'), {
+    type: 'bar',
+    data: {
+        labels: {$tLabels} || [],
+        datasets: [{
+            label: 'Messages',
+            data: {$tValues} || [],
+            backgroundColor: 'rgba(0,200,150,0.7)',
+            borderRadius: 6,
+            borderSkipped: false
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { grid: { display: false } }, y: { beginAtZero: true } }
+    }
+});
 </script>
 JS;
 include __DIR__ . '/../includes/layout-footer.php';

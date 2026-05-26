@@ -224,6 +224,61 @@ class SMS {
     }
 
     /**
+     * Send a message to multiple recipients via the API (no campaign context).
+     * Normalizes and deduplicates phone numbers, then dispatches via dispatchBatch().
+     * Returns a result array suitable for JSON encoding.
+     */
+    public static function sendBulk(int $userId, array $phones, string $message, string $senderId = 'SHANFIX'): array {
+        try {
+            $validSender = DB::queryOne(
+                "SELECT sender_id FROM sender_ids WHERE user_id = ? AND BINARY sender_id = ? AND status = 'approved'",
+                [$userId, $senderId]
+            );
+            if (!$validSender) {
+                return ['success' => false, 'error' => "Sender ID '$senderId' is not approved for your account."];
+            }
+            $senderId    = $validSender['sender_id'];
+            $isUnicode   = self::isUnicode($message);
+            $partsPerMsg = max(1, (int)ceil(mb_strlen($message) / ($isUnicode ? 70 : 160)));
+
+            $seen       = [];
+            $recipients = [];
+            $invalid    = [];
+            foreach ($phones as $p) {
+                $normalized = self::normalizePhone((string)$p);
+                if ($normalized === null) {
+                    $invalid[] = (string)$p;
+                } elseif (!isset($seen[$normalized])) {
+                    $seen[$normalized] = true;
+                    $recipients[]      = ['phone' => $normalized, 'message' => $message];
+                }
+            }
+
+            if (empty($recipients)) {
+                return ['success' => false, 'error' => 'No valid phone numbers provided.'];
+            }
+
+            [$sent, $failed, $units] = self::dispatchBatch($userId, $senderId, $recipients, $partsPerMsg, null, $isUnicode);
+
+            $balance = (float)DB::queryValue("SELECT sms_units FROM users WHERE id = ?", [$userId]);
+            self::maybeSendLowBalanceAlert($userId);
+
+            return [
+                'success'          => true,
+                'total_submitted'  => count($recipients),
+                'sent'             => $sent,
+                'failed'           => $failed,
+                'invalid_numbers'  => $invalid,
+                'units_charged'    => round($units, 4),
+                'remaining_units'  => number_format($balance, 2, '.', ''),
+            ];
+        } catch (Exception $e) {
+            error_log("SMS::sendBulk #$userId: " . $e->getMessage());
+            return ['success' => false, 'error' => 'System Error'];
+        }
+    }
+
+    /**
      * Process a campaign in batches — streams file/group/numbers without timeout.
      * Sends up to 500 recipients per Onfon API call; bulk-inserts message logs.
      */
@@ -570,7 +625,7 @@ BODY);
      */
     private static function dispatchBatch(
         int $userId, string $senderId, array $recipients,
-        int $partsPerMsg, int $campaignId, bool $isUnicode = false
+        int $partsPerMsg, ?int $campaignId, bool $isUnicode = false
     ): array {
         $count      = count($recipients);
         $totalCost  = $count * $partsPerMsg;
@@ -644,7 +699,7 @@ BODY);
      */
     private static function bulkLogMessages(
         int $userId, string $senderId, array $recipients,
-        int $partsPerMsg, int $campaignId, string $defaultStatus,
+        int $partsPerMsg, ?int $campaignId, string $defaultStatus,
         array $sentMsgIds, array $failedSet = [], array $reasons = []
     ): void {
         if (empty($recipients)) return;
