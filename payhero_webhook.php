@@ -10,12 +10,24 @@ try {
     require_once __DIR__ . '/includes/actions/purchases.php';
     require_once __DIR__ . '/includes/actions/ussd-wallet.php';
 
-    $input = file_get_contents('php://input');
-    $data = json_decode($input, true);
-
-    // Logging setup
+    // Logging setup — done first so even auth failures are traceable
     $logFile = __DIR__ . '/tmp/payhero_callback.log';
     if (!is_dir(__DIR__ . '/tmp')) @mkdir(__DIR__ . '/tmp', 0777, true);
+
+    // Token-based webhook authentication.
+    // If payhero_webhook_token is configured in system settings, the request
+    // must include ?token=<value> matching it.  No token configured = open (legacy).
+    $expectedToken = get_setting('payhero_webhook_token', '');
+    $receivedToken = $_GET['token'] ?? '';
+    if ($expectedToken !== '' && !hash_equals($expectedToken, $receivedToken)) {
+        @file_put_contents($logFile, "[" . date('Y-m-d H:i:s') . "] AUTH_FAIL: invalid token\n", FILE_APPEND);
+        http_response_code(403);
+        echo json_encode(['status' => 'error', 'message' => 'Forbidden']);
+        exit;
+    }
+
+    $input = file_get_contents('php://input');
+    $data = json_decode($input, true);
     
     // Check Config & DB
     $configLoaded = defined('DB_NAME') ? 'YES' : 'NO';

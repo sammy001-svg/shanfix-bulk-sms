@@ -10,7 +10,7 @@ require_role('reseller');
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) {
         flash_set('danger', 'Invalid security token.');
-        redirect($_SERVER['HTTP_REFERER']);
+        redirect(safe_referer('/reseller/ussd-wallet.php'));
     }
 
     $user = current_user();
@@ -19,12 +19,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($amount < 10) {
         flash_set('danger', 'Minimum top up amount is KES 10.');
-        redirect($_SERVER['HTTP_REFERER']);
+        redirect(safe_referer('/reseller/ussd-wallet.php'));
     }
 
     if (empty($phone)) {
         flash_set('danger', 'Phone number is required.');
-        redirect($_SERVER['HTTP_REFERER']);
+        redirect(safe_referer('/reseller/ussd-wallet.php'));
     }
 
     // 1. Record pending transaction
@@ -49,5 +49,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash_set('danger', 'Internal database error. Please try again.');
     }
 
-    redirect($_SERVER['HTTP_REFERER'] ?? '/reseller/ussd-wallet.php');
+    redirect(safe_referer('/reseller/ussd-wallet.php'));
 }

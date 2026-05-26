@@ -8,7 +8,7 @@ require_once __DIR__ . '/../../includes/actions/purchases.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) {
         $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid security token. Please try again.'];
-        redirect($_SERVER['HTTP_REFERER']);
+        redirect(safe_referer('/client/purchases.php'));
     }
 
     $user = current_user();
@@ -34,5 +34,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Transaction failed: ' . $result['error']];
     }
 
-    redirect($_SERVER['HTTP_REFERER'] ?? '/client/purchases.php');
+    redirect(safe_referer('/client/purchases.php'));
 }

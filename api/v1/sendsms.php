@@ -28,6 +28,28 @@ if (!$user) {
     exit;
 }
 
+// Rate limit: 60 requests per minute per user (sliding window)
+try {
+    $bucket      = 'api:' . $user['id'];
+    $recentCalls = (int)DB::queryValue(
+        "SELECT COUNT(*) FROM rate_limits
+          WHERE bucket = ? AND hit_at >= DATE_SUB(NOW(), INTERVAL 1 MINUTE)",
+        [$bucket]
+    );
+    if ($recentCalls >= 60) {
+        http_response_code(429);
+        echo json_encode(['success' => false, 'error' => 'Rate limit exceeded. Max 60 requests per minute.']);
+        exit;
+    }
+    DB::execute("INSERT INTO rate_limits (bucket, hit_at) VALUES (?, NOW())", [$bucket]);
+    // Periodic cleanup: delete entries older than 2 minutes (runs ~1% of requests)
+    if (random_int(1, 100) === 1) {
+        DB::execute("DELETE FROM rate_limits WHERE bucket = ? AND hit_at < DATE_SUB(NOW(), INTERVAL 2 MINUTE)", [$bucket]);
+    }
+} catch (Exception $e) {
+    // rate_limits table not yet created — skip rate limiting (run phase6 migration)
+}
+
 // Request Data
 $to = sanitize($params['to'] ?? '');
 $message = $params['message'] ?? '';
@@ -43,11 +65,12 @@ if (!$to || !$message) {
 $result = SMS::send($user['id'], $to, $message, $senderId);
 
 if ($result['success']) {
+    $freshBalance = (float)DB::queryValue("SELECT sms_units FROM users WHERE id = ?", [$user['id']]);
     echo json_encode([
-        'success' => true,
-        'message_id' => $result['id'],
-        'units_charged' => $result['cost'],
-        'remaining_units' => number_format($user['sms_units'] - $result['cost'], 2, '.', '')
+        'success'         => true,
+        'message_id'      => $result['id'],
+        'units_charged'   => $result['cost'],
+        'remaining_units' => number_format($freshBalance, 2, '.', ''),
     ]);
 } else {
     http_response_code(400);

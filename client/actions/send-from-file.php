@@ -74,6 +74,35 @@ if (!in_array($ext, ['csv', 'xlsx'])) {
     redirect('/client/send-from-file.php');
 }
 
+// Verify the file's actual content matches the declared extension.
+// Prevents a PHP/HTML file renamed to .csv from being accepted.
+if (function_exists('finfo_open')) {
+    $finfo       = finfo_open(FILEINFO_MIME_TYPE);
+    $detectedMime = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+
+    $allowedMimes = [
+        'text/plain',           // most CSV files
+        'text/csv',
+        'application/csv',
+        'application/octet-stream', // some CSV exporters
+        // XLSX is a ZIP archive internally
+        'application/zip',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
+
+    if (!in_array($detectedMime, $allowedMimes, true)) {
+        flash_set('danger', "File content is not a recognised spreadsheet or CSV (detected: $detectedMime).");
+        redirect('/client/send-from-file.php');
+    }
+
+    // Cross-check: an xlsx extension must not resolve to a plain-text type
+    if ($ext === 'xlsx' && in_array($detectedMime, ['text/plain', 'text/csv', 'application/csv'], true)) {
+        flash_set('danger', 'File has an .xlsx extension but appears to be plain text. Save as .csv and re-upload.');
+        redirect('/client/send-from-file.php');
+    }
+}
+
 // ── Prepare upload directory ───────────────────────────────────────────────────
 $uploadDir = dirname(__DIR__, 2) . '/uploads/campaigns/' . $user['id'] . '/';
 if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {

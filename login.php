@@ -15,15 +15,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (empty($email) || empty($password)) {
             $error = 'Please enter your email and password.';
         } else {
-            $user = auth_login($email, $password);
-            if ($user) {
-                switch ($user['role']) {
+            $result = auth_login($email, $password);
+            if (is_array($result)) {
+                switch ($result['role']) {
                     case 'admin':    $dest = '/admin/'; break;
                     case 'reseller': $dest = '/reseller/'; break;
                     case 'client':   $dest = '/client/'; break;
                     default:         $dest = '/login.php'; break;
                 }
                 redirect($dest);
+            } elseif ($result === 'locked') {
+                $error = 'Too many failed attempts. Please try again in 15 minutes.';
             } else {
                 $error = 'Invalid email or password. Please try again.';
             }

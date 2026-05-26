@@ -48,7 +48,10 @@ class Payhero {
             $siteUrl = "$protocol://$host";
         }
         $siteUrl = rtrim($siteUrl, '/');
-        $callbackUrl = "$siteUrl/payhero_webhook.php";
+        $webhookToken = get_setting('payhero_webhook_token', '');
+        $callbackUrl  = $webhookToken !== ''
+            ? "$siteUrl/payhero_webhook.php?token=" . urlencode($webhookToken)
+            : "$siteUrl/payhero_webhook.php";
 
         $body = [
             'amount' => (float)$amount,
@@ -68,7 +71,7 @@ class Payhero {
             "Accept: application/json"
         ]);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
 
         $response = curl_exec($ch);

@@ -12,7 +12,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params([
         'lifetime' => SESSION_TIMEOUT,
         'path'     => '/',
-        'secure'   => false, // set true in production over HTTPS
+        'secure'   => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
         'httponly' => true,
         'samesite' => 'Lax',
     ]);
@@ -21,22 +21,60 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // ─── Auth Functions ───────────────────────────────────────────────────────────
 
+/**
+ * Returns the authenticated user array on success,
+ * the string 'locked' if too many recent failures, or false for wrong credentials.
+ */
 function auth_login($email, $password) {
+    $bucket     = 'login:' . strtolower(trim($email));
+    $maxAttempts = (int)(get_setting('max_login_attempts') ?: 5);
+    $windowMins  = 15;
+
+    // Check lockout — wrapped in try/catch so a missing rate_limits table
+    // never breaks login (run the phase6 migration to activate enforcement).
+    try {
+        $recentFails = (int)DB::queryValue(
+            "SELECT COUNT(*) FROM rate_limits
+              WHERE bucket = ? AND hit_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)",
+            [$bucket, $windowMins]
+        );
+        if ($recentFails >= $maxAttempts) {
+            return 'locked';
+        }
+    } catch (Exception $e) {
+        // rate_limits table not yet created — skip lockout check
+    }
+
     $user = DB::queryOne(
         "SELECT * FROM users WHERE email = ? AND status = 'active' LIMIT 1",
         [$email]
     );
+
     if ($user && password_verify($password, $user['password_hash'])) {
-        // Update last login
+        // Clear failure history and record successful login
+        try {
+            DB::execute("DELETE FROM rate_limits WHERE bucket = ?", [$bucket]);
+        } catch (Exception $e) {}
+
         DB::execute("UPDATE users SET last_login = NOW() WHERE id = ?", [$user['id']]);
 
-        // Store in session (never store password_hash)
         unset($user['password_hash']);
+        // Rotate the session ID to prevent session-fixation attacks.
+        session_regenerate_id(true);
         $_SESSION['user'] = $user;
-        $_SESSION['user_id'] = $user['id']; // Set for compatibility
+        $_SESSION['user_id'] = $user['id'];
         $_SESSION['last_activity'] = time();
         return $user;
     }
+
+    // Record failure; periodic cleanup to keep the table lean
+    try {
+        DB::execute("INSERT INTO rate_limits (bucket, hit_at) VALUES (?, NOW())", [$bucket]);
+        if (random_int(1, 100) === 1) {
+            DB::execute("DELETE FROM rate_limits WHERE hit_at < DATE_SUB(NOW(), INTERVAL 24 HOUR)");
+        }
+    } catch (Exception $e) {}
+
     return false;
 }
 
@@ -164,6 +202,18 @@ function redirect($url, $code = 302) {
     http_response_code($code);
     header("Location: $url");
     exit;
+}
+
+/**
+ * Return the HTTP Referer only when it is on the same host.
+ * Falls back to $default to prevent open-redirect via a crafted Referer header.
+ */
+function safe_referer(string $default = '/'): string {
+    $ref  = $_SERVER['HTTP_REFERER'] ?? '';
+    if ($ref === '') return $default;
+    $host = parse_url($ref, PHP_URL_HOST);
+    if (!$host || $host !== ($_SERVER['HTTP_HOST'] ?? '')) return $default;
+    return $ref;
 }
 
 function flash_set($type, $message) {

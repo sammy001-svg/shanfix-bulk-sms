@@ -20,5 +20,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    redirect($_SERVER['HTTP_REFERER'] ?? '/client/groups.php');
+    redirect(safe_referer('/client/groups.php'));
 }

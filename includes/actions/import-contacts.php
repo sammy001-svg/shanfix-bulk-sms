@@ -8,16 +8,34 @@ $user = auth_user();
 if (!$user || !in_array($user['role'], ['reseller', 'client'])) redirect('/login.php');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
+    if (!csrf_verify()) {
+        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Security token mismatch. Please try again.'];
+        redirect(safe_referer('/'));
+    }
+
     $groupId    = (int)($_POST['group_id'] ?? 0);
     $duplicates = $_POST['duplicates'] ?? 'skip';
     $file       = $_FILES['csv_file'];
+
+    // Verify the group belongs to the current user before importing into it.
+    // Without this check, a crafted POST could import into any group in the system.
+    if ($groupId) {
+        $validGroup = DB::queryOne(
+            "SELECT id FROM contact_groups WHERE id = ? AND user_id = ?",
+            [$groupId, $user['id']]
+        );
+        if (!$validGroup) {
+            $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid contact group.'];
+            redirect(safe_referer('/'));
+        }
+    }
 
     if ($file['error'] === UPLOAD_ERR_OK) {
         $handle = fopen($file['tmp_name'], "r");
         $header = fgetcsv($handle);
         if (!$header) {
             $_SESSION['flash'] = ['type' => 'danger', 'message' => "CSV file is empty or invalid."];
-            redirect($_SERVER['HTTP_REFERER']);
+            redirect(safe_referer('/'));
         }
         
         // Clean and lowercase headers for matching
@@ -29,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
 
         if ($phoneIdx === false) {
             $_SESSION['flash'] = ['type' => 'danger', 'message' => "CSV must contain a 'phone' column header."];
-            redirect($_SERVER['HTTP_REFERER']);
+            redirect(safe_referer('/'));
         }
 
         $imported = 0; $skipped = 0;
@@ -79,5 +97,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
         $_SESSION['flash'] = ['type' => 'danger', 'message' => "File upload error code: " . $file['error']];
     }
 
-    redirect($_SERVER['HTTP_REFERER']);
+    redirect(safe_referer('/'));
 }

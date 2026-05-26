@@ -17,7 +17,7 @@ $uid = $user['id'];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) {
         flash_set('danger', 'Invalid security token.');
-        redirect($_SERVER['HTTP_REFERER'] ?? '/client/whatsapp-contacts.php');
+        redirect(safe_referer('/client/whatsapp-contacts.php'));
     }
 }
 

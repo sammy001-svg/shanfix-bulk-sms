@@ -13,7 +13,12 @@ if (!$user) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    redirect($_SERVER['HTTP_REFERER'] ?? '/');
+    redirect(safe_referer('/'));
+}
+
+if (!csrf_verify()) {
+    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Security token mismatch. Please try again.'];
+    redirect(safe_referer('/'));
 }
 
 $name        = sanitize($_POST['name'] ?? '');
@@ -22,6 +27,23 @@ $message     = sanitize($_POST['message'] ?? '');
 $scheduledAt = $_POST['scheduled_at'] ?? null;
 $groupId     = (int)($_POST['group_id'] ?? 0);
 $rawNumbers  = sanitize($_POST['numbers'] ?? '');
+
+// --- Basic validation ---
+if ($name === '' || $message === '') {
+    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Campaign name and message are required.'];
+    redirect(safe_referer('/'));
+}
+
+// Validate sender ID belongs to this user and is approved — catch bad IDs before
+// the background worker starts (avoids wasting a queued slot on a doomed campaign).
+$validSender = DB::queryOne(
+    "SELECT sender_id FROM sender_ids WHERE user_id = ? AND BINARY sender_id = ? AND status = 'approved'",
+    [$user['id'], $senderId]
+);
+if (!$validSender) {
+    $_SESSION['flash'] = ['type' => 'danger', 'message' => "Sender ID \"$senderId\" is not approved for your account."];
+    redirect(safe_referer('/'));
+}
 
 // --- Resolve recipients ---
 // For groups: only fetch the count; processCampaign reads contacts in paginated batches.
@@ -47,7 +69,7 @@ if ($rawNumbers) {
 $totalCount = $groupCount + count($manualNums);
 if ($totalCount === 0) {
     $_SESSION['flash'] = ['type' => 'danger', 'message' => 'No valid recipients found.'];
-    redirect($_SERVER['HTTP_REFERER'] ?? '/');
+    redirect(safe_referer('/'));
 }
 
 $status = $scheduledAt ? 'scheduled' : 'queued';

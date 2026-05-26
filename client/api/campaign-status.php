@@ -44,16 +44,16 @@ if (isset($_GET['campaign_id'])) {
     $page        = max(1, (int)($_GET['page'] ?? 1));
     $offset      = ($page - 1) * $perPage;
     $failedTotal = (int)DB::queryValue(
-        "SELECT COUNT(*) FROM messages WHERE campaign_id = ? AND status = 'failed'",
-        [$campaignId]
+        "SELECT COUNT(*) FROM messages WHERE campaign_id = ? AND user_id = ? AND status = 'failed'",
+        [$campaignId, $uid]
     );
     $failed = DB::query(
         "SELECT recipient, failed_reason, created_at
          FROM messages
-         WHERE campaign_id = ? AND status = 'failed'
+         WHERE campaign_id = ? AND user_id = ? AND status = 'failed'
          ORDER BY id DESC
          LIMIT ? OFFSET ?",
-        [$campaignId, $perPage, $offset]
+        [$campaignId, $uid, $perPage, $offset]
     );
 
     echo json_encode([

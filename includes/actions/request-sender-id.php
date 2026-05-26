@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Basic Validation
     if (strlen($senderId) < 3 || strlen($senderId) > 11) {
         $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Sender ID must be between 3 and 11 characters.'];
-        redirect($_SERVER['HTTP_REFERER']);
+        redirect(safe_referer('/'));
     }
 
     // Handle File Uploads
@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$appLetterPath || !$regCertPath) {
         $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Both Application Letter and Registration Certificate are required (PDF/JPG/PNG).'];
-        redirect($_SERVER['HTTP_REFERER']);
+        redirect(safe_referer('/'));
     }
 
     $id = DB::insert("INSERT INTO sender_ids (user_id, sender_id, purpose, application_letter, registration_cert, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', NOW())", 
@@ -58,5 +58,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Database error. Duplicate Sender ID requested?'];
     }
 
-    redirect($_SERVER['HTTP_REFERER']);
+    redirect(safe_referer('/'));
 }

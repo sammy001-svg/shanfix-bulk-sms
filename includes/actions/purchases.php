@@ -94,75 +94,84 @@ class Purchase {
     }
 
     public static function complete($purchaseId) {
-        $purchase = DB::queryOne("SELECT * FROM purchases WHERE id = ?", [$purchaseId]);
-        
-        if (!$purchase) {
-            $err = "[".date('Y-m-d H:i:s')."] Purchase::complete - ERROR: Purchase #$purchaseId NOT FOUND in database." . PHP_EOL;
-            @file_put_contents(__DIR__ . '/../../tmp/purchase_debug.log', $err, FILE_APPEND);
-            return false;
-        }
+        $purchaseId = (int)$purchaseId;
+        if (!$purchaseId) return false;
 
-        if ($purchase['status'] !== 'pending') {
-            $err = "[".date('Y-m-d H:i:s')."] Purchase::complete - IGNORE: Purchase #$purchaseId is already '{$purchase['status']}'." . PHP_EOL;
-            @file_put_contents(__DIR__ . '/../../tmp/purchase_debug.log', $err, FILE_APPEND);
-            return false;
-        }
-
-        $userId = $purchase['user_id'];
-        $user = DB::queryOne("SELECT parent_id FROM users WHERE id = ?", [$userId]);
-        
-        $parentId = $user['parent_id'];
-        if (!$parentId) {
-            $admin = DB::queryOne("SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1");
-            $parentId = $admin['id'] ?? 1;
-        }
-
-        // Custom log for debugging webhooks
-        $tmpDir = __DIR__ . '/../../tmp';
+        $tmpDir  = __DIR__ . '/../../tmp';
         if (!is_dir($tmpDir)) @mkdir($tmpDir, 0777, true);
-        $logMsg = "[".date('Y-m-d H:i:s')."] Purchase::complete - ID: $purchaseId, User: $userId, Parent: $parentId, Units: {$purchase['units']}" . PHP_EOL;
-        @file_put_contents($tmpDir . '/purchase_debug.log', $logMsg, FILE_APPEND);
+        $logFile = $tmpDir . '/purchase_debug.log';
 
-        // Use transaction for atomic balance update
         try {
             DB::beginTransaction();
-            
-            if ($purchase['type'] === 'whatsapp') {
-                // Add money to whatsapp balance
-                $added = DB::execute("UPDATE users SET whatsapp_balance = whatsapp_balance + ? WHERE id = ?", [$purchase['amount'], $userId]);
-                $deducted = true; // No parent deduction for money topups in this model? 
-                // Or maybe deduct from reseller's whatsapp balance? 
-                // Usually resellers topup their own wallet at admin rate.
-            } else {
-                // Deduct from parent
-                $deducted = DB::execute("UPDATE users SET sms_units = sms_units - ? WHERE id = ?", [$purchase['units'], $parentId]);
-                // Add to child
-                $added = DB::execute("UPDATE users SET sms_units = sms_units + ? WHERE id = ?", [$purchase['units'], $userId]);
-            }
-            
-            // Mark purchase as completed
-            $marked = DB::execute("UPDATE purchases SET status = 'completed' WHERE id = ?", [$purchaseId]);
-            
-            if (($deducted !== false) && $added !== false && $marked !== false) {
-                DB::commit();
-                error_log("Purchase #$purchaseId completed successfully. Units: {$purchase['units']}");
-                
-                // Notify User
-                notify($userId, 'Purchase Successful', "Your purchase of " . number_format($purchase['units']) . " units was successful.", 'success');
-                
-                return true;
-            } else {
+
+            // Atomic first-claim: lock the row and verify it is still pending.
+            // If a concurrent webhook already claimed it, FOR UPDATE blocks until that
+            // transaction commits, then this SELECT returns 0 rows (status no longer 'pending').
+            $purchase = DB::queryOne(
+                "SELECT * FROM purchases WHERE id = ? AND status = 'pending' FOR UPDATE",
+                [$purchaseId]
+            );
+
+            if (!$purchase) {
                 DB::rollback();
-                $err = "Purchase completion failed for #$purchaseId: Deducted=$deducted, Added=$added, Marked=$marked. Rolling back." . PHP_EOL;
-                file_put_contents(__DIR__ . '/../../tmp/purchase_debug.log', $err, FILE_APPEND);
-                error_log($err);
+                $state = DB::queryOne("SELECT status FROM purchases WHERE id = ?", [$purchaseId]);
+                $reason = $state ? "already '{$state['status']}'" : 'not found';
+                @file_put_contents($logFile, "[" . date('Y-m-d H:i:s') . "] complete #$purchaseId SKIP: $reason\n", FILE_APPEND);
                 return false;
             }
+
+            $userId = $purchase['user_id'];
+            $user   = DB::queryOne("SELECT parent_id FROM users WHERE id = ?", [$userId]);
+
+            $parentId = $user['parent_id'];
+            if (!$parentId) {
+                $admin    = DB::queryOne("SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1");
+                $parentId = $admin['id'] ?? 1;
+            }
+
+            @file_put_contents($logFile,
+                "[" . date('Y-m-d H:i:s') . "] complete #$purchaseId: user=$userId parent=$parentId units={$purchase['units']}\n",
+                FILE_APPEND
+            );
+
+            if ($purchase['type'] === 'whatsapp') {
+                DB::execute(
+                    "UPDATE users SET whatsapp_balance = whatsapp_balance + ? WHERE id = ?",
+                    [$purchase['amount'], $userId]
+                );
+            } else {
+                // Deduct from parent — guard prevents the parent going negative.
+                $deducted = DB::execute(
+                    "UPDATE users SET sms_units = sms_units - ? WHERE id = ? AND sms_units >= ?",
+                    [$purchase['units'], $parentId, $purchase['units']]
+                );
+                if (!$deducted) {
+                    DB::rollback();
+                    $msg = "[" . date('Y-m-d H:i:s') . "] complete #$purchaseId FAIL: parent $parentId has insufficient balance\n";
+                    @file_put_contents($logFile, $msg, FILE_APPEND);
+                    error_log("Purchase #$purchaseId: parent $parentId insufficient balance — rolling back.");
+                    return false;
+                }
+                DB::execute(
+                    "UPDATE users SET sms_units = sms_units + ? WHERE id = ?",
+                    [$purchase['units'], $userId]
+                );
+            }
+
+            DB::execute("UPDATE purchases SET status = 'completed' WHERE id = ?", [$purchaseId]);
+            DB::commit();
+
+            error_log("Purchase #$purchaseId completed. Units: {$purchase['units']}");
+            notify($userId, 'Purchase Successful',
+                "Your purchase of " . number_format($purchase['units']) . " units was successful.", 'success');
+
+            return true;
+
         } catch (Exception $e) {
             DB::rollback();
-            $err = "Purchase completion exception for #$purchaseId: " . $e->getMessage() . PHP_EOL;
-            file_put_contents(__DIR__ . '/../../tmp/purchase_debug.log', $err, FILE_APPEND);
-            error_log($err);
+            $msg = "[" . date('Y-m-d H:i:s') . "] complete #$purchaseId EXCEPTION: " . $e->getMessage() . "\n";
+            @file_put_contents($logFile, $msg, FILE_APPEND);
+            error_log("Purchase #$purchaseId exception: " . $e->getMessage());
             return false;
         }
     }

@@ -29,5 +29,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    redirect($_SERVER['HTTP_REFERER'] ?? '/client/contacts.php');
+    redirect(safe_referer('/client/contacts.php'));
 }

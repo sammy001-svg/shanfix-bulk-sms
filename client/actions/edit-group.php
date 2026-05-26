@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$id || !$name) {
         $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Group name is required.'];
-        redirect($_SERVER['HTTP_REFERER'] ?? '/client/groups.php');
+        redirect(safe_referer('/client/groups.php'));
     }
 
     // Verify ownership and update

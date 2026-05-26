@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$id || !$phone) {
         $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Phone number is required.'];
-        redirect($_SERVER['HTTP_REFERER'] ?? '/client/contacts.php');
+        redirect(safe_referer('/client/contacts.php'));
     }
 
     // Verify ownership and update

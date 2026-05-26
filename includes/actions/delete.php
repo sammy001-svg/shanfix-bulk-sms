@@ -10,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id   = (int)($_POST['id'] ?? 0);
     $type = $_POST['type'] ?? ''; // 'contact', 'group', 'campaign'
 
-    if (!$id || !$type) redirect($_SERVER['HTTP_REFERER']);
+    if (!$id || !$type) redirect(safe_referer('/'));
 
     $table = '';
     switch ($type) {
@@ -28,5 +28,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    redirect($_SERVER['HTTP_REFERER']);
+    redirect(safe_referer('/'));
 }

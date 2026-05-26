@@ -7,6 +7,11 @@ require_once __DIR__ . '/../../includes/db.php';
 require_role('admin');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrf_verify()) {
+        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid security token.'];
+        redirect('/admin/clients.php');
+    }
+
     $userId = (int)($_POST['user_id'] ?? 0);
     $status = sanitize($_POST['status'] ?? '');
 
@@ -27,5 +32,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    redirect($_SERVER['HTTP_REFERER'] ?? '/admin/clients.php');
+    redirect(safe_referer('/admin/clients.php'));
 }

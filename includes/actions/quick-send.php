@@ -17,10 +17,15 @@ if (!$user) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    redirect($_SERVER['HTTP_REFERER'] ?? '/');
+    redirect(safe_referer('/'));
 }
 
-$senderId    = sanitize($_POST['sender_id'] ?? 'SHANFIX');
+if (!csrf_verify()) {
+    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Security token mismatch. Please try again.'];
+    redirect(safe_referer('/'));
+}
+
+$senderId    = sanitize($_POST['sender_id'] ?? '');
 $message     = sanitize($_POST['message'] ?? '');
 $scheduledAt = $_POST['scheduled_at'] ?? null;
 $groupId     = (int)($_POST['group_id'] ?? 0);
@@ -28,7 +33,20 @@ $manualInput = trim($_POST['numbers'] ?? '') ?: trim($_POST['recipient'] ?? '');
 
 if (!$message) {
     $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Message content is required.'];
-    redirect($_SERVER['HTTP_REFERER'] ?? '/');
+    redirect(safe_referer('/'));
+}
+
+// Validate sender ID is approved for this user — fail fast before creating any DB record
+if ($senderId) {
+    $validSender = DB::queryOne(
+        "SELECT sender_id FROM sender_ids WHERE user_id = ? AND BINARY sender_id = ? AND status = 'approved'",
+        [$user['id'], $senderId]
+    );
+    if (!$validSender) {
+        $_SESSION['flash'] = ['type' => 'danger', 'message' => "Sender ID \"$senderId\" is not approved for your account."];
+        redirect(safe_referer('/'));
+    }
+    $senderId = $validSender['sender_id']; // use the DB-canonical form
 }
 
 // --- Resolve recipients without loading them all into memory ---
@@ -55,7 +73,7 @@ $totalCount = $groupCount + count($recipients);
 
 if ($totalCount === 0) {
     $_SESSION['flash'] = ['type' => 'danger', 'message' => 'No valid recipients found.'];
-    redirect($_SERVER['HTTP_REFERER'] ?? '/');
+    redirect(safe_referer('/'));
 }
 
 // --- Single number, no schedule: send inline and return immediately ---
@@ -66,7 +84,7 @@ if (!$groupId && count($recipients) === 1 && !$scheduledAt) {
     } else {
         $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Failed to send: ' . $result['error']];
     }
-    redirect($_SERVER['HTTP_REFERER'] ?? '/');
+    redirect(safe_referer('/'));
 }
 
 // --- Scheduled send: store and let cron fire it at the right time ---
@@ -88,7 +106,7 @@ if ($scheduledAt) {
     $_SESSION['flash'] = $campaignId
         ? ['type' => 'success', 'message' => 'Broadcast scheduled for ' . date('d M Y H:i', strtotime($scheduledAt)) . '.']
         : ['type' => 'danger',  'message' => 'Failed to schedule broadcast. Please try again.'];
-    redirect($_SERVER['HTTP_REFERER'] ?? '/');
+    redirect(safe_referer('/'));
 }
 
 // --- Multi-recipient immediate send ---
@@ -109,7 +127,7 @@ $campaignId = DB::insert(
 
 if (!$campaignId) {
     $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Failed to initiate broadcast. Please try again.'];
-    redirect($_SERVER['HTTP_REFERER'] ?? '/');
+    redirect(safe_referer('/'));
 }
 
 $_SESSION['flash'] = [
@@ -122,7 +140,7 @@ $_SESSION['flash'] = [
 // so it won't be killed by request_terminate_timeout — safe for any campaign size.
 session_write_close();
 while (ob_get_level() > 0) ob_end_clean();
-$returnTo = $_SERVER['HTTP_REFERER'] ?? '/';
+$returnTo = safe_referer('/');
 header('Location: ' . $returnTo, true, 302);
 header('Connection: close');
 header('Content-Encoding: none');

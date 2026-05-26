@@ -60,9 +60,14 @@ if (empty($campaigns)) {
 $log('Processing ' . count($campaigns) . ' campaign(s)...');
 
 foreach ($campaigns as $c) {
-    $log("  → Campaign #{$c['id']} starting...");
-    SMS::processCampaign($c['id']);
-    $log("  ✓ Campaign #{$c['id']} done.");
+    if (SMS::spawnCampaign($c['id'])) {
+        $log("  → Spawned campaign #{$c['id']}.");
+    } else {
+        // Fallback: spawn unavailable (restricted host) — process inline
+        $log("  → Campaign #{$c['id']} starting (inline fallback)...");
+        SMS::processCampaign($c['id']);
+        $log("  ✓ Campaign #{$c['id']} done.");
+    }
 }
 
-$log('All campaigns processed.');
+$log('All campaigns dispatched.');
