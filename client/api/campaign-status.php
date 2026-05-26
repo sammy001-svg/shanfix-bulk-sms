@@ -66,7 +66,27 @@ if (isset($_GET['campaign_id'])) {
     exit;
 }
 
-// ── All active campaigns (for polling) ────────────────────────────────────────
+// ── Specific campaign IDs (JS passes all visible IDs, regardless of status) ───
+if (isset($_GET['ids'])) {
+    $rawIds = explode(',', $_GET['ids']);
+    $ids    = array_values(array_unique(array_filter(array_map('intval', $rawIds))));
+    if (empty($ids)) {
+        echo json_encode(['campaigns' => []]);
+        exit;
+    }
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $campaigns = DB::query(
+        "SELECT id, status, sent_count, failed_count, total_count
+         FROM campaigns
+         WHERE user_id = ? AND id IN ($placeholders)
+         ORDER BY created_at DESC",
+        array_merge([$uid], $ids)
+    );
+    echo json_encode(['campaigns' => $campaigns]);
+    exit;
+}
+
+// ── All active campaigns (legacy / no-ids fallback) ───────────────────────────
 $campaigns = DB::query(
     "SELECT id, status, sent_count, failed_count, total_count
      FROM campaigns

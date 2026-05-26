@@ -91,28 +91,29 @@ $groups    = DB::query("SELECT id,name FROM contact_groups WHERE user_id=?",[$ui
               <?php endif; ?>
             </td>
             <td><code style="font-size:12px"><?=htmlspecialchars($c['sender_id'])?></code></td>
-            <td style="min-width:180px">
-              <?php if ($total > 0 || $isActive): ?>
-                <!-- Counts — updated in-place by JS polling -->
+            <td class="progress-cell" style="min-width:180px">
+              <?php if ($total > 0 || $isActive || $isDone): ?>
                 <div class="campaign-counts" style="display:flex;gap:10px;font-size:13px;font-weight:600;margin-bottom:5px">
                   <span class="cnt-sent" style="color:var(--success)"><i class="fa-solid fa-check"></i> <span class="cnt-val"><?=number_format($sent)?></span> Sent</span>
-                  <?php if ($failCnt > 0 || $isActive): ?>
-                    <span class="cnt-failed" style="color:var(--danger)"><i class="fa-solid fa-xmark"></i> <span class="cnt-val"><?=number_format($failCnt)?></span> Failed</span>
-                  <?php endif; ?>
+                  <span class="cnt-failed" style="color:var(--danger)<?= $failCnt === 0 ? ';display:none' : '' ?>"><i class="fa-solid fa-xmark"></i> <span class="cnt-val"><?=number_format($failCnt)?></span> Failed</span>
                 </div>
-                <!-- Progress bar -->
-                <div style="background:var(--border-color);border-radius:4px;height:6px;overflow:hidden" title="<?=$pct?>% processed">
-                  <div class="campaign-progress" style="height:100%;width:<?=$pct?>%;background:<?=$failCnt > 0 && $sent === 0 ? 'var(--danger)' : 'var(--success)'?>;border-radius:4px;transition:width .5s"></div>
+                <?php
+                  $sentPct = $total > 0 ? min(100, (int)round($sent   / $total * 100)) : ($isDone && $failCnt === 0 ? 100 : 0);
+                  $failPct = $total > 0 ? min(100 - $sentPct, (int)round($failCnt / $total * 100)) : 0;
+                ?>
+                <div class="prog-wrap" style="background:var(--border-color);border-radius:4px;height:7px;overflow:hidden;display:flex" title="<?=$pct?>% complete">
+                  <div class="prog-sent" style="height:100%;width:<?=$sentPct?>%;background:var(--success);transition:width .4s ease"></div>
+                  <div class="prog-fail" style="height:100%;width:<?=$failPct?>%;background:var(--danger);transition:width .4s ease"></div>
                 </div>
-                <div style="font-size:10px;color:var(--text-secondary);margin-top:2px"><span class="cnt-pct"><?=$pct?></span>% · <?=number_format($total)?> total</div>
+                <div style="font-size:10px;color:var(--text-secondary);margin-top:2px"><span class="cnt-pct"><?=$pct?></span>% · <span class="cnt-total"><?=number_format($total)?></span> total</div>
               <?php else: ?>
-                <div style="font-weight:700;color:var(--text-primary)"><?=number_format($total)?> Contacts</div>
+                <div class="no-progress" style="font-weight:700;color:var(--text-primary)"><?=number_format($total)?> Contacts</div>
               <?php endif; ?>
             </td>
-            <td>
+            <td class="status-cell">
               <span class="badge badge-<?=$sc?> campaign-status-badge"><?=ucfirst($c['status'])?></span>
               <?php if ($isActive): ?>
-                <div style="font-size:10px;color:var(--text-secondary);margin-top:3px"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:9px"></i> Sending…</div>
+                <div class="sending-spinner" style="font-size:10px;color:var(--text-secondary);margin-top:3px"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:9px"></i> Sending…</div>
               <?php endif; ?>
             </td>
             <td style="font-size:12px"><?=$c['scheduled_at']?date('d M Y H:i',strtotime($c['scheduled_at'])):'<span class="text-muted">—</span>'?></td>
@@ -251,16 +252,6 @@ if (isset($_GET['edit'])) {
     if ($ec) $editJs = 'editCampaign(' . json_encode($ec) . ');';
 }
 
-// Which campaign IDs on this page are still active? Pass to JS for initial poll.
-$activeCampaignIds = [];
-if ($view === 'campaigns') {
-    foreach ($items as $c) {
-        if (in_array($c['status'], ['queued','running','sending'])) {
-            $activeCampaignIds[] = (int)$c['id'];
-        }
-    }
-}
-
 $extraScript = '<script>';
 if ($editJs) $extraScript .= $editJs;
 $extraScript .= '
@@ -319,81 +310,116 @@ function resetCampaign() {
 }
 
 // ── Live campaign polling ─────────────────────────────────────────────────────
-const POLL_MS  = 3000;
-let   pollTimer = null;
-const activeIds = new Set(' . json_encode($activeCampaignIds) . ');
+// Polls all campaign IDs visible on this page (not just ones active at load).
+// Fast (2 s) when any campaign is active, slow (9 s) otherwise.
+// Pauses when the tab is hidden; resumes immediately when it becomes visible.
+let pollTimer = null;
 
-function startPolling() {
-    if (activeIds.size === 0) return;
-    pollTimer = setTimeout(doPoll, POLL_MS);
+function allCampaignIds() {
+    return [...document.querySelectorAll("tr[data-campaign-id]")]
+        .map(r => r.dataset.campaignId).filter(Boolean);
+}
+function hasActiveCampaigns() {
+    return !!document.querySelector(\'tr[data-status="queued"], tr[data-status="running"], tr[data-status="sending"]\');
+}
+function scheduleNextPoll() {
+    pollTimer = setTimeout(doPoll, hasActiveCampaigns() ? 2000 : 9000);
 }
 
 function doPoll() {
-    fetch("/client/api/campaign-status.php")
+    clearTimeout(pollTimer);
+    if (document.hidden) return;
+    const ids = allCampaignIds();
+    if (!ids.length) { scheduleNextPoll(); return; }
+    fetch("/client/api/campaign-status.php?ids=" + ids.join(","))
         .then(r => r.ok ? r.json() : null)
-        .then(data => {
-            if (!data) return;
-            data.campaigns.forEach(applyUpdate);
-            if (activeIds.size > 0) pollTimer = setTimeout(doPoll, POLL_MS);
-        })
-        .catch(() => { if (activeIds.size > 0) pollTimer = setTimeout(doPoll, POLL_MS * 2); });
+        .then(data => { if (data) data.campaigns.forEach(applyUpdate); })
+        .catch(() => {})
+        .finally(scheduleNextPoll);
 }
 
 function applyUpdate(c) {
     const row = document.querySelector(`tr[data-campaign-id="${c.id}"]`);
     if (!row) return;
 
-    const sent    = parseInt(c.sent_count)   || 0;
-    const failed  = parseInt(c.failed_count) || 0;
-    const total   = parseInt(c.total_count)  || (sent + failed);
-    const done    = sent + failed;
-    const pct     = total > 0 ? Math.min(100, Math.round(done / total * 100)) : (done > 0 ? 100 : 0);
+    const sent     = parseInt(c.sent_count)   || 0;
+    const failed   = parseInt(c.failed_count) || 0;
+    const total    = parseInt(c.total_count)  || 0;
+    const done     = sent + failed;
+    const pct      = total > 0 ? Math.min(100, Math.round(done   / total * 100)) : 0;
+    const sentPct  = total > 0 ? Math.min(100, Math.round(sent   / total * 100)) : 0;
+    const failPct  = total > 0 ? Math.min(100 - sentPct, Math.round(failed / total * 100)) : 0;
     const isActive = ["queued","running","sending"].includes(c.status);
 
-    // Counts
-    const sentEl   = row.querySelector(".cnt-sent .cnt-val");
-    const failEl   = row.querySelector(".cnt-failed .cnt-val");
-    const pctEl    = row.querySelector(".cnt-pct");
-    const progEl   = row.querySelector(".campaign-progress");
-    if (sentEl)  sentEl.textContent  = sent.toLocaleString();
-    if (failEl)  failEl.textContent  = failed.toLocaleString();
-    if (pctEl)   pctEl.textContent   = pct;
-    if (progEl)  progEl.style.width  = pct + "%";
+    // Inject progress markup for campaigns that had no counts when page loaded
+    const cell = row.querySelector(".progress-cell");
+    if (cell && !cell.querySelector(".prog-wrap") && (total > 0 || isActive)) {
+        cell.innerHTML =
+            \'<div class="campaign-counts" style="display:flex;gap:10px;font-size:13px;font-weight:600;margin-bottom:5px">\' +
+            \'<span class="cnt-sent" style="color:var(--success)"><i class="fa-solid fa-check"></i> <span class="cnt-val">0</span> Sent</span>\' +
+            \'<span class="cnt-failed" style="color:var(--danger);display:none"><i class="fa-solid fa-xmark"></i> <span class="cnt-val">0</span> Failed</span>\' +
+            \'</div>\' +
+            \'<div class="prog-wrap" style="background:var(--border-color);border-radius:4px;height:7px;overflow:hidden;display:flex">\' +
+            \'<div class="prog-sent" style="height:100%;width:0%;background:var(--success);transition:width .4s ease"></div>\' +
+            \'<div class="prog-fail" style="height:100%;width:0%;background:var(--danger);transition:width .4s ease"></div>\' +
+            \'</div>\' +
+            \'<div style="font-size:10px;color:var(--text-secondary);margin-top:2px"><span class="cnt-pct">0</span>% · <span class="cnt-total">0</span> total</div>\';
+    }
 
-    // Show cnt-failed cell if previously hidden
+    // Update counts and dual-segment progress bar
+    const sentVal  = row.querySelector(".cnt-sent .cnt-val");
+    const failVal  = row.querySelector(".cnt-failed .cnt-val");
     const failSpan = row.querySelector(".cnt-failed");
-    if (failSpan && failed > 0) failSpan.style.display = "";
+    const pctEl    = row.querySelector(".cnt-pct");
+    const totalEl  = row.querySelector(".cnt-total");
+    const progSent = row.querySelector(".prog-sent");
+    const progFail = row.querySelector(".prog-fail");
 
-    // Status badge
-    const badge = row.querySelector(".campaign-status-badge");
-    if (badge && row.dataset.status !== c.status) {
+    if (sentVal)  sentVal.textContent  = sent.toLocaleString();
+    if (failVal)  failVal.textContent  = failed.toLocaleString();
+    if (pctEl)    pctEl.textContent    = pct;
+    if (totalEl)  totalEl.textContent  = total.toLocaleString();
+    if (failSpan) failSpan.style.display = failed > 0 ? "" : "none";
+    if (progSent) progSent.style.width   = sentPct + "%";
+    if (progFail) progFail.style.width   = failPct + "%";
+
+    // Status badge — update on every transition
+    if (row.dataset.status !== c.status) {
         row.dataset.status = c.status;
-        const cls = {queued:"warning",running:"info",sending:"info",completed:"success",failed:"danger"};
-        badge.className = `badge badge-${cls[c.status]||"muted"} campaign-status-badge`;
-        badge.textContent = c.status.charAt(0).toUpperCase() + c.status.slice(1);
+        const badge = row.querySelector(".campaign-status-badge");
+        if (badge) {
+            const cls = {draft:"muted",scheduled:"warning",queued:"warning",running:"info",sending:"info",completed:"success",failed:"danger"};
+            badge.className = `badge badge-${cls[c.status]||"muted"} campaign-status-badge`;
+            badge.textContent = c.status.charAt(0).toUpperCase() + c.status.slice(1);
+        }
     }
 
-    // Stop polling once terminal
-    if (!isActive) {
-        activeIds.delete(String(c.id));
-        // Remove the "Sending…" spinner line
-        const spinner = row.querySelector(".fa-circle-notch");
-        if (spinner) spinner.closest("div").remove();
-        // Add / refresh "Failed" button if there are failures
-        if (failed > 0) refreshFailButton(row, c.id, failed);
+    // Sending spinner — add when active, remove when terminal
+    const statusCell = row.querySelector(".status-cell");
+    if (statusCell) {
+        const spinner = statusCell.querySelector(".sending-spinner");
+        if (isActive && !spinner) {
+            const d = document.createElement("div");
+            d.className = "sending-spinner";
+            d.style.cssText = "font-size:10px;color:var(--text-secondary);margin-top:3px";
+            d.innerHTML = \'<i class="fa-solid fa-circle-notch fa-spin" style="font-size:9px"></i> Sending…\';
+            statusCell.appendChild(d);
+        } else if (!isActive && spinner) {
+            spinner.remove();
+        }
     }
+
+    if (failed > 0) refreshFailButton(row, c.id, failed);
 }
 
 function refreshFailButton(row, campaignId, failedCount) {
-    // If a "Failed" button already exists, just update its count
-    let btn = row.querySelector(".fail-btn");
-    if (btn) {
-        btn.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${failedCount.toLocaleString()} Failed`;
-    }
-    // (Button was already rendered server-side for known failures; new ones get it on next full reload)
+    const btn = row.querySelector(".fail-btn");
+    if (btn) btn.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${failedCount.toLocaleString()} Failed`;
 }
 
-startPolling();
+// Start polling immediately; resume instantly when tab becomes visible again
+document.addEventListener("visibilitychange", () => { if (!document.hidden) doPoll(); });
+doPoll();
 
 // ── Failures drawer ───────────────────────────────────────────────────────────
 let drawerCampaignId  = null;
