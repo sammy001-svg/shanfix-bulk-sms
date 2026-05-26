@@ -68,13 +68,24 @@ $s = fn(string $key, string $default='') => htmlspecialchars($settings[$key] ?? 
           <hr style="margin:24px 0;border-color:var(--border)">
           <div class="form-group"><label class="form-label">Default Unit Price (KES)</label><input type="number" step="0.0001" name="unit_price" class="form-control" value="<?=$s('unit_price','0.50')?>"></div>
         <?php elseif ($activeTab==='email'): ?>
+          <div class="alert alert-info" style="margin-bottom:20px"><i class="fa-solid fa-info-circle"></i> Used for password reset emails. Works with Gmail (App Password), Mailgun, or any SMTP provider.</div>
           <div class="form-group"><label class="form-label">SMTP Host</label><input type="text" name="smtp_host" class="form-control" value="<?=$s('smtp_host','smtp.gmail.com')?>"></div>
           <div class="form-row">
             <div class="form-group"><label class="form-label">SMTP Port</label><input type="number" name="smtp_port" class="form-control" value="<?=$s('smtp_port','587')?>"></div>
-            <div class="form-group"><label class="form-label">Encryption</label><select name="smtp_encryption" class="form-control"><option value="tls">TLS</option><option value="ssl">SSL</option></select></div>
+            <div class="form-group"><label class="form-label">Encryption</label><select name="smtp_encryption" class="form-control"><option value="tls" <?=$s('smtp_encryption','tls')==='tls'?'selected':''?>>TLS (port 587)</option><option value="ssl" <?=$s('smtp_encryption')==='ssl'?'selected':''?>>SSL (port 465)</option></select></div>
           </div>
-          <div class="form-group"><label class="form-label">SMTP Username</label><input type="text" name="smtp_user" class="form-control" value="<?=$s('smtp_user')?>"></div>
+          <div class="form-group"><label class="form-label">SMTP Username / From Address</label><input type="text" name="smtp_user" class="form-control" value="<?=$s('smtp_user')?>" placeholder="you@gmail.com"></div>
           <div class="form-group"><label class="form-label">SMTP Password</label><input type="password" name="smtp_pass" class="form-control" placeholder="Leave blank to keep current"></div>
+          <div class="form-group"><label class="form-label">From Name <span style="font-size:11px;color:var(--text-muted)">(defaults to platform name)</span></label><input type="text" name="smtp_from_name" class="form-control" value="<?=$s('smtp_from_name')?>" placeholder="<?=$s('site_name','Shanfix Technology')?>"></div>
+          <hr style="margin:24px 0;border-color:var(--border)">
+          <div class="form-group">
+            <label class="form-label">SMS Delivery Report (DLR) Webhook URL</label>
+            <div class="input-group">
+              <input type="text" class="form-control" value="<?= htmlspecialchars(rtrim($settings['site_url']??'', '/') . '/webhooks/sms-dlr.php') ?>" readonly onclick="this.select()">
+              <div class="input-group-text" style="cursor:pointer" onclick="navigator.clipboard.writeText(this.previousElementSibling.value)" title="Copy"><i class="fa-regular fa-copy"></i></div>
+            </div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Paste this URL into Onfon Media → Account → SMS Settings → Delivery Report URL to receive real-time delivery confirmations.</div>
+          </div>
         <?php elseif ($activeTab==='security'): ?>
           <div class="form-group"><label class="form-label">Session Timeout (seconds)</label><input type="number" name="session_timeout" class="form-control" value="<?=$s('session_timeout','3600')?>"></div>
           <div class="form-group"><label class="form-label">Max Login Attempts</label><input type="number" name="max_login_attempts" class="form-control" value="<?=$s('max_login_attempts','5')?>"></div>

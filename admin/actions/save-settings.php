@@ -29,7 +29,7 @@ const ALLOWED_SETTING_KEYS = [
     // Pricing
     'unit_price',
     // SMTP
-    'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_user', 'smtp_pass',
+    'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_user', 'smtp_pass', 'smtp_from_name',
     // Security & access
     'session_timeout', 'max_login_attempts', 'allow_registration', 'maintenance_mode',
     // Performance

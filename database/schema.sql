@@ -223,6 +223,20 @@ CREATE TABLE IF NOT EXISTS `unit_allocations` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
+-- Table: password_resets
+-- Stores single-use tokens for the forgot-password flow.
+-- Each email may have at most one active token (old ones are deleted before inserting).
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `password_resets` (
+  `token`      VARCHAR(64)  NOT NULL,
+  `email`      VARCHAR(180) NOT NULL,
+  `expires_at` DATETIME     NOT NULL,
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`token`),
+  KEY `idx_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
 -- Table: api_rate_counters
 -- Atomic per-minute hit counter (INSERT ... ON DUPLICATE KEY UPDATE
 -- hits = LAST_INSERT_ID(hits + 1)) — no SELECT+INSERT race condition.
@@ -289,6 +303,8 @@ INSERT INTO `system_settings` (`key`, `value`) VALUES
   ('onfon_access_key',  ''),
   -- SMTP Settings
   ('smtp_host',         'smtp.gmail.com'),
-  ('smtp_port',         '587');
+  ('smtp_port',         '587'),
+  ('smtp_encryption',   'tls'),
+  ('smtp_from_name',    '');
 
 COMMIT;
