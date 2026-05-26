@@ -35,7 +35,7 @@ const MAX_ROWS = 100_000;
 
 $sql    = "SELECT id, campaign_id, sender_id, recipient, message, units_charged, status, failed_reason, sent_at, created_at
            FROM messages
-           WHERE user_id = ? AND DATE(created_at) BETWEEN ? AND ?";
+           WHERE user_id = ? AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY)";
 $params = [$uid, $from, $to];
 
 if ($campaignId > 0) {

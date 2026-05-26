@@ -78,6 +78,11 @@ $s = fn(string $key, string $default='') => htmlspecialchars($settings[$key] ?? 
         <?php elseif ($activeTab==='security'): ?>
           <div class="form-group"><label class="form-label">Session Timeout (seconds)</label><input type="number" name="session_timeout" class="form-control" value="<?=$s('session_timeout','3600')?>"></div>
           <div class="form-group"><label class="form-label">Max Login Attempts</label><input type="number" name="max_login_attempts" class="form-control" value="<?=$s('max_login_attempts','5')?>"></div>
+          <div class="form-group">
+            <label class="form-label">Max Concurrent Campaigns</label>
+            <input type="number" name="max_concurrent_campaigns" class="form-control" min="1" max="50" value="<?=$s('max_concurrent_campaigns','5')?>">
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">How many campaigns may send at the same time across all users. Rule of thumb: 1 per 256 MB available RAM. Default: 5.</div>
+          </div>
           <div class="form-group"><label class="form-label">Registration</label><select name="allow_registration" class="form-control"><option value="1" <?=$s('allow_registration','0')==='1'?'selected':''?>>Open</option><option value="0" <?=$s('allow_registration','0')==='0'?'selected':''?>>Invite Only</option></select></div>
           <div class="form-group"><label class="form-label">Maintenance Mode</label><select name="maintenance_mode" class="form-control"><option value="0">Off</option><option value="1" <?=$s('maintenance_mode')==='1'?'selected':''?>>On</option></select></div>
         <?php endif; ?>

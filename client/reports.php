@@ -9,7 +9,7 @@ $from       = sanitize($_GET['from'] ?? date('Y-m-01'));
 $to         = sanitize($_GET['to']   ?? date('Y-m-d'));
 $campaignId = (int)($_GET['campaign_id'] ?? 0);
 
-$where  = "WHERE m.user_id=? AND DATE(m.created_at) BETWEEN ? AND ?";
+$where  = "WHERE m.user_id=? AND m.created_at >= ? AND m.created_at < DATE_ADD(?, INTERVAL 1 DAY)";
 $params = [$uid, $from, $to];
 
 if ($campaignId > 0) {
@@ -22,7 +22,7 @@ if ($campaignId > 0) {
 $summary = DB::queryOne("SELECT COUNT(*) as total, SUM(status='sent') as sent, SUM(status='sent' OR status='delivered') as delivered, SUM(status='failed') as failed, COALESCE(SUM(units_charged),0) as units FROM messages m $where", $params);
 
 $trendParams = [$uid, $from, $to];
-$trendWhere  = "user_id=? AND DATE(created_at) BETWEEN ? AND ?";
+$trendWhere  = "user_id=? AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY)";
 if ($campaignId > 0) { $trendWhere .= " AND campaign_id=?"; $trendParams[] = $campaignId; }
 $trend   = DB::query("SELECT DATE(created_at) as day, COUNT(*) as total FROM messages WHERE $trendWhere GROUP BY day ORDER BY day", $trendParams);
 $tLabels = json_encode(array_column($trend,'day'));

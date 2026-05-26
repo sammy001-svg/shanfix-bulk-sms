@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS `contacts` (
   `name`        VARCHAR(120) DEFAULT NULL,
   `phone`       VARCHAR(20)  NOT NULL,
   `email`       VARCHAR(120) DEFAULT NULL,
+  `metadata`    JSON         DEFAULT NULL COMMENT 'Extra CSV columns as JSON for personalisation ({name}, {balance}, etc.)',
   `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_user` (`user_id`),
@@ -96,19 +97,26 @@ CREATE TABLE IF NOT EXISTS `campaigns` (
   `sender_id`     VARCHAR(20)  NOT NULL,
   `message`       TEXT         NOT NULL,
   `group_id`      INT UNSIGNED DEFAULT NULL,
-  `recipients`    TEXT         DEFAULT NULL COMMENT 'Comma-separated numbers if no group',
-  `total_count`   INT UNSIGNED NOT NULL DEFAULT 0,
+  `recipients`      TEXT         DEFAULT NULL COMMENT 'Comma-separated numbers if no group',
+  `file_path`       VARCHAR(600) DEFAULT NULL COMMENT 'Server path to uploaded CSV/XLSX for queue processing',
+  `total_count`     INT UNSIGNED NOT NULL DEFAULT 0,
+  `processed_rows`    INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Rows already processed — used for progress tracking',
+  `resume_contact_id` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Last contacts.id fetched — cursor for group crash-recovery',
   `sent_count`    INT UNSIGNED NOT NULL DEFAULT 0,
   `failed_count`  INT UNSIGNED NOT NULL DEFAULT 0,
   `units_used`    DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   `status`        ENUM('draft','scheduled','queued','running','sending','completed','failed') NOT NULL DEFAULT 'draft',
-  `scheduled_at`  DATETIME     DEFAULT NULL,
-  `sent_at`       DATETIME     DEFAULT NULL,
-  `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `scheduled_at`      DATETIME     DEFAULT NULL,
+  `sent_at`           DATETIME     DEFAULT NULL,
+  `locked_at`         DATETIME     DEFAULT NULL COMMENT 'Set when a worker claims this campaign',
+  `last_heartbeat_at` DATETIME     DEFAULT NULL COMMENT 'Updated every batch; NULL = dead worker',
+  `created_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_user` (`user_id`),
   KEY `idx_status` (`status`),
   KEY `idx_user_status` (`user_id`, `status`),
+  KEY `idx_status_locked` (`status`, `locked_at`),
+  KEY `idx_heartbeat`     (`status`, `last_heartbeat_at`),
   CONSTRAINT `fk_camp_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_camp_group` FOREIGN KEY (`group_id`) REFERENCES `contact_groups`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -129,12 +137,14 @@ CREATE TABLE IF NOT EXISTS `messages` (
   `gateway_msg_id` VARCHAR(100)   DEFAULT NULL,
   `sent_at`       DATETIME        DEFAULT NULL,
   `delivered_at`  DATETIME        DEFAULT NULL,
+  `failed_reason` VARCHAR(500)    DEFAULT NULL COMMENT 'Gateway error or validation failure description',
   `created_at`    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_campaign` (`campaign_id`),
   KEY `idx_user` (`user_id`),
   KEY `idx_status` (`status`),
   KEY `idx_campaign_status` (`campaign_id`, `status`),
+  KEY `idx_user_created`    (`user_id`, `created_at`),
   CONSTRAINT `fk_msg_campaign` FOREIGN KEY (`campaign_id`) REFERENCES `campaigns`(`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_msg_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -210,6 +220,18 @@ CREATE TABLE IF NOT EXISTS `unit_allocations` (
   KEY `idx_to` (`to_user`),
   CONSTRAINT `fk_alloc_from` FOREIGN KEY (`from_user`) REFERENCES `users`(`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_alloc_to`   FOREIGN KEY (`to_user`)   REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- Table: api_rate_counters
+-- Atomic per-minute hit counter (INSERT ... ON DUPLICATE KEY UPDATE
+-- hits = LAST_INSERT_ID(hits + 1)) — no SELECT+INSERT race condition.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `api_rate_counters` (
+  `bucket`       VARCHAR(100) NOT NULL,
+  `window_start` DATETIME     NOT NULL,
+  `hits`         INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (`bucket`, `window_start`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================

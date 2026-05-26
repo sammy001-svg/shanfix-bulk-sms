@@ -44,16 +44,20 @@ $maxWorkers = (int)($capRow['value'] ?? DEFAULT_MAX_CONCURRENT);
 if ($maxWorkers < 1) $maxWorkers = 1;
 
 // ------------------------------------------------------------------
-// Step 1: Rescue campaigns stuck in 'sending'.
-// If locked_at is older than 5 minutes the process died — reset to
-// 'queued' so this run can pick them up.
+// Step 1: Rescue campaigns whose worker has gone silent.
+//
+// last_heartbeat_at is updated after every batch (~every few seconds
+// for an active worker).  If it hasn't moved in 5 minutes the process
+// is dead — reset to 'queued' so we can re-pick it up this tick.
+//
+// A SLOW campaign (large list, gateway latency) keeps its heartbeat
+// current, so it is never incorrectly rescued and double-sent.
 // ------------------------------------------------------------------
 $rescued = DB::execute(
     "UPDATE campaigns
-     SET status = 'queued', locked_at = NULL
+     SET status = 'queued', locked_at = NULL, last_heartbeat_at = NULL
      WHERE status = 'sending'
-       AND locked_at IS NOT NULL
-       AND locked_at < NOW() - INTERVAL 5 MINUTE"
+       AND last_heartbeat_at < NOW() - INTERVAL 5 MINUTE"
 );
 if ($rescued > 0) {
     $log("Rescued {$rescued} stuck campaign(s) → re-queued.");

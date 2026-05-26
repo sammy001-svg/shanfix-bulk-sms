@@ -227,9 +227,9 @@ class SMS {
      * Sends up to 500 recipients per Onfon API call; bulk-inserts message logs.
      */
     public static function processCampaign($campaignId) {
-        // Atomic lock: stamp locked_at so the cron can detect if we die mid-way
+        // Atomic lock: stamp locked_at + heartbeat so the cron can detect if we die mid-way
         $locked = DB::execute(
-            "UPDATE campaigns SET status = 'sending', locked_at = NOW()
+            "UPDATE campaigns SET status = 'sending', locked_at = NOW(), last_heartbeat_at = NOW()
              WHERE id = ? AND status IN ('queued', 'scheduled', 'running')",
             [$campaignId]
         );
@@ -301,9 +301,9 @@ class SMS {
             $failed     += $bf;
             $totalUnits += $bu;
             $batch = [];
-            // Live progress so campaigns page shows real-time counts
+            // Live progress + heartbeat: proves the worker is still alive to the rescue cron
             DB::execute(
-                "UPDATE campaigns SET sent_count = ?, failed_count = ? WHERE id = ?",
+                "UPDATE campaigns SET sent_count = ?, failed_count = ?, last_heartbeat_at = NOW() WHERE id = ?",
                 [$sent, $failed, $campaignId]
             );
         };
@@ -339,6 +339,12 @@ class SMS {
             $fh = fopen($filePath, 'r');
             if ($fh === false) {
                 throw new \RuntimeException("Cannot open campaign file: $filePath");
+            }
+            if (!flock($fh, LOCK_EX | LOCK_NB)) {
+                fclose($fh);
+                error_log("Campaign #$campaignId: CSV file locked by another process: $filePath");
+                DB::execute("UPDATE campaigns SET status = 'failed', locked_at = NULL WHERE id = ?", [$campaignId]);
+                return;
             }
 
             $headers  = fgetcsv($fh);
@@ -396,13 +402,26 @@ class SMS {
             }
         }
 
-        // --- Source 2: Contact group (paginated, 1 000 rows at a time) ---
+        // --- Source 2: Contact group (cursor-based pagination, O(log N) per page) ---
         if ($groupId) {
-            $offset = $skipCount; // resume: jump past already-sent contacts
+            // Set total_count upfront so the progress bar shows a denominator immediately
+            if ((int)$campaign['total_count'] === 0) {
+                $totalContacts = (int)DB::queryValue(
+                    "SELECT COUNT(*) FROM contacts WHERE group_id = ? AND user_id = ?",
+                    [$groupId, $userId]
+                );
+                DB::execute("UPDATE campaigns SET total_count = ? WHERE id = ?", [$totalContacts, $campaignId]);
+            }
+
+            // Resume from the last contact ID saved before any crash (0 = beginning)
+            $lastContactId = (int)($campaign['resume_contact_id'] ?? 0);
+
             do {
                 $contacts = DB::query(
-                    "SELECT phone, metadata FROM contacts WHERE group_id = ? AND user_id = ? LIMIT 1000 OFFSET ?",
-                    [$groupId, $userId, $offset]
+                    "SELECT id, phone, metadata FROM contacts
+                     WHERE group_id = ? AND user_id = ? AND id > ?
+                     ORDER BY id LIMIT 1000",
+                    [$groupId, $userId, $lastContactId]
                 );
                 foreach ($contacts as $c) {
                     $phone = self::normalizePhone($c['phone']);
@@ -420,7 +439,13 @@ class SMS {
                     $batch[] = ['phone' => $phone, 'message' => $msg];
                     if (count($batch) >= self::BATCH_SIZE * self::CONCURRENCY) $flush();
                 }
-                $offset += 1000;
+                if (!empty($contacts)) {
+                    $lastContactId = (int)end($contacts)['id'];
+                    DB::execute(
+                        "UPDATE campaigns SET resume_contact_id = ? WHERE id = ?",
+                        [$lastContactId, $campaignId]
+                    );
+                }
             } while (count($contacts) === 1000);
         }
 

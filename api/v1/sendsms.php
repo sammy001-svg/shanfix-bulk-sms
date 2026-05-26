@@ -28,26 +28,34 @@ if (!$user) {
     exit;
 }
 
-// Rate limit: 60 requests per minute per user (sliding window)
+// Rate limit: 60 requests per minute per user (fixed 1-minute window, atomic counter)
 try {
-    $bucket      = 'api:' . $user['id'];
-    $recentCalls = (int)DB::queryValue(
-        "SELECT COUNT(*) FROM rate_limits
-          WHERE bucket = ? AND hit_at >= DATE_SUB(NOW(), INTERVAL 1 MINUTE)",
-        [$bucket]
+    $bucket = 'api:' . $user['id'];
+    $window = date('Y-m-d H:i:00'); // truncate to current minute
+    // Atomic increment — LAST_INSERT_ID(expr) sets the connection-local last_insert_id
+    // so the subsequent SELECT LAST_INSERT_ID() returns *this* connection's new value.
+    DB::execute(
+        "INSERT INTO api_rate_counters (bucket, window_start, hits)
+         VALUES (?, ?, 1)
+         ON DUPLICATE KEY UPDATE hits = LAST_INSERT_ID(hits + 1)",
+        [$bucket, $window]
     );
-    if ($recentCalls >= 60) {
+    $hitCount = (int)DB::queryValue("SELECT LAST_INSERT_ID()");
+    if ($hitCount > 60) {
+        DB::execute(
+            "UPDATE api_rate_counters SET hits = hits - 1 WHERE bucket = ? AND window_start = ?",
+            [$bucket, $window]
+        );
         http_response_code(429);
         echo json_encode(['success' => false, 'error' => 'Rate limit exceeded. Max 60 requests per minute.']);
         exit;
     }
-    DB::execute("INSERT INTO rate_limits (bucket, hit_at) VALUES (?, NOW())", [$bucket]);
-    // Periodic cleanup: delete entries older than 2 minutes (runs ~1% of requests)
+    // Periodic cleanup: remove stale windows (~1% of requests)
     if (random_int(1, 100) === 1) {
-        DB::execute("DELETE FROM rate_limits WHERE bucket = ? AND hit_at < DATE_SUB(NOW(), INTERVAL 2 MINUTE)", [$bucket]);
+        DB::execute("DELETE FROM api_rate_counters WHERE window_start < DATE_SUB(NOW(), INTERVAL 2 MINUTE)");
     }
 } catch (Exception $e) {
-    // rate_limits table not yet created — skip rate limiting (run phase6 migration)
+    // api_rate_counters table not yet created — skip rate limiting (run phase13 migration)
 }
 
 // Request Data
