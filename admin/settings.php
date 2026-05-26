@@ -79,6 +79,12 @@ $s = fn(string $key, string $default='') => htmlspecialchars($settings[$key] ?? 
           <div class="form-group"><label class="form-label">From Name <span style="font-size:11px;color:var(--text-muted)">(defaults to platform name)</span></label><input type="text" name="smtp_from_name" class="form-control" value="<?=$s('smtp_from_name')?>" placeholder="<?=$s('site_name','Shanfix Technology')?>"></div>
           <hr style="margin:24px 0;border-color:var(--border)">
           <div class="form-group">
+            <label class="form-label">Low Balance Alert Threshold <span style="font-size:11px;color:var(--text-muted)">(units — set 0 to disable)</span></label>
+            <input type="number" name="low_balance_threshold" class="form-control" min="0" value="<?=$s('low_balance_threshold','0')?>" placeholder="e.g. 100">
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Users receive an email alert when their balance drops below this number after a campaign finishes. Alerts are rate-limited to once per 24 hours per user.</div>
+          </div>
+          <hr style="margin:24px 0;border-color:var(--border)">
+          <div class="form-group">
             <label class="form-label">SMS Delivery Report (DLR) Webhook URL</label>
             <div class="input-group">
               <input type="text" class="form-control" value="<?= htmlspecialchars(rtrim($settings['site_url']??'', '/') . '/webhooks/sms-dlr.php') ?>" readonly onclick="this.select()">

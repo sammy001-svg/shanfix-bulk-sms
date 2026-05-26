@@ -302,9 +302,10 @@ INSERT INTO `system_settings` (`key`, `value`) VALUES
   ('onfon_user_id',     ''),
   ('onfon_access_key',  ''),
   -- SMTP Settings
-  ('smtp_host',         'smtp.gmail.com'),
-  ('smtp_port',         '587'),
-  ('smtp_encryption',   'tls'),
-  ('smtp_from_name',    '');
+  ('smtp_host',             'smtp.gmail.com'),
+  ('smtp_port',             '587'),
+  ('smtp_encryption',       'tls'),
+  ('smtp_from_name',        ''),
+  ('low_balance_threshold', '0');
 
 COMMIT;

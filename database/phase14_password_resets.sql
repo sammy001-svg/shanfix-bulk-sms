@@ -13,3 +13,6 @@ CREATE TABLE IF NOT EXISTS `password_resets` (
 
 -- 2. Email sender display name setting (optional override for smtp_user)
 INSERT IGNORE INTO `system_settings` (`key`, `value`) VALUES ('smtp_from_name', '');
+
+-- 3. Low-balance alert threshold (0 = disabled)
+INSERT IGNORE INTO `system_settings` (`key`, `value`) VALUES ('low_balance_threshold', '0');

@@ -28,8 +28,9 @@ const ALLOWED_SETTING_KEYS = [
     'kk_client_id', 'kk_client_secret', 'kk_till_number', 'kk_base_url', 'kk_webhook_secret',
     // Pricing
     'unit_price',
-    // SMTP
+    // SMTP + notifications
     'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_user', 'smtp_pass', 'smtp_from_name',
+    'low_balance_threshold',
     // Security & access
     'session_timeout', 'max_login_attempts', 'allow_registration', 'maintenance_mode',
     // Performance

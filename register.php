@@ -4,6 +4,7 @@
  */
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/includes/helpers/Mailer.php';
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -49,6 +50,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($new_user_id) {
                 generate_user_api_keys((int)$new_user_id);
+
+                // Welcome email — fire-and-forget; failure never blocks registration
+                try {
+                    $siteName  = get_setting('site_name', 'Shanfix Technology');
+                    $siteUrl   = rtrim(get_setting('site_url', ''), '/');
+                    $roleLabel = ucfirst($role);
+                    $uName     = htmlspecialchars($name);
+                    $uEmail    = htmlspecialchars($email);
+                    $html = Mailer::html("Welcome to $siteName", <<<BODY
+<p>Hi $uName,</p>
+<p>Your account has been created successfully. You can now sign in and start sending bulk SMS.</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:20px 0">
+  <tr style="background:#f4f5f7"><td style="padding:10px 14px;font-weight:600;border-bottom:1px solid #e8e8e8;width:40%">Email</td><td style="padding:10px 14px;border-bottom:1px solid #e8e8e8">$uEmail</td></tr>
+  <tr><td style="padding:10px 14px;font-weight:600">Account Type</td><td style="padding:10px 14px">$roleLabel</td></tr>
+</table>
+<p style="text-align:center;margin:28px 0"><a class="btn-link" href="$siteUrl/login.php">Sign In to Your Account</a></p>
+<p>If you have any questions, feel free to contact our support team.</p>
+BODY);
+                    Mailer::send($email, $name, "Welcome to $siteName", $html);
+                } catch (Throwable $e) {
+                    error_log("Welcome email failed for $email: " . $e->getMessage());
+                }
+
                 $_SESSION['flash'] = ['type' => 'success', 'message' => 'Account created successfully! Please sign in.'];
                 header('Location: /login.php');
                 exit;

@@ -4,6 +4,7 @@
  * Handles validation, unit deduction, and provider interfacing.
  */
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../helpers/Mailer.php';
 
 class SMS {
 
@@ -473,6 +474,92 @@ class SMS {
         // retry if the process was killed before reaching this line.
         if ($filePath && file_exists($filePath)) {
             @unlink($filePath);
+        }
+
+        // Post-completion notifications (fire-and-forget — never throw back to caller)
+        self::notifyCampaignComplete($userId, $campaign['name'], $sent, $failed, $totalUnits);
+        self::maybeSendLowBalanceAlert($userId);
+    }
+
+    /**
+     * Email the campaign owner a summary when the campaign finishes.
+     */
+    private static function notifyCampaignComplete(int $userId, string $campaignName, int $sent, int $failed, float $units): void {
+        try {
+            $user = DB::queryOne("SELECT name, email FROM users WHERE id = ?", [$userId]);
+            if (!$user || !$user['email']) return;
+
+            $siteName = get_setting('site_name', 'Shanfix Technology');
+            $siteUrl  = rtrim(get_setting('site_url', ''), '/');
+            $total    = $sent + $failed;
+            $rate     = $total > 0 ? round(($sent / $total) * 100) : 0;
+            $uName    = htmlspecialchars($user['name']);
+            $cName    = htmlspecialchars($campaignName);
+            $unitsFmt = number_format($units, 2);
+
+            $html = Mailer::html("Campaign Complete: $cName", <<<BODY
+<p>Hi $uName,</p>
+<p>Your campaign "<strong>$cName</strong>" has finished sending. Here's the summary:</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:20px 0">
+  <tr style="background:#f4f5f7"><td style="padding:10px 14px;font-weight:600;border-bottom:1px solid #e8e8e8;width:45%">Total Messages</td><td style="padding:10px 14px;border-bottom:1px solid #e8e8e8">$total</td></tr>
+  <tr><td style="padding:10px 14px;font-weight:600;border-bottom:1px solid #e8e8e8">Sent Successfully</td><td style="padding:10px 14px;border-bottom:1px solid #e8e8e8;color:#00c896"><strong>$sent ($rate%)</strong></td></tr>
+  <tr style="background:#f4f5f7"><td style="padding:10px 14px;font-weight:600;border-bottom:1px solid #e8e8e8">Failed</td><td style="padding:10px 14px;border-bottom:1px solid #e8e8e8;color:#e74c3c">$failed</td></tr>
+  <tr><td style="padding:10px 14px;font-weight:600">Units Used</td><td style="padding:10px 14px">$unitsFmt</td></tr>
+</table>
+<p style="text-align:center;margin:28px 0"><a class="btn-link" href="$siteUrl/client/campaigns.php">View Campaigns</a></p>
+BODY);
+
+            Mailer::send($user['email'], $user['name'], "Campaign Complete: $campaignName", $html);
+        } catch (Throwable $e) {
+            error_log("notifyCampaignComplete #campaign/$userId failed: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Send a low-balance alert once per 24 hours when units fall below the configured threshold.
+     * Threshold = 0 (default) disables the feature entirely.
+     */
+    private static function maybeSendLowBalanceAlert(int $userId): void {
+        try {
+            $threshold = (float)get_setting('low_balance_threshold', '0');
+            if ($threshold <= 0) return;
+
+            $balance = (float)DB::queryValue("SELECT sms_units FROM users WHERE id = ?", [$userId]);
+            if ($balance >= $threshold) return;
+
+            // Rate-limit: one alert per user per 24 hours via existing rate_limits table
+            $bucket   = 'low_balance_alert:' . $userId;
+            $alerted  = (int)DB::queryValue(
+                "SELECT COUNT(*) FROM rate_limits WHERE bucket = ? AND hit_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)",
+                [$bucket]
+            );
+            if ($alerted > 0) return;
+
+            DB::execute("INSERT INTO rate_limits (bucket, hit_at) VALUES (?, NOW())", [$bucket]);
+
+            $user = DB::queryOne("SELECT name, email FROM users WHERE id = ?", [$userId]);
+            if (!$user || !$user['email']) return;
+
+            $siteName     = get_setting('site_name', 'Shanfix Technology');
+            $siteUrl      = rtrim(get_setting('site_url', ''), '/');
+            $uName        = htmlspecialchars($user['name']);
+            $balanceFmt   = number_format($balance, 2);
+            $threshFmt    = number_format($threshold, 0);
+
+            $html = Mailer::html('Low SMS Balance Alert', <<<BODY
+<p>Hi $uName,</p>
+<p>Your SMS balance has dropped below your alert threshold of <strong>$threshFmt units</strong>.</p>
+<div style="text-align:center;margin:28px 0;padding:20px;background:#fff3f3;border-radius:8px;border:1px solid #fdd">
+  <div style="font-size:13px;color:#999;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Current Balance</div>
+  <div style="font-size:36px;font-weight:800;color:#e74c3c">$balanceFmt units</div>
+</div>
+<p>Recharge now to keep your messages sending without interruption.</p>
+<p style="text-align:center;margin:28px 0"><a class="btn-link" href="$siteUrl/client/purchases.php">Buy Units Now</a></p>
+BODY);
+
+            Mailer::send($user['email'], $user['name'], 'Low SMS Balance — Action Needed', $html);
+        } catch (Throwable $e) {
+            error_log("maybeSendLowBalanceAlert #$userId failed: " . $e->getMessage());
         }
     }
 
