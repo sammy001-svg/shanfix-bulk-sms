@@ -124,8 +124,8 @@ $groups    = DB::query("SELECT id,name FROM contact_groups WHERE user_id=?",[$ui
                   <button class="btn btn-primary btn-sm btn-icon" onclick='editCampaign(<?=htmlspecialchars(json_encode($c),ENT_QUOTES,"UTF-8")?>)' title="Edit/Send"><i class="fa-solid fa-pen"></i></button>
                 <?php endif; ?>
                 <a href="/client/reports.php?campaign_id=<?=$c['id']?>" class="btn btn-muted btn-sm btn-icon" title="View Report"><i class="fa-solid fa-chart-line"></i></a>
-                <?php if ($failCnt > 0 || $isActive): ?>
-                  <button class="btn btn-danger btn-sm" onclick="showFailures(<?=$c['id']?>,<?=htmlspecialchars(json_encode($c['name']),ENT_QUOTES,'UTF-8')?>)" title="View Failed Messages" style="font-size:11px;padding:4px 8px">
+                <?php if ($failCnt > 0): ?>
+                  <button class="btn btn-danger btn-sm fail-btn" onclick="showFailures(<?=$c['id']?>,<?=htmlspecialchars(json_encode($c['name']),ENT_QUOTES,'UTF-8')?>)" title="View Failed Messages" style="font-size:11px;padding:4px 8px">
                     <i class="fa-solid fa-triangle-exclamation"></i> <?=number_format($failCnt)?> Failed
                   </button>
                 <?php endif; ?>
@@ -174,7 +174,7 @@ $groups    = DB::query("SELECT id,name FROM contact_groups WHERE user_id=?",[$ui
 </div>
 
 <!-- ── Failed Messages Drawer ────────────────────────────────────────────────── -->
-<div id="failuresDrawer" style="display:none;position:fixed;top:0;right:0;width:520px;max-width:100vw;height:100vh;background:var(--card-bg);box-shadow:-4px 0 24px rgba(0,0,0,.18);z-index:9999;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .3s">
+<div id="failuresDrawer" style="display:none;position:fixed;top:0;right:0;width:520px;max-width:100vw;height:100vh;background:var(--card-bg);box-shadow:-4px 0 24px rgba(0,0,0,.18);z-index:9999;flex-direction:column;transform:translateX(100%);transition:transform .3s">
   <div style="padding:18px 20px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;gap:12px">
     <div>
       <h3 style="margin:0;font-size:16px" id="drawerTitle">Failed Messages</h3>
@@ -413,8 +413,19 @@ function applyUpdate(c) {
 }
 
 function refreshFailButton(row, campaignId, failedCount) {
-    const btn = row.querySelector(".fail-btn");
-    if (btn) btn.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${failedCount.toLocaleString()} Failed`;
+    let btn = row.querySelector(".fail-btn");
+    if (!btn) {
+        const actionsDiv = row.querySelector("td:last-child > div");
+        if (!actionsDiv) return;
+        btn = document.createElement("button");
+        btn.className = "btn btn-danger btn-sm fail-btn";
+        btn.style.cssText = "font-size:11px;padding:4px 8px";
+        btn.title = "View Failed Messages";
+        const name = row.querySelector("strong")?.textContent || "";
+        btn.addEventListener("click", () => showFailures(campaignId, name));
+        actionsDiv.appendChild(btn);
+    }
+    btn.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${failedCount.toLocaleString()} Failed`;
 }
 
 // Start polling immediately; resume instantly when tab becomes visible again
@@ -424,10 +435,12 @@ doPoll();
 // ── Failures drawer ───────────────────────────────────────────────────────────
 let drawerCampaignId  = null;
 let drawerCurrentPage = 1;
+let drawerHideTimer   = null;
 
 function showFailures(campaignId, campaignName) {
     drawerCampaignId  = campaignId;
     drawerCurrentPage = 1;
+    if (drawerHideTimer) { clearTimeout(drawerHideTimer); drawerHideTimer = null; }
     document.getElementById("drawerTitle").textContent    = "Failed Messages";
     document.getElementById("drawerSubtitle").textContent = campaignName;
     document.getElementById("drawerBody").innerHTML       = \'<div style="padding:40px;text-align:center"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:24px;color:var(--primary)"></i></div>\';
@@ -446,7 +459,7 @@ function closeDrawer() {
     const overlay = document.getElementById("drawerOverlay");
     drawer.style.transform = "translateX(100%)";
     overlay.style.display  = "none";
-    setTimeout(() => { drawer.style.display = "none"; }, 310);
+    drawerHideTimer = setTimeout(() => { drawer.style.display = "none"; drawerHideTimer = null; }, 310);
     drawerCampaignId = null;
 }
 
@@ -480,25 +493,33 @@ function renderFailures(data) {
     html += \'</tr></thead><tbody>\';
 
     data.failed_messages.forEach(m => {
-        const reason = m.failed_reason || \'—\';
-        const time   = m.created_at ? new Date(m.created_at).toLocaleString(undefined, {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
+        const reason  = m.failed_reason || "—";
+        const preview = m.message ? m.message.substring(0, 60) + (m.message.length > 60 ? "…" : "") : "";
+        const time    = m.created_at ? new Date(m.created_at).toLocaleString(undefined, {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
         html += `<tr style="border-bottom:1px solid var(--border-color)">
-            <td style="padding:9px 16px;font-family:monospace;font-size:12px">${escHtml(m.recipient)}</td>
-            <td style="padding:9px 16px;color:var(--danger);font-size:12px;max-width:200px">${escHtml(reason)}</td>
+            <td style="padding:9px 16px">
+              <div style="font-family:monospace;font-size:12px;font-weight:600">${escHtml(m.recipient)}</div>
+              ${preview ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:2px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(m.message||"")}">${escHtml(preview)}</div>` : ""}
+            </td>
+            <td style="padding:9px 16px;font-size:12px;color:var(--danger);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(reason)}">${escHtml(reason)}</td>
             <td style="padding:9px 16px;font-size:11px;color:var(--text-secondary);white-space:nowrap">${time}</td>
         </tr>`;
     });
     html += "</tbody></table>";
     document.getElementById("drawerBody").innerHTML = html;
 
-    // Pager
-    let pager = "";
+    // Pager — Prev / Next
+    const failLabel = `<span style="font-size:12px;color:var(--text-secondary)">${data.failed_total.toLocaleString()} failed · Page ${data.page} of ${data.pages}</span>`;
+    let pager = failLabel;
     if (data.pages > 1) {
-        for (let p = 1; p <= data.pages; p++) {
-            pager += `<button onclick="loadFailures(${drawerCampaignId},${p})" class="page-btn ${p===data.page?\'active\':\'\'}" style="min-width:32px">${p}</button>`;
-        }
+        let nav = "";
+        if (data.page > 1)
+            nav += `<button onclick="loadFailures(${drawerCampaignId},${data.page - 1})" class="btn btn-secondary btn-sm"><i class="fa-solid fa-chevron-left"></i> Prev</button>`;
+        nav += failLabel;
+        if (data.page < data.pages)
+            nav += `<button onclick="loadFailures(${drawerCampaignId},${data.page + 1})" class="btn btn-primary btn-sm">Next <i class="fa-solid fa-chevron-right"></i></button>`;
+        pager = nav;
     }
-    pager += `<span style="font-size:12px;color:var(--text-secondary);margin-left:8px">${data.failed_total.toLocaleString()} total</span>`;
     document.getElementById("drawerPager").innerHTML = pager;
 
     // Auto-refresh if campaign is still running

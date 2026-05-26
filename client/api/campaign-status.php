@@ -48,7 +48,7 @@ if (isset($_GET['campaign_id'])) {
         [$campaignId, $uid]
     );
     $failed = DB::query(
-        "SELECT recipient, failed_reason, created_at
+        "SELECT recipient, message, failed_reason, created_at
          FROM messages
          WHERE campaign_id = ? AND user_id = ? AND status = 'failed'
          ORDER BY id DESC
