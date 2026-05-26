@@ -54,6 +54,11 @@ $s = fn(string $key, string $default='') => htmlspecialchars($settings[$key] ?? 
             <div class="form-group"><label class="form-label">Onfon API Key</label><input type="text" name="onfon_api_key" class="form-control" value="<?=$s('onfon_api_key')?>"></div>
             <div class="form-group"><label class="form-label">Onfon User ID / Client ID</label><input type="text" name="onfon_user_id" class="form-control" value="<?=$s('onfon_user_id')?>"></div>
             <div class="form-group"><label class="form-label">Onfon Access Key (Optional)</label><input type="text" name="onfon_access_key" class="form-control" value="<?=$s('onfon_access_key')?>"></div>
+            <div class="form-group">
+              <label class="form-label">Batch Delay <span style="font-size:11px;color:var(--text-muted)">(ms between API calls)</span></label>
+              <input type="number" name="onfon_batch_delay_ms" class="form-control" min="0" max="5000" value="<?=$s('onfon_batch_delay_ms','100')?>">
+              <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Pause between each batch of 20 messages sent to Onfon. Increase (e.g. 300–500 ms) if you see high failure rates from Onfon throttling. Default: 100 ms.</div>
+            </div>
           </div>
           <div id="other_sms_fields" style="display: <?=$s('sms_gateway')!=='onfon'?'block':'none'?>">
             <div class="form-group"><label class="form-label">API Key / Username</label><input type="text" name="sms_api_key" class="form-control" value="<?=$s('sms_api_key')?>"></div>

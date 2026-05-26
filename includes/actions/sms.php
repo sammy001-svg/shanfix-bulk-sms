@@ -332,8 +332,9 @@ class SMS {
         }
         $senderId = $validSender['sender_id'];
 
-        $isUnicode   = self::isUnicode($msgTemplate);
-        $partsPerMsg = max(1, (int)ceil(mb_strlen($msgTemplate) / ($isUnicode ? 70 : 160)));
+        $isUnicode    = self::isUnicode($msgTemplate);
+        $partsPerMsg  = max(1, (int)ceil(mb_strlen($msgTemplate) / ($isUnicode ? 70 : 160)));
+        $batchDelayUs = max(0, (int)get_setting('onfon_batch_delay_ms', '100')) * 1000;
 
         // On crash-recovery the cron rescues the campaign back to 'queued' but
         // preserves sent_count / failed_count.  Skip those recipients so we never
@@ -347,10 +348,10 @@ class SMS {
 
         // Flush the current batch to Onfon and reset
         $batchNum = 0;
-        $flush = function () use (&$batch, &$sent, &$failed, &$totalUnits, &$batchNum, $userId, $senderId, $partsPerMsg, $campaignId, $isUnicode) {
+        $flush = function () use (&$batch, &$sent, &$failed, &$totalUnits, &$batchNum, $userId, $senderId, $partsPerMsg, $campaignId, $isUnicode, $batchDelayUs) {
             if (empty($batch)) return;
             DB::keepAlive(); // Reconnect if MySQL dropped the connection during a long run
-            if ($batchNum > 0) usleep(100000); // 100ms pause between batches — avoids Onfon rate-limit
+            if ($batchNum > 0 && $batchDelayUs > 0) usleep($batchDelayUs); // configurable pause — avoids Onfon rate-limit
             $batchNum++;
             [$bs, $bf, $bu] = self::dispatchBatch($userId, $senderId, $batch, $partsPerMsg, $campaignId, $isUnicode);
             $sent       += $bs;

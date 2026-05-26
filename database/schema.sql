@@ -306,6 +306,7 @@ INSERT INTO `system_settings` (`key`, `value`) VALUES
   ('smtp_port',             '587'),
   ('smtp_encryption',       'tls'),
   ('smtp_from_name',        ''),
-  ('low_balance_threshold', '0');
+  ('low_balance_threshold', '0'),
+  ('onfon_batch_delay_ms',  '100');
 
 COMMIT;

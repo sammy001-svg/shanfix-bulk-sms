@@ -37,6 +37,18 @@ $log = function (string $msg): void {
 };
 
 // ------------------------------------------------------------------
+// Housekeeping: prune stale rate-counter rows ~once per hour.
+// Runs on 1-in-60 cron ticks so cleanup never blocks campaigns.
+// api_rate_counters: keep 2h (1-min windows expire fast anyway)
+// rate_limits:       keep 48h (low-balance alert de-dup window is 24h)
+// ------------------------------------------------------------------
+if (random_int(1, 60) === 1) {
+    $c1 = (int)DB::execute("DELETE FROM api_rate_counters WHERE window_start < NOW() - INTERVAL 2 HOUR");
+    $c2 = (int)DB::execute("DELETE FROM rate_limits WHERE hit_at < NOW() - INTERVAL 48 HOUR");
+    if ($c1 + $c2 > 0) $log("Pruned {$c1} rate-counter row(s) and {$c2} rate-limit row(s).");
+}
+
+// ------------------------------------------------------------------
 // Read worker cap — DB setting overrides the compile-time constant.
 // ------------------------------------------------------------------
 $capRow = DB::queryOne("SELECT value FROM system_settings WHERE `key` = 'max_concurrent_campaigns'");
@@ -85,11 +97,16 @@ $log("Active workers: {$activeWorkers}/{$maxWorkers}. {$slots} slot(s) available
 // hundreds of campaigns are queued simultaneously.
 // ------------------------------------------------------------------
 $now       = date('Y-m-d H:i:s');
+// One campaign per user per dispatch round (round-robin fairness).
+// Prevents a single user with many queued campaigns from monopolising
+// all worker slots while other users' campaigns wait indefinitely.
 $campaigns = DB::query(
-    "SELECT id FROM campaigns
+    "SELECT MIN(id) AS id
+     FROM campaigns
      WHERE status = 'queued'
         OR (status = 'scheduled' AND scheduled_at <= ?)
-     ORDER BY created_at ASC
+     GROUP BY user_id
+     ORDER BY MIN(created_at) ASC
      LIMIT " . $slots,
     [$now]
 );

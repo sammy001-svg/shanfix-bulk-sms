@@ -21,7 +21,7 @@ const ALLOWED_SETTING_KEYS = [
     // Site identity
     'site_name', 'site_url', 'support_email', 'support_phone', 'default_currency',
     // SMS gateway
-    'sms_gateway', 'onfon_api_key', 'onfon_user_id', 'onfon_access_key',
+    'sms_gateway', 'onfon_api_key', 'onfon_user_id', 'onfon_access_key', 'onfon_batch_delay_ms',
     'sms_api_key', 'sms_api_secret', 'sms_shortcode',
     // Payments
     'payhero_api_username', 'payhero_api_password', 'payhero_channel_id', 'payhero_webhook_token',
