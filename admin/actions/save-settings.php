@@ -32,6 +32,8 @@ const ALLOWED_SETTING_KEYS = [
     'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_user', 'smtp_pass',
     // Security & access
     'session_timeout', 'max_login_attempts', 'allow_registration', 'maintenance_mode',
+    // Performance
+    'max_concurrent_campaigns',
 ];
 
 // Secrets that must not be blanked out if the field is submitted empty
