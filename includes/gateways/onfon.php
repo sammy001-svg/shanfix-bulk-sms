@@ -15,6 +15,27 @@ class Onfon {
     }
 
     /**
+     * Map Onfon per-message error codes to human-readable descriptions.
+     * Used as a fallback when MessageErrorDescription is empty.
+     */
+    private static function describeErrorCode(int $code): string {
+        static $map = [
+            1   => 'Invalid or unregistered mobile number',
+            2   => 'Sender ID not approved for this account',
+            3   => 'Insufficient Onfon account credits',
+            4   => 'Mobile network not supported',
+            5   => 'Message text too long',
+            100 => 'Invalid Onfon API key',
+            101 => 'Invalid Onfon Client ID',
+            102 => 'Invalid Onfon access key',
+            103 => 'Onfon account inactive or suspended',
+            104 => 'Sending IP address not whitelisted',
+            200 => 'Onfon gateway internal server error',
+        ];
+        return $map[$code] ?? "Onfon gateway error (code $code)";
+    }
+
+    /**
      * Send SMS via Onfon Media (single recipient, used for one-off sends only).
      */
     public static function sendSMS($to, $message, $senderId, bool $isUnicode = false) {
@@ -75,7 +96,9 @@ class Onfon {
         if ($httpCode === 200 && isset($result['ErrorCode']) && $result['ErrorCode'] === 0) {
             $msgData = $result['Data'][0] ?? null;
             if ($msgData && isset($msgData['MessageErrorCode']) && $msgData['MessageErrorCode'] !== 0) {
-                return ['success' => false, 'error' => $msgData['MessageErrorDescription'] ?? 'Onfon Error ' . $msgData['MessageErrorCode']];
+                $errCode = (int)$msgData['MessageErrorCode'];
+                $desc    = !empty($msgData['MessageErrorDescription']) ? $msgData['MessageErrorDescription'] : self::describeErrorCode($errCode);
+                return ['success' => false, 'error' => $desc];
             }
             return ['success' => true, 'id' => $msgData['MessageId'] ?? uniqid()];
         }
@@ -227,7 +250,7 @@ class Onfon {
                         $sent[] = ['idx' => $idx, 'msg_id' => $item['MessageId'] ?? null];
                     } else {
                         $failed[]      = $idx;
-                        $reasons[$idx] = $item['MessageErrorDescription'] ?? "Onfon error $errCode";
+                        $reasons[$idx] = !empty($item['MessageErrorDescription']) ? $item['MessageErrorDescription'] : self::describeErrorCode((int)$errCode);
                     }
                 }
                 // Onfon returned fewer rows than we sent

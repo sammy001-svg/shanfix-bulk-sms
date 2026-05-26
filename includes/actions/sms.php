@@ -343,8 +343,9 @@ class SMS {
 
         $sent = $skipCount > 0 ? (int)$campaign['sent_count']   : 0;
         $failed = $skipCount > 0 ? (int)$campaign['failed_count'] : 0;
-        $totalUnits = 0.0;
-        $batch = [];
+        $totalUnits   = 0.0;
+        $batch        = [];
+        $invalidBatch = [];
 
         // Flush the current batch to Onfon and reset
         $batchNum = 0;
@@ -435,7 +436,16 @@ class SMS {
                 if ($csvRowCount < $skipCount) { $csvRowCount++; continue; } // resume: skip already-sent
                 $rawPhone = trim($row[$phoneIdx] ?? '');
                 $phone    = self::normalizePhone($rawPhone);
-                if (!$phone) { $failed++; $csvRowCount++; continue; }
+                if (!$phone) {
+                    $failed++;
+                    $invalidBatch[] = $rawPhone;
+                    $csvRowCount++;
+                    if (count($invalidBatch) >= 500) {
+                        self::logInvalidNumbers($userId, $senderId, $campaignId, $msgTemplate, $invalidBatch);
+                        $invalidBatch = [];
+                    }
+                    continue;
+                }
 
                 $msg = $msgTemplate;
                 foreach ($cleanHdr as $i => $hdr) {
@@ -482,7 +492,15 @@ class SMS {
                 );
                 foreach ($contacts as $c) {
                     $phone = self::normalizePhone($c['phone']);
-                    if (!$phone) { $failed++; continue; }
+                    if (!$phone) {
+                        $failed++;
+                        $invalidBatch[] = $c['phone'];
+                        if (count($invalidBatch) >= 500) {
+                            self::logInvalidNumbers($userId, $senderId, $campaignId, $msgTemplate, $invalidBatch);
+                            $invalidBatch = [];
+                        }
+                        continue;
+                    }
 
                     $msg = $msgTemplate;
                     if ($c['metadata']) {
@@ -512,13 +530,26 @@ class SMS {
             if ($skipCount > 0) $nums = array_slice($nums, $skipCount); // resume: skip already-sent
             foreach ($nums as $n) {
                 $phone = self::normalizePhone($n);
-                if (!$phone) { $failed++; continue; }
+                if (!$phone) {
+                    $failed++;
+                    $invalidBatch[] = $n;
+                    if (count($invalidBatch) >= 500) {
+                        self::logInvalidNumbers($userId, $senderId, $campaignId, $msgTemplate, $invalidBatch);
+                        $invalidBatch = [];
+                    }
+                    continue;
+                }
                 $batch[] = ['phone' => $phone, 'message' => $msgTemplate];
                 if (count($batch) >= self::BATCH_SIZE * self::CONCURRENCY) $flush();
             }
         }
 
         $flush(); // Dispatch any remaining recipients
+
+        if (!empty($invalidBatch)) {
+            self::logInvalidNumbers($userId, $senderId, $campaignId, $msgTemplate, $invalidBatch);
+            $invalidBatch = [];
+        }
 
         DB::execute(
             "UPDATE campaigns SET status = 'completed', total_count = ?, sent_count = ?, failed_count = ?,
@@ -729,6 +760,29 @@ BODY);
             "INSERT INTO messages
              (user_id, campaign_id, sender_id, recipient, message, units_charged, status, gateway_msg_id, sent_at, failed_reason)
              VALUES " . implode(',', $placeholders),
+            $params
+        );
+    }
+
+    /**
+     * Bulk-insert invalid phone numbers as failed messages (units_charged = 0).
+     * This ensures failed_count in campaigns matches rows in the messages table
+     * so the "View Failed" drawer shows every failure, not just gateway rejections.
+     */
+    private static function logInvalidNumbers(
+        int $userId, string $senderId, ?int $campaignId, string $msgTemplate, array $phones
+    ): void {
+        if (empty($phones)) return;
+        $reason       = 'Invalid or unrecognized phone number format';
+        $placeholders = implode(',', array_fill(0, count($phones), '(?,?,?,?,?,0,?,NULL,NULL,?)'));
+        $params       = [];
+        foreach ($phones as $p) {
+            array_push($params, $userId, $campaignId, $senderId, $p, $msgTemplate, 'failed', $reason);
+        }
+        DB::execute(
+            "INSERT INTO messages
+             (user_id, campaign_id, sender_id, recipient, message, units_charged, status, gateway_msg_id, sent_at, failed_reason)
+             VALUES $placeholders",
             $params
         );
     }
