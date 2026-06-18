@@ -109,7 +109,10 @@ if ($customRate) {
 
 <!-- Purchase History -->
 <div class="card" style="margin-bottom: 28px;">
-  <div class="card-header"><h3 class="card-title"><i class="fa-solid fa-receipt" style="color:var(--primary)"></i> Purchase History</h3></div>
+  <div class="card-header">
+    <h3 class="card-title"><i class="fa-solid fa-receipt" style="color:var(--primary)"></i> Recent Purchases</h3>
+    <a href="/client/purchase-history.php" class="btn btn-outline btn-sm">Full History →</a>
+  </div>
   <div class="table-wrapper">
     <table class="data-table">
       <thead><tr><th>Reference</th><th>Units</th><th>Amount</th><th>Method</th><th>Status</th><th>Date</th></tr></thead>

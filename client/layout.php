@@ -34,6 +34,7 @@ $navItems = [
   ['type'=>'section','label'=>'ACCOUNT'],
   ['icon'=>'<i class="fa-solid fa-id-badge"></i>',       'label'=>'Sender IDs',       'url'=>'/client/sender-ids.php'],
   ['icon'=>'<i class="fa-solid fa-cart-shopping"></i>',  'label'=>'Buy Units',         'url'=>'/client/purchases.php'],
+  ['icon'=>'<i class="fa-solid fa-receipt"></i>',        'label'=>'Purchase History',  'url'=>'/client/purchase-history.php'],
   ['icon'=>'<i class="fa-solid fa-chart-bar"></i>',      'label'=>'Reports',           'url'=>'/client/reports.php'],
   [
     'id'=>'ussd','icon'=>'<i class="fa-solid fa-hashtag"></i>','label'=>'USSD',
