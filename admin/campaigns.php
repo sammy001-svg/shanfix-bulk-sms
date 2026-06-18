@@ -49,11 +49,11 @@ if (($_GET['export'] ?? '') === '1') {
 // KPI summary
 $kpis = DB::queryOne(
     "SELECT COUNT(*) as total,
-            SUM(status IN ('queued','running','sending')) as active,
-            SUM(status='completed') as completed,
-            SUM(status='failed') as failed_count,
-            COALESCE(SUM(total_count),0) as recipients,
-            COALESCE(SUM(units_used),0) as units
+            SUM(c.status IN ('queued','running','sending')) as active,
+            SUM(c.status='completed') as completed,
+            SUM(c.status='failed') as failed_count,
+            COALESCE(SUM(c.total_count),0) as recipients,
+            COALESCE(SUM(c.units_used),0) as units
      FROM campaigns c JOIN users u ON c.user_id = u.id $where",
     $params
 );
