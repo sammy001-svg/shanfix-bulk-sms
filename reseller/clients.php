@@ -62,8 +62,17 @@ $totalPages = ceil($total/$perPage);
               <td style="font-size:12px"><?=date('d M Y',strtotime($u['created_at']))?></td>
               <td>
                 <div class="btn-group">
-                    <button class="btn btn-outline btn-sm" onclick="openAllocate(<?=$u['id']?>,'<?=htmlspecialchars($u['name'])?>',<?=$u['sms_units']?>)"><i class="fa-solid fa-coins"></i> Units</button>
-                    <button class="btn btn-secondary btn-sm" onclick="openEdit(<?=htmlspecialchars(json_encode($u), ENT_QUOTES, 'UTF-8')?>)"><i class="fa-solid fa-pen"></i> Rate</button>
+                    <a class="btn btn-outline btn-sm btn-icon" title="View Profile" href="/reseller/client-detail.php?id=<?=$u['id']?>"><i class="fa-solid fa-eye"></i></a>
+                    <button class="btn btn-outline btn-sm btn-icon" title="Transfer Units" onclick="openAllocate(<?=$u['id']?>,'<?=htmlspecialchars($u['name'])?>',<?=$u['sms_units']?>)"><i class="fa-solid fa-coins"></i></button>
+                    <button class="btn btn-secondary btn-sm btn-icon" title="Edit Rate" onclick="openEdit(<?=htmlspecialchars(json_encode($u), ENT_QUOTES, 'UTF-8')?>)"><i class="fa-solid fa-pen"></i></button>
+                    <form method="POST" action="/reseller/actions/toggle-client-status.php" style="display:inline"
+                          onsubmit="return confirm('<?=$u['status']==='active'?'Suspend':'Activate'?> <?=htmlspecialchars(addslashes($u['name']))?>?')">
+                      <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
+                      <input type="hidden" name="id" value="<?=$u['id']?>">
+                      <button type="submit" class="btn <?=$u['status']==='active'?'btn-danger':'btn-primary'?> btn-sm btn-icon" title="<?=$u['status']==='active'?'Suspend':'Activate'?>">
+                        <i class="fa-solid <?=$u['status']==='active'?'fa-ban':'fa-check'?>"></i>
+                      </button>
+                    </form>
                 </div>
               </td>
             </tr>

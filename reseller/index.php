@@ -12,6 +12,24 @@ $msgToday      = DB::queryOne("SELECT COUNT(*) as c FROM messages WHERE user_id=
 $units         = $user['sms_units'];
 $isNewUser     = $totalCampaigns == 0;
 
+// ── Client summary ─────────────────────────────────────────────
+$clientIds     = DB::query("SELECT id FROM users WHERE role='client' AND parent_id=?", [$uid]);
+$cidList       = array_column($clientIds, 'id');
+$clientMsgSent = 0; $clientUnits = 0; $clientCampaigns = 0; $recentClientCampaigns = [];
+$pendingClientPurchases = 0;
+if (!empty($cidList)) {
+    $in = implode(',', array_fill(0, count($cidList), '?'));
+    $clientMsgSent   = (int)(DB::queryOne("SELECT COUNT(*) as c FROM messages WHERE user_id IN ($in) AND status='sent'", $cidList)['c'] ?? 0);
+    $clientUnits     = (float)(DB::queryOne("SELECT COALESCE(SUM(sms_units),0) as u FROM users WHERE id IN ($in)", $cidList)['u'] ?? 0);
+    $clientCampaigns = (int)(DB::queryOne("SELECT COUNT(*) as c FROM campaigns WHERE user_id IN ($in)", $cidList)['c'] ?? 0);
+    $pendingClientPurchases = (int)(DB::queryOne("SELECT COUNT(*) as c FROM purchases WHERE user_id IN ($in) AND status='pending'", $cidList)['c'] ?? 0);
+    $recentClientCampaigns  = DB::query(
+        "SELECT c.*, u.name as client_name FROM campaigns c JOIN users u ON c.user_id=u.id
+         WHERE c.user_id IN ($in) ORDER BY c.created_at DESC LIMIT 6",
+        $cidList
+    );
+}
+
 // ── Chart ──────────────────────────────────────────────────────
 $chartData = DB::query("
   SELECT DATE(created_at) as day, COUNT(*) as total
@@ -127,6 +145,68 @@ $banners = get_dashboard_banners($uid);
     </div>
   </div>
 </div>
+
+<!-- Client Summary Section -->
+<?php if ($totalClients > 0): ?>
+<div style="margin-bottom:24px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <h3 style="font-size:15px;font-weight:700;margin:0"><i class="fa-solid fa-users" style="color:var(--primary);margin-right:8px"></i>Client Activity Summary</h3>
+    <a href="/reseller/clients.php" class="btn btn-outline btn-sm">View All Clients →</a>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
+    <div class="stat-card" style="margin:0">
+      <div class="stat-icon blue"><i class="fa-solid fa-users"></i></div>
+      <div class="stat-info"><div class="stat-label">Active Clients</div><div class="stat-value"><?= number_format($totalClients) ?></div></div>
+    </div>
+    <div class="stat-card" style="margin:0">
+      <div class="stat-icon green"><i class="fa-solid fa-coins"></i></div>
+      <div class="stat-info"><div class="stat-label">Client Units</div><div class="stat-value"><?= number_format($clientUnits, 0) ?></div></div>
+    </div>
+    <div class="stat-card" style="margin:0">
+      <div class="stat-icon orange"><i class="fa-solid fa-paper-plane"></i></div>
+      <div class="stat-info"><div class="stat-label">Client Msgs Sent</div><div class="stat-value"><?= number_format($clientMsgSent) ?></div></div>
+    </div>
+    <div class="stat-card" style="margin:0">
+      <div class="stat-icon <?= $pendingClientPurchases > 0 ? 'orange' : 'blue' ?>"><i class="fa-solid fa-receipt"></i></div>
+      <div class="stat-info">
+        <div class="stat-label">Pending Purchases</div>
+        <div class="stat-value"><?= number_format($pendingClientPurchases) ?></div>
+        <?php if ($pendingClientPurchases > 0): ?>
+          <div class="stat-trend" style="color:var(--warning)"><a href="/reseller/purchase-requests.php" style="color:inherit">Review →</a></div>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+
+  <?php if (!empty($recentClientCampaigns)): ?>
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-bullhorn" style="color:var(--primary)"></i> Recent Client Campaigns</h3>
+    </div>
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead><tr><th>Client</th><th>Campaign</th><th>Sender ID</th><th>Sent</th><th>Failed</th><th>Status</th><th>Date</th></tr></thead>
+        <tbody>
+          <?php foreach ($recentClientCampaigns as $cc):
+            $ccs = ['draft'=>'muted','scheduled'=>'warning','queued'=>'warning','sending'=>'info','running'=>'info','completed'=>'success','failed'=>'danger'][$cc['status']]??'muted';
+          ?>
+            <tr>
+              <td style="font-size:13px;font-weight:600"><a href="/reseller/client-detail.php?id=<?= $cc['user_id'] ?>" style="color:inherit"><?= htmlspecialchars($cc['client_name']) ?></a></td>
+              <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= htmlspecialchars($cc['name']) ?></td>
+              <td><code style="font-size:11px"><?= htmlspecialchars($cc['sender_id']) ?></code></td>
+              <td style="color:var(--success)"><?= number_format($cc['sent_count']) ?></td>
+              <td style="color:var(--danger)"><?= number_format($cc['failed_count']) ?></td>
+              <td><span class="badge badge-<?= $ccs ?>"><?= ucfirst($cc['status']) ?></span></td>
+              <td style="font-size:11px"><?= date('d M Y', strtotime($cc['created_at'])) ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <!-- Chart + Quick Send -->
 <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:24px;">

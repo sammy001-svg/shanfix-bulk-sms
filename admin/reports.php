@@ -9,7 +9,7 @@ $to     = sanitize($_GET['to']   ?? date('Y-m-d'));
 $userId = (int)($_GET['user_id'] ?? 0);
 
 $allowedPerPage = [10, 50, 100, 1000, 10000];
-$perPage = in_array((int)($_GET['per_page'] ?? 50), $allowedPerPage, true) ? (int)$_GET['per_page'] : 50;
+$perPage = in_array((int)($_GET['per_page'] ?? 50), $allowedPerPage, true) ? (int)($_GET['per_page'] ?? 50) : 50;
 
 $validStatuses = ['sent', 'delivered', 'failed', 'queued', 'undelivered'];
 $statusFilter  = in_array($_GET['status'] ?? '', $validStatuses, true) ? $_GET['status'] : '';
