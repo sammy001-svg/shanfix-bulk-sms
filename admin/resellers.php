@@ -66,6 +66,7 @@ $totalPages = ceil($total/$perPage);
               <td style="font-size:12px"><?= date('d M Y',strtotime($u['created_at'])) ?></td>
               <td>
                 <div class="btn-group">
+                  <a class="btn btn-outline btn-sm btn-icon" title="View Profile" href="/admin/user-detail.php?id=<?=$u['id']?>"><i class="fa-solid fa-eye"></i></a>
                   <?php if ($u['role'] === 'reseller'): ?>
                     <button class="btn btn-outline btn-sm btn-icon" title="White-Label Branding" onclick="openWhiteLabel(<?=$u['id']?>,'<?=htmlspecialchars($u['name'])?>')">
                       <i class="fa-solid fa-brush"></i>

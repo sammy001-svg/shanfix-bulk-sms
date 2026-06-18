@@ -57,6 +57,7 @@ $totalPages = ceil($total/$perPage);
               <td style="font-size:12px"><?=date('d M Y',strtotime($u['created_at']))?></td>
               <td>
                 <div class="btn-group">
+                  <a class="btn btn-outline btn-sm btn-icon" title="View Profile" href="/admin/user-detail.php?id=<?=$u['id']?>"><i class="fa-solid fa-eye"></i></a>
                   <button class="btn btn-outline btn-sm btn-icon" title="Allocate Units" onclick="openAllocate(<?=$u['id']?>,'<?=htmlspecialchars($u['name'])?>',<?=$u['sms_units']?>)"><i class="fa-solid fa-coins"></i></button>
                   <a class="btn btn-secondary btn-sm btn-icon" title="Edit User" href="/admin/edit-user.php?id=<?=$u['id']?>"><i class="fa-solid fa-pen"></i></a>
                   <form method="POST" action="/admin/actions/toggle-status.php" style="display:inline">

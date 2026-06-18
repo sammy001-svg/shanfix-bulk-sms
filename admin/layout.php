@@ -7,8 +7,9 @@ $breadcrumb = $breadcrumb ?? [];
 $user = current_user();
 
 // Fetch pending counts for badges
-$pendingSenderIds = DB::queryValue("SELECT COUNT(*) FROM sender_ids WHERE status = 'pending'");
+$pendingSenderIds    = DB::queryValue("SELECT COUNT(*) FROM sender_ids WHERE status = 'pending'");
 $pendingUssdRequests = DB::queryValue("SELECT COUNT(*) FROM ussd_codes WHERE status = 'pending'");
+$pendingPurchases    = DB::queryValue("SELECT COUNT(*) FROM purchases WHERE status = 'pending'");
 
 $navItems = [
   ['type'=>'section','label'=>'MAIN'],
@@ -28,6 +29,10 @@ $navItems = [
   ],
   ['icon'=>'<i class="fa-solid fa-coins"></i>',     'label'=>'Units',          'url'=>'/admin/units.php'],
   ['icon'=>'<i class="fa-solid fa-tags"></i>',      'label'=>'Pricing Plans',  'url'=>'/admin/pricing.php'],
+  ['icon'=>'<i class="fa-solid fa-bullhorn"></i>',  'label'=>'Campaigns',      'url'=>'/admin/campaigns.php'],
+  ['icon'=>'<i class="fa-solid fa-receipt"></i>',   'label'=>'Finances',       'url'=>'/admin/finances.php',
+   'badge'=> ($pendingPurchases ?? 0) > 0 ? ($pendingPurchases ?? 0) : null
+  ],
   ['type'=>'section','label'=>'REPORTS'],
   ['icon'=>'<i class="fa-solid fa-chart-line"></i>','label'=>'Analytics',      'url'=>'/admin/analytics.php'],
   ['icon'=>'<i class="fa-solid fa-file-lines"></i>','label'=>'Reports',        'url'=>'/admin/reports.php'],
