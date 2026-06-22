@@ -290,18 +290,27 @@ function dismiss_notification($userId, $notificationId) {
 }
 
 /**
- * Get persistent popup notifications for the dashboard.
- * Ignores the dismissed/read status to ensure they show on every refresh.
+ * Get undismissed popup notifications for a user.
+ * Returns at most 3, oldest first so they display in creation order.
  */
 function get_dashboard_popups($userId) {
-    return DB::query(
-        "SELECT * FROM notifications 
-         WHERE is_popup = 1 
-         AND (user_id = ? OR user_id IS NULL) 
-         AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-         ORDER BY created_at DESC",
-        [$userId]
-    ) ?: [];
+    try {
+        return DB::query(
+            "SELECT n.id, n.title, n.message, n.type, n.image_url
+             FROM notifications n
+             LEFT JOIN notification_interactions ni
+                ON n.id = ni.notification_id AND ni.user_id = ?
+             WHERE n.is_popup = 1
+               AND (n.user_id = ? OR n.user_id IS NULL)
+               AND n.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+               AND (ni.is_dismissed IS NULL OR ni.is_dismissed = 0)
+             ORDER BY n.created_at ASC
+             LIMIT 3",
+            [$userId, $userId]
+        ) ?: [];
+    } catch (Exception $e) {
+        return [];
+    }
 }
 
 /**

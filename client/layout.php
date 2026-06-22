@@ -5,6 +5,7 @@ require_role('client');
 $pageTitle = $pageTitle ?? 'Dashboard';
 $breadcrumb = $breadcrumb ?? [];
 $user = current_user();
+$_popupNotifs = get_dashboard_popups($user['id']);
 
 $navItems = [
   ['type'=>'section','label'=>'MAIN'],
@@ -218,6 +219,39 @@ $navItems = [
         }
     };
   </script>
+<?php if (!empty($_popupNotifs)): ?>
+<script>
+(function() {
+  var popups = <?= json_encode(array_values($_popupNotifs)) ?>;
+  var token  = <?= json_encode(csrf_token()) ?>;
+  var icons  = { info:'info', success:'success', warning:'warning', danger:'error' };
+  document.addEventListener('DOMContentLoaded', function() {
+    if (!popups.length || typeof Swal === 'undefined') return;
+    function showNext(i) {
+      if (i >= popups.length) return;
+      var p = popups[i];
+      var opts = {
+        title: p.title,
+        html: String(p.message).replace(/\n/g, '<br>'),
+        icon: icons[p.type] || 'info',
+        confirmButtonText: 'Got it',
+        confirmButtonColor: 'var(--primary)',
+        allowOutsideClick: false
+      };
+      if (p.image_url) { opts.imageUrl = p.image_url; opts.imageMaxHeight = 200; opts.imageAlt = p.title; }
+      Swal.fire(opts).then(function() {
+        var fd = new FormData();
+        fd.append('id', p.id);
+        fd.append('csrf_token', token);
+        fetch('/client/actions/dismiss-popup.php', { method:'POST', body:fd }).catch(function(){});
+        showNext(i + 1);
+      });
+    }
+    showNext(0);
+  });
+})();
+</script>
+<?php endif; ?>
 </head>
 <body>
 <div id="page-loader"></div>

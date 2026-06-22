@@ -3,15 +3,17 @@ $pageTitle = 'USSD Code Requests';
 $breadcrumb = [['label'=>'Admin'],['label'=>'USSD Requests']];
 require_once __DIR__ . '/layout.php';
 
-$filter = sanitize($_GET['status'] ?? '');
-$where  = $filter ? "WHERE uc.status = '$filter'" : '';
+$validStatuses = ['pending', 'approved', 'rejected'];
+$filter = in_array($_GET['status'] ?? '', $validStatuses, true) ? $_GET['status'] : '';
+$where  = $filter ? "WHERE uc.status = ?" : '';
+$params = $filter ? [$filter] : [];
 $ussdRequests = DB::query("
-    SELECT uc.*, u.name as user_name, u.email as user_email, u.role as user_role 
-    FROM ussd_codes uc 
-    JOIN users u ON uc.user_id = u.id 
-    $where 
+    SELECT uc.*, u.name as user_name, u.email as user_email, u.role as user_role
+    FROM ussd_codes uc
+    JOIN users u ON uc.user_id = u.id
+    $where
     ORDER BY uc.created_at DESC
-");
+", $params);
 ?>
 
 <div class="page-header">
