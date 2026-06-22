@@ -6,10 +6,20 @@ $pageTitle = $pageTitle ?? 'Dashboard';
 $breadcrumb = $breadcrumb ?? [];
 $user = current_user();
 
-// Fetch pending counts for badges
-$pendingSenderIds    = DB::queryValue("SELECT COUNT(*) FROM sender_ids WHERE status = 'pending'");
-$pendingUssdRequests = DB::queryValue("SELECT COUNT(*) FROM ussd_codes WHERE status = 'pending'");
-$pendingPurchases    = DB::queryValue("SELECT COUNT(*) FROM purchases WHERE status = 'pending'");
+// Fetch pending counts for badges — cached in session for 5 minutes to avoid
+// hitting the DB on every admin page load.
+$_now = time();
+if (!isset($_SESSION['_admin_badge_ts']) || ($_now - $_SESSION['_admin_badge_ts']) > 300) {
+    $_SESSION['_admin_badge'] = [
+        'sender_ids'    => (int)DB::queryValue("SELECT COUNT(*) FROM sender_ids WHERE status = 'pending'"),
+        'ussd_requests' => (int)DB::queryValue("SELECT COUNT(*) FROM ussd_codes WHERE status = 'pending'"),
+        'purchases'     => (int)DB::queryValue("SELECT COUNT(*) FROM purchases WHERE status = 'pending'"),
+    ];
+    $_SESSION['_admin_badge_ts'] = $_now;
+}
+$pendingSenderIds    = $_SESSION['_admin_badge']['sender_ids'];
+$pendingUssdRequests = $_SESSION['_admin_badge']['ussd_requests'];
+$pendingPurchases    = $_SESSION['_admin_badge']['purchases'];
 
 $navItems = [
   ['type'=>'section','label'=>'MAIN'],
@@ -70,8 +80,19 @@ $navItems = [
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($pageTitle) ?> — BulkSMS Admin</title>
+  <!-- DNS prefetch & preconnect for external resources -->
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Google Fonts — non-blocking (replaced CSS @import) -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="/assets/css/style.css?v=1.1">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <!-- Font Awesome — preload hint so the browser starts the download early -->
+  <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"></noscript>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script>
     (function() {

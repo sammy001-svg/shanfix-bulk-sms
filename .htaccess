@@ -4,6 +4,17 @@
 Options -Indexes
 Options -MultiViews
 
+# ── Gzip / Deflate compression ──────────────────────────────────
+# Reduces HTML, CSS, JS and JSON transfer sizes by 60-70%
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/css
+  AddOutputFilterByType DEFLATE application/javascript text/javascript
+  AddOutputFilterByType DEFLATE application/json application/xml text/xml
+  AddOutputFilterByType DEFLATE image/svg+xml font/opentype font/woff font/woff2
+  # Tell caches that the response varies by Accept-Encoding
+  Header append Vary Accept-Encoding
+</IfModule>
+
 RewriteEngine On
 
 # ── Force www (optional — uncomment if needed) ──
@@ -36,9 +47,9 @@ Header always set X-Content-Type-Options "nosniff"
 Header always set X-Frame-Options "SAMEORIGIN"
 Header always set Referrer-Policy "strict-origin-when-cross-origin"
 
-# ── Cache static assets ──
-<FilesMatch "\.(css|js|png|jpg|svg|ico|woff2)$">
-  Header set Cache-Control "public, max-age=2592000"
+# ── Cache static assets (30 days) ──────────────────────────────
+<FilesMatch "\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|pdf|webp)$">
+  Header set Cache-Control "public, max-age=2592000, immutable"
 </FilesMatch>
 
 # ── Block access to .htaccess itself ──

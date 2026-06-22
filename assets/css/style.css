@@ -2,7 +2,7 @@
    BULK SMS PRO — Global Design System
    ============================================================ */
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
+/* Google Fonts loaded via <link> in layout <head> to avoid @import render-blocking */
 
 /* ─── CSS Custom Properties ──────────────────────────────── */
 :root {

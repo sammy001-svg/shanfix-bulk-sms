@@ -73,9 +73,21 @@ $navItems = [
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($pageTitle) ?> — <?= htmlspecialchars(Branding::get('system_name')) ?></title>
   <meta name="view-transition" content="same-origin">
+  <!-- DNS prefetch & preconnect for external resources -->
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Google Fonts — non-blocking (replaced CSS @import) -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="/assets/css/style.css?v=1.1">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <!-- Font Awesome — preload so the browser starts the download early -->
+  <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"></noscript>
+  <!-- SweetAlert2 deferred — only called in user-triggered handlers, never at parse time -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
   <?php Branding::renderStyles(); ?>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script>
@@ -90,9 +102,14 @@ $navItems = [
     if (($user['custom_unit_price'] ?? 0) > 0) {
         $effectiveSmsRate = (float)$user['custom_unit_price'];
     } elseif (!empty($user['parent_id'])) {
-        $rs = DB::queryOne("SELECT unit_price FROM reseller_settings WHERE reseller_id = ?", [$user['parent_id']]);
-        if ($rs && ($rs['unit_price'] ?? 0) > 0) {
-            $effectiveSmsRate = (float)$rs['unit_price'];
+        // Cache reseller unit price in session — it rarely changes between page loads
+        $cacheKey = '_rs_rate_' . $user['parent_id'];
+        if (!isset($_SESSION[$cacheKey])) {
+            $rs = DB::queryOne("SELECT unit_price FROM reseller_settings WHERE reseller_id = ?", [$user['parent_id']]);
+            $_SESSION[$cacheKey] = ($rs && ($rs['unit_price'] ?? 0) > 0) ? (float)$rs['unit_price'] : 0;
+        }
+        if ($_SESSION[$cacheKey] > 0) {
+            $effectiveSmsRate = $_SESSION[$cacheKey];
         }
     }
     ?>

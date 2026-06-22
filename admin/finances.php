@@ -47,16 +47,21 @@ if (($_GET['export'] ?? '') === '1') {
     exit;
 }
 
-// KPIs (all-time for summary cards, date range for the table)
-$allTime = DB::queryOne(
-    "SELECT COALESCE(SUM(CASE WHEN status='completed' THEN amount ELSE 0 END),0) as revenue,
-            SUM(status='completed') as completed,
-            SUM(status='pending')   as pending,
-            SUM(status='failed')    as failed,
-            SUM(status='refunded')  as refunded,
-            COALESCE(SUM(CASE WHEN status='completed' AND MONTH(created_at)=MONTH(NOW()) AND YEAR(created_at)=YEAR(NOW()) THEN amount ELSE 0 END),0) as this_month
-     FROM purchases"
-);
+// KPIs (all-time summary) — cached 1 hour; this is a full-table aggregate
+// that changes slowly and is too expensive to recompute on every page load.
+if (!isset($_SESSION['_fin_alltime_ts']) || (time() - $_SESSION['_fin_alltime_ts']) > 3600) {
+    $_SESSION['_fin_alltime'] = DB::queryOne(
+        "SELECT COALESCE(SUM(CASE WHEN status='completed' THEN amount ELSE 0 END),0) as revenue,
+                SUM(status='completed') as completed,
+                SUM(status='pending')   as pending,
+                SUM(status='failed')    as failed,
+                SUM(status='refunded')  as refunded,
+                COALESCE(SUM(CASE WHEN status='completed' AND MONTH(created_at)=MONTH(NOW()) AND YEAR(created_at)=YEAR(NOW()) THEN amount ELSE 0 END),0) as this_month
+         FROM purchases"
+    );
+    $_SESSION['_fin_alltime_ts'] = time();
+}
+$allTime = $_SESSION['_fin_alltime'];
 
 $pendingList = DB::query(
     "SELECT p.*, u.name as user_name, u.email as user_email, u.role as user_role,

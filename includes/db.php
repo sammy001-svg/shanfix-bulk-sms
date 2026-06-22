@@ -114,13 +114,20 @@ class DB {
 }
 
 /**
- * Global Helper: Get system setting by key
+ * Global Helper: Get system setting by key.
+ * All settings are loaded in one SELECT on the first call and cached
+ * in a static array for the lifetime of the request, so subsequent
+ * calls are pure PHP array lookups with no DB round-trip.
  */
 function get_setting($key, $default = null) {
-    try {
-        $row = DB::queryOne("SELECT value FROM system_settings WHERE `key` = ?", [$key]);
-        return $row ? $row['value'] : $default;
-    } catch (Exception $e) {
-        return $default;
+    static $cache = null;
+    if ($cache === null) {
+        try {
+            $rows  = DB::query("SELECT `key`, `value` FROM system_settings");
+            $cache = array_column($rows, 'value', 'key');
+        } catch (Exception $e) {
+            $cache = [];
+        }
     }
+    return $cache[$key] ?? $default;
 }

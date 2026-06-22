@@ -189,15 +189,6 @@ $totalPages = ceil($total/$perPage);
           <input type="number" name="units" class="form-control" min="1" step="0.01" required>
         </div>
 
-        <div class="form-group" id="methodGroup">
-          <label class="form-label">Method</label>
-          <select name="method" class="form-control">
-            <option value="admin_credit">Admin Credit (Free)</option>
-            <option value="mpesa">M-Pesa</option>
-            <option value="bank">Bank Transfer</option>
-          </select>
-        </div>
-
         <div class="form-group">
           <label class="form-label">Reason / Note <span class="required">*</span></label>
           <input type="text" name="note" class="form-control" placeholder="e.g. Correction of billing error" required>
@@ -259,19 +250,13 @@ function openAllocate(id, name, units) {
 
 function toggleAction(val) {
     const label = document.getElementById('unitsLabel');
-    const method = document.getElementById('methodGroup');
-    const btn = document.getElementById('allocSubmitBtn');
-    
+    const btn   = document.getElementById('allocSubmitBtn');
     if (val === 'remove') {
         label.textContent = 'Units to Remove *';
-        method.style.display = 'none';
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-danger');
+        btn.classList.replace('btn-primary', 'btn-danger');
     } else {
         label.textContent = 'Units to Add *';
-        method.style.display = 'block';
-        btn.classList.remove('btn-danger');
-        btn.classList.add('btn-primary');
+        btn.classList.replace('btn-danger', 'btn-primary');
     }
 }
 </script>

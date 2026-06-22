@@ -92,19 +92,28 @@ function auth_logout() {
 }
 
 function auth_user() {
+    static $cachedUser  = null;
+    static $resolved    = false;
+
+    if ($resolved) {
+        return $cachedUser;
+    }
+    $resolved = true;
+
     // Check session timeout
     if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > SESSION_TIMEOUT)) {
         auth_logout();
     }
     if (isset($_SESSION['user']['id'])) {
         $_SESSION['last_activity'] = time();
-        
-        // Refresh user data from DB to ensure units and status are always up-to-date
+
+        // Refresh user data from DB once per request to keep units/status current
         $user = DB::queryOne("SELECT * FROM users WHERE id = ? LIMIT 1", [$_SESSION['user']['id']]);
         if ($user) {
             unset($user['password_hash']);
             $_SESSION['user'] = $user;
             $_SESSION['user_id'] = $user['id'];
+            $cachedUser = $user;
             return $user;
         } else {
             auth_logout();
@@ -246,12 +255,13 @@ function notify($userId, $title, $message, $type = 'info', $isPopup = false, $im
 function get_unread_notifications($userId) {
     // 1. Get personal notifications not in interactions (or marked not read)
     // 2. Get broadcast (user_id IS NULL) notifications not in interactions (or marked not read)
-    $sql = "SELECT n.* FROM notifications n 
+    $sql = "SELECT n.* FROM notifications n
             LEFT JOIN notification_interactions ni ON n.id = ni.notification_id AND ni.user_id = ?
             WHERE (n.user_id = ? OR n.user_id IS NULL)
             AND (ni.is_read IS NULL OR ni.is_read = 0)
             AND (ni.is_dismissed IS NULL OR ni.is_dismissed = 0)
-            ORDER BY n.created_at DESC";
+            ORDER BY n.created_at DESC
+            LIMIT 20";
     return DB::query($sql, [$userId, $userId]) ?: [];
 }
 

@@ -3,20 +3,34 @@ $pageTitle = 'WhatsApp Service Overview';
 $breadcrumb = [['label'=>'WhatsApp'],['label'=>'Management']];
 require_once __DIR__ . '/layout.php';
 
-// Global Stats
-$totalAccounts = DB::queryValue("SELECT COUNT(*) FROM whatsapp_accounts");
-$activeAccounts = DB::queryValue("SELECT COUNT(*) FROM whatsapp_accounts WHERE status = 'active'");
-$totalMessages = DB::queryValue("SELECT COUNT(*) FROM whatsapp_messages");
-$totalRevenue = DB::queryValue("SELECT SUM(amount) FROM ussd_transactions WHERE description LIKE '%WhatsApp%' AND status = 'completed'"); // Assuming we use transactions for topups
+// Global Stats — wrapped in try/catch so the page doesn't crash if a table
+// hasn't been created yet on this installation.
+try {
+    $totalAccounts  = (int)DB::queryValue("SELECT COUNT(*) FROM whatsapp_accounts");
+    $activeAccounts = (int)DB::queryValue("SELECT COUNT(*) FROM whatsapp_accounts WHERE status = 'active'");
+} catch (Exception $e) { $totalAccounts = $activeAccounts = 0; }
+
+try {
+    $totalMessages = (int)DB::queryValue("SELECT COUNT(*) FROM whatsapp_messages");
+} catch (Exception $e) { $totalMessages = 0; }
+
+// Revenue: sum of completed WhatsApp purchases (not USSD transactions)
+try {
+    $totalRevenue = (float)DB::queryValue(
+        "SELECT COALESCE(SUM(amount), 0) FROM purchases WHERE type = 'whatsapp' AND status = 'completed'"
+    );
+} catch (Exception $e) { $totalRevenue = 0; }
 
 // Recent Global Activity
-$recentAccounts = DB::query("
-    SELECT a.*, u.email, u.name as user_name 
-    FROM whatsapp_accounts a
-    JOIN users u ON a.user_id = u.id
-    ORDER BY a.created_at DESC 
-    LIMIT 10
-");
+try {
+    $recentAccounts = DB::query("
+        SELECT a.*, u.email, u.name as user_name
+        FROM whatsapp_accounts a
+        JOIN users u ON a.user_id = u.id
+        ORDER BY a.created_at DESC
+        LIMIT 10
+    ");
+} catch (Exception $e) { $recentAccounts = []; }
 ?>
 
 <div class="page-header">
@@ -79,7 +93,9 @@ $recentAccounts = DB::query("
                                 </span>
                             </td>
                             <td style="text-align:right">
-                                <button class="btn btn-sm btn-outline-primary">Manage</button>
+                                <a href="/admin/user-detail.php?id=<?= $a['user_id'] ?>" class="btn btn-sm btn-outline-primary">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Manage
+                                </a>
                             </td>
                         </tr>
                     <?php endforeach; ?>

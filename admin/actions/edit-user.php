@@ -34,8 +34,8 @@ if (!$id || !$name || !$email) {
     redirect(safe_referer('/admin/resellers.php'));
 }
 
-// Whitelist role and status — prevents privilege escalation via crafted POST
-if (!in_array($role, ['admin', 'reseller', 'client'], true)) {
+// Whitelist role and status — admin role cannot be assigned via this handler
+if (!in_array($role, ['reseller', 'client'], true)) {
     $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid role.'];
     redirect(safe_referer('/admin/resellers.php'));
 }
