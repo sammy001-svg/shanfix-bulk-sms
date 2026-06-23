@@ -91,7 +91,7 @@ async function viewSession(sessionId) {
     openModal('sessionModal');
 
     try {
-        const response = await fetch(`/reseller/actions/get-session-requests.php?session_id=${sessionId}`);
+        const response = await fetch(`/client/actions/get-session-requests.php?session_id=${sessionId}`);
         const html = await response.text();
         timeline.innerHTML = html;
     } catch (e) {

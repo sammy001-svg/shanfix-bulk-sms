@@ -10,7 +10,7 @@ $senderIds= DB::query("SELECT * FROM sender_ids WHERE user_id=? ORDER BY created
 <div class="page-header">
   <div>
     <h1>Sender IDs</h1>
-    <div class="subtitle">Your approved sender identifiers. <a href="/actions/download-sender-id-template.php" style="color:var(--primary); font-weight:600; text-decoration:underline"><i class="fa-solid fa-file-arrow-down"></i> Download Application Template</a></div>
+    <div class="subtitle">Your approved sender identifiers. <a href="/client/actions/download-sender-id-template.php" style="color:var(--primary); font-weight:600; text-decoration:underline"><i class="fa-solid fa-file-arrow-down"></i> Download Application Template</a></div>
   </div>
   <button class="btn btn-primary" onclick="openModal('requestModal')"><i class="fa-solid fa-plus"></i> Request Sender ID</button>
 </div>
