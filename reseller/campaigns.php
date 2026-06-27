@@ -39,6 +39,16 @@ if ($detailId) {
         [$detailId, $uid]
     );
 }
+
+// Draft campaign edit
+$editDraftCampaign = null;
+$editDraftId = (int)($_GET['edit'] ?? 0);
+if ($editDraftId) {
+    $editDraftCampaign = DB::queryOne(
+        "SELECT * FROM campaigns WHERE id = ? AND user_id = ? AND status = 'draft'",
+        [$editDraftId, $uid]
+    );
+}
 ?>
 
 <div class="page-header">
@@ -271,20 +281,21 @@ $ddlv = $dc['total_count'] > 0 ? round($dc['sent_count'] / max($dc['total_count'
 <div class="modal-overlay" id="campaignModal">
   <div class="modal" style="max-width:620px">
     <div class="modal-header">
-      <h3 class="modal-title"><i class="fa-solid fa-bullhorn" style="color:var(--primary)"></i> Create New Campaign</h3>
+      <h3 class="modal-title" id="rCampaignModalTitle"><i class="fa-solid fa-bullhorn" style="color:var(--primary)"></i> Create New Campaign</h3>
       <button class="modal-close" onclick="closeModal('campaignModal')">×</button>
     </div>
     <form method="POST" action="/reseller/actions/create-campaign.php" enctype="multipart/form-data">
       <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+      <input type="hidden" name="id" id="rCampaignId" value="">
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label">Campaign Name <span class="required">*</span></label>
-          <input type="text" name="name" class="form-control" placeholder="e.g. July Promo" required>
+          <input type="text" name="name" id="rCampaignName" class="form-control" placeholder="e.g. July Promo" required>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Sender ID <span class="required">*</span></label>
-            <select name="sender_id" class="form-control" required>
+            <select name="sender_id" id="rCampaignSenderId" class="form-control" required>
               <option value="">-- Select --</option>
               <?php foreach ($senderIds as $s): ?>
                 <option value="<?= htmlspecialchars($s['sender_id']) ?>"><?= htmlspecialchars($s['sender_id']) ?></option>
@@ -296,7 +307,7 @@ $ddlv = $dc['total_count'] > 0 ? round($dc['sent_count'] / max($dc['total_count'
           </div>
           <div class="form-group">
             <label class="form-label">Schedule (optional)</label>
-            <input type="datetime-local" name="scheduled_at" class="form-control">
+            <input type="datetime-local" name="scheduled_at" id="rCampaignScheduledAt" class="form-control">
             <div class="form-hint">Leave blank to send immediately after saving</div>
           </div>
         </div>
@@ -308,7 +319,7 @@ $ddlv = $dc['total_count'] > 0 ? round($dc['sent_count'] / max($dc['total_count'
             <button type="button" class="tab-btn" onclick="switchTab(this,'tab-upload')">Upload CSV</button>
           </div>
           <div class="tab-panel active" id="tab-group">
-            <select name="group_id" class="form-control">
+            <select name="group_id" id="rCampaignGroupId" class="form-control">
               <option value="">-- Select Group --</option>
               <?php foreach ($groups as $g): ?>
                 <option value="<?= $g['id'] ?>"><?= htmlspecialchars($g['name']) ?></option>
@@ -316,7 +327,7 @@ $ddlv = $dc['total_count'] > 0 ? round($dc['sent_count'] / max($dc['total_count'
             </select>
           </div>
           <div class="tab-panel" id="tab-numbers">
-            <textarea name="numbers" class="form-control" placeholder="Enter phone numbers separated by commas or new lines&#10;+254712345678, +254798765432" rows="4"></textarea>
+            <textarea name="numbers" id="rCampaignNumbers" class="form-control" placeholder="Enter phone numbers separated by commas or new lines&#10;+254712345678, +254798765432" rows="4"></textarea>
           </div>
           <div class="tab-panel" id="tab-upload">
             <div class="upload-zone" id="uploadZone" onclick="document.getElementById('csvFile').click()">
@@ -344,6 +355,9 @@ $ddlv = $dc['total_count'] > 0 ? round($dc['sent_count'] / max($dc['total_count'
 
 <?php
 $openModalJs = !empty($_GET['new']) ? "openModal('campaignModal');" : "";
+if ($editDraftCampaign) {
+    $openModalJs = 'editDraftCampaign(' . json_encode($editDraftCampaign) . ');';
+}
 $extraScript = <<<JS
 <script>
 (function() {
@@ -357,6 +371,31 @@ $extraScript = <<<JS
       document.getElementById('cmpCost').textContent = s;
     });
   }
+
+  function editDraftCampaign(c) {
+    document.getElementById('rCampaignModalTitle').innerHTML = '<i class="fa-solid fa-pen" style="color:var(--primary)"></i> Edit Draft Campaign';
+    document.getElementById('rCampaignId').value          = c.id;
+    document.getElementById('rCampaignName').value        = c.name;
+    document.getElementById('rCampaignSenderId').value    = c.sender_id;
+    document.getElementById('rCampaignScheduledAt').value = c.scheduled_at ? c.scheduled_at.replace(' ','T').substring(0,16) : '';
+    document.getElementById('campMsg').value              = c.message || '';
+    if (c.group_id) {
+      document.getElementById('rCampaignGroupId').value = c.group_id;
+      // switch to group tab
+      document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+      document.getElementById('tab-group').classList.add('active');
+    } else if (c.recipients) {
+      document.getElementById('rCampaignNumbers').value = c.recipients.replace(/,/g,'\\n');
+      document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+      document.getElementById('tab-numbers').classList.add('active');
+    }
+    const charEvt = campMsg && new Event('input');
+    if (charEvt) campMsg.dispatchEvent(charEvt);
+    openModal('campaignModal');
+  }
+
+  window.editDraftCampaign = editDraftCampaign;
+
   $openModalJs
 })();
 </script>

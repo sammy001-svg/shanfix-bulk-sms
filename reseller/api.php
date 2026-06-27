@@ -226,6 +226,29 @@ curl -X GET "<?= SITE_URL ?>/api/v1/status.php?message_id=MESSAGE_ID" \
 </pre>
                 </div>
 
+                <hr style="border:none; border-top:1px solid var(--border); margin:40px 0">
+
+                <!-- Message List Section -->
+                <div class="api-section">
+                    <h4 style="margin-bottom:15px; display:flex; align-items:center; gap:10px">
+                        <span style="background:#3b82f6; color:#fff; font-size:11px; padding:2px 8px; border-radius:4px; font-weight:800">GET</span>
+                        List Messages
+                        <code style="background:var(--bg-muted); padding:5px 10px; border-radius:4px; color:var(--primary); font-size:12px; margin-left:auto"><?= SITE_URL ?>/api/v1/messages.php</code>
+                    </h4>
+                    <p style="font-size:13px; color:var(--text-secondary); margin-bottom:15px">Paginated list of your sent messages. Supports filtering by status and date range.</p>
+                    <pre style="background:#0f172a; color:#f8fafc; padding:20px; border-radius:12px; font-size:13px; line-height:1.6; overflow-x:auto">
+curl -X GET "<?= SITE_URL ?>/api/v1/messages.php?status=delivered&from=2026-01-01&per_page=50" \
+  -H "X-Client-ID: <?= htmlspecialchars($u['api_client_id']) ?>" \
+  -H "X-API-Key: <?= htmlspecialchars($u['api_key']) ?>"
+</pre>
+                    <p style="font-size:12px; color:var(--text-secondary); margin-top:10px">
+                        Optional filters: <code>status</code> (queued/sent/delivered/failed) &nbsp;·&nbsp;
+                        <code>from</code> / <code>to</code> (YYYY-MM-DD) &nbsp;·&nbsp;
+                        <code>campaign_id</code> &nbsp;·&nbsp;
+                        <code>page</code> &nbsp;·&nbsp;
+                        <code>per_page</code> (max 100, default 50)
+                    </p>
+                </div>
 
                 <div style="margin-top:40px">
                     <h4 style="margin-bottom:20px">Parameter Reference</h4>

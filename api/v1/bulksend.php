@@ -76,6 +76,12 @@ if (empty($message)) {
     echo json_encode(['success' => false, 'error' => 'Missing required field: message']);
     exit;
 }
+
+if (mb_strlen($message) > 918) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Message exceeds 918 characters (max 6 SMS segments).']);
+    exit;
+}
 if ($toRaw === null) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Missing required field: to']);

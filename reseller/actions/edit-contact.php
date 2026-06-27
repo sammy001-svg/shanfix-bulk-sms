@@ -1,18 +1,15 @@
 <?php
-/**
- * Client Action: Edit Contact - Shanfix Technology
- */
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/db.php';
-require_role('client');
+require_role('reseller');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    redirect('/client/contacts.php');
+    redirect('/reseller/contacts.php');
 }
 
 if (!csrf_verify()) {
     flash_set('danger', 'Security token mismatch. Please try again.');
-    redirect(safe_referer('/client/contacts.php'));
+    redirect(safe_referer('/reseller/contacts.php'));
 }
 
 $user    = current_user();
@@ -24,7 +21,7 @@ $groupId = !empty($_POST['group_id']) ? (int)$_POST['group_id'] : null;
 
 if (!$id || !$phone) {
     flash_set('danger', 'Phone number is required.');
-    redirect(safe_referer('/client/contacts.php'));
+    redirect(safe_referer('/reseller/contacts.php'));
 }
 
 $affected = DB::execute(
@@ -33,4 +30,4 @@ $affected = DB::execute(
 );
 
 flash_set($affected ? 'success' : 'danger', $affected ? 'Contact updated.' : 'Contact not found.');
-redirect('/client/contacts.php');
+redirect('/reseller/contacts.php');

@@ -27,8 +27,8 @@ if (!$name || !$email || !$password) {
     redirect(safe_referer('/admin/clients.php'));
 }
 
-// Whitelist role — prevents privilege escalation via crafted POST
-if (!in_array($role, ['admin', 'reseller', 'client'], true)) {
+// Whitelist role — admin accounts may only be created directly in the DB
+if (!in_array($role, ['reseller', 'client'], true)) {
     $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid role selected.'];
     redirect(safe_referer('/admin/clients.php'));
 }

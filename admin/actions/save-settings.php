@@ -25,6 +25,7 @@ const ALLOWED_SETTING_KEYS = [
     'sms_api_key', 'sms_api_secret', 'sms_shortcode',
     // Payments
     'payhero_api_username', 'payhero_api_password', 'payhero_channel_id', 'payhero_webhook_token',
+    'dlr_webhook_token',
     'kk_client_id', 'kk_client_secret', 'kk_till_number', 'kk_base_url', 'kk_webhook_secret',
     // Pricing
     'unit_price',
@@ -60,13 +61,16 @@ foreach ($_POST as $key => $value) {
 
     $value = sanitize($value);
 
-    $res = DB::execute(
-        "INSERT INTO system_settings (`key`, `value`) VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
-        [$key, $value]
-    );
-
-    if ($res === false) $errors++;
+    try {
+        DB::execute(
+            "INSERT INTO system_settings (`key`, `value`) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
+            [$key, $value]
+        );
+    } catch (Exception $e) {
+        error_log('save-settings: failed to save ' . $key . ': ' . $e->getMessage());
+        $errors++;
+    }
 }
 
 $_SESSION['flash'] = $errors === 0

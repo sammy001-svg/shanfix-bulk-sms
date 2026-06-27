@@ -41,6 +41,18 @@ if (!password_verify($current, $user['password_hash'])) {
     redirect('/client/profile.php');
 }
 
+// Validate new password BEFORE touching the DB
+if ($newPass !== '') {
+    if (strlen($newPass) < 8) {
+        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'New password must be at least 8 characters.'];
+        redirect('/client/profile.php');
+    }
+    if ($newPass !== $confirm) {
+        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'New passwords do not match.'];
+        redirect('/client/profile.php');
+    }
+}
+
 // Email uniqueness check
 $existing = DB::queryOne("SELECT id FROM users WHERE email = ? AND id != ?", [strtolower($email), $uid]);
 if ($existing) {
@@ -54,16 +66,12 @@ DB::execute(
 );
 
 if ($newPass !== '') {
-    if (strlen($newPass) < 8) {
-        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'New password must be at least 8 characters.'];
-        redirect('/client/profile.php');
-    }
-    if ($newPass !== $confirm) {
-        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'New passwords do not match.'];
-        redirect('/client/profile.php');
-    }
     DB::execute("UPDATE users SET password_hash = ? WHERE id = ?", [password_hash($newPass, PASSWORD_BCRYPT), $uid]);
 }
 
-$_SESSION['flash'] = ['type' => 'success', 'message' => 'Profile updated successfully!'];
+// Refresh session so displayed name/email updates immediately without re-login
+$_SESSION['user'] = DB::queryOne("SELECT * FROM users WHERE id = ?", [$uid]);
+unset($_SESSION['user']['password_hash']);
+
+flash_set('success', 'Profile updated successfully!');
 redirect('/client/profile.php');

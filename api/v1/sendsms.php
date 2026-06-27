@@ -66,6 +66,12 @@ if (!$toRaw || !$message) {
     exit;
 }
 
+if (mb_strlen($message) > 918) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Message exceeds 918 characters (max 6 SMS segments).']);
+    exit;
+}
+
 // Normalize phone number (handles 07XX, +254XX, 254XX formats)
 $to = SMS::normalizePhone($toRaw);
 if ($to === null) {
