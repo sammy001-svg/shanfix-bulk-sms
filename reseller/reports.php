@@ -60,8 +60,8 @@ $rangeStart = $total > 0 ? $offset + 1 : 0;
 $rangeEnd   = min($offset + $perPage, $total);
 
 $defaults = ['from' => date('Y-m-01'), 'to' => date('Y-m-d'), 'status' => '', 'per_page' => 50];
-$changed  = ($from !== $defaults['from'] || $to !== $defaults['to']
-          || $statusFilter !== $defaults['status'] || $perPage !== $defaults['per_page']);
+$changed  = $from !== $defaults['from'] || $to !== $defaults['to']
+          || $statusFilter !== $defaults['status'] || $perPage !== $defaults['per_page'];
 
 function resellerRptQs(array $overrides = []): string {
     global $from, $to, $statusFilter, $perPage;
@@ -71,9 +71,19 @@ function resellerRptQs(array $overrides = []): string {
     return http_build_query(array_filter(array_merge($base, $overrides), fn($v) => $v !== null && $v !== ''));
 }
 ?>
+<?php
+$csvQs = http_build_query(array_filter([
+    'from'   => $from,
+    'to'     => $to,
+    'status' => $statusFilter ?: null,
+]));
+?>
 <div class="page-header">
   <div><h1>Reports</h1><div class="subtitle">Your message delivery reports</div></div>
-  <button onclick="downloadPDF(event)" class="btn btn-secondary"><i class="fa-solid fa-file-pdf"></i> Download PDF</button>
+  <div class="btn-group">
+    <a href="/reseller/actions/download-report.php?<?= $csvQs ?>" class="btn btn-secondary"><i class="fa-solid fa-file-csv"></i> Export CSV</a>
+    <button onclick="downloadPDF(event)" class="btn btn-secondary"><i class="fa-solid fa-file-pdf"></i> Download PDF</button>
+  </div>
 </div>
 <div id="report-content">
 

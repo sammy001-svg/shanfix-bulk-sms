@@ -7,8 +7,7 @@ $pageTitle = 'Account Settings';
 $breadcrumb = [['label'=>'Reseller'],['label'=>'Settings']];
 require_once __DIR__ . '/layout.php';
 
-// Fetch current user data
-$user = DB::queryOne("SELECT * FROM users WHERE id = ?", [$_SESSION['user_id']]);
+// $user is already set by layout.php via current_user()
 
 $activeTab = sanitize($_GET['tab'] ?? 'profile');
 ?>

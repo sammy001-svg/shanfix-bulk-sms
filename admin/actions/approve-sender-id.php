@@ -25,7 +25,7 @@ if (!$id || !in_array($action, ['approve', 'reject'], true)) {
 }
 
 $status     = ($action === 'approve') ? 'approved' : 'rejected';
-$approvedBy = $_SESSION['user']['id'];
+$approvedBy = current_user()['id'];
 $approvedAt = ($status === 'approved') ? date('Y-m-d H:i:s') : null;
 
 $success = DB::execute(

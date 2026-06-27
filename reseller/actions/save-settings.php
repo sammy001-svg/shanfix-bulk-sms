@@ -1,79 +1,84 @@
 <?php
-/**
- * Action: Save Reseller Settings
- */
 require_once __DIR__ . '/../../includes/auth.php';
-
+require_once __DIR__ . '/../../includes/db.php';
 require_role('reseller');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: ../settings.php');
-    exit;
+    redirect('/reseller/settings.php');
 }
 
-$userId = $_SESSION['user_id'];
-$tab = $_POST['tab'] ?? 'profile';
+if (!csrf_verify()) {
+    flash_set('danger', 'Security token mismatch. Please try again.');
+    redirect('/reseller/settings.php');
+}
+
+$user   = current_user();
+$userId = $user['id'];
+$tab    = $_POST['tab'] ?? 'profile';
 
 if ($tab === 'profile') {
-    $name = sanitize($_POST['name'] ?? '');
-    $email = sanitize($_POST['email'] ?? '');
+    $name  = sanitize($_POST['name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
     $phone = sanitize($_POST['phone'] ?? '');
 
     if (!$name || !$email || !$phone) {
-        flash_set('error', 'All fields are required.');
-        header('Location: ../settings.php?tab=profile');
-        exit;
+        flash_set('danger', 'All fields are required.');
+        redirect('/reseller/settings.php?tab=profile');
     }
 
-    // Check if email is already taken by another user
-    $existing = DB::queryOne("SELECT id FROM users WHERE email = ? AND id != ?", [$email, $userId]);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        flash_set('danger', 'Invalid email address.');
+        redirect('/reseller/settings.php?tab=profile');
+    }
+
+    $existing = DB::queryOne("SELECT id FROM users WHERE email = ? AND id != ?", [strtolower($email), $userId]);
     if ($existing) {
-        flash_set('error', 'Email address is already in use by another account.');
-        header('Location: ../settings.php?tab=profile');
-        exit;
+        flash_set('danger', 'Email address is already in use by another account.');
+        redirect('/reseller/settings.php?tab=profile');
     }
 
-    $updated = DB::execute("UPDATE users SET name = ?, email = ?, phone = ? WHERE id = ?", [$name, $email, $phone, $userId]);
-    
-    if ($updated !== false) {
+    try {
+        DB::execute("UPDATE users SET name = ?, email = ?, phone = ? WHERE id = ?", [$name, strtolower($email), $phone, $userId]);
+        // Refresh session so navbar name/email updates immediately
+        $_SESSION['user'] = DB::queryOne("SELECT * FROM users WHERE id = ?", [$userId]);
+        unset($_SESSION['user']['password_hash']);
         flash_set('success', 'Profile updated successfully.');
-    } else {
-        flash_set('error', 'Failed to update profile.');
+    } catch (Exception $e) {
+        flash_set('danger', 'Failed to update profile.');
     }
+
 } elseif ($tab === 'security') {
     $currentPass = $_POST['current_password'] ?? '';
-    $newPass = $_POST['new_password'] ?? '';
+    $newPass     = $_POST['new_password'] ?? '';
     $confirmPass = $_POST['confirm_password'] ?? '';
 
     if (empty($newPass)) {
-        flash_set('error', 'Please enter a new password.');
-        header('Location: ../settings.php?tab=security');
-        exit;
+        flash_set('danger', 'Please enter a new password.');
+        redirect('/reseller/settings.php?tab=security');
+    }
+
+    if (strlen($newPass) < 8) {
+        flash_set('danger', 'New password must be at least 8 characters.');
+        redirect('/reseller/settings.php?tab=security');
     }
 
     if ($newPass !== $confirmPass) {
-        flash_set('error', 'New passwords do not match.');
-        header('Location: ../settings.php?tab=security');
-        exit;
+        flash_set('danger', 'New passwords do not match.');
+        redirect('/reseller/settings.php?tab=security');
     }
 
-    // Verify current password
-    $user = DB::queryOne("SELECT password_hash FROM users WHERE id = ?", [$userId]);
-    if (!password_verify($currentPass, $user['password_hash'])) {
-        flash_set('error', 'Current password is incorrect.');
-        header('Location: ../settings.php?tab=security');
-        exit;
+    $row = DB::queryOne("SELECT password_hash FROM users WHERE id = ?", [$userId]);
+    if (!password_verify($currentPass, $row['password_hash'])) {
+        flash_set('danger', 'Current password is incorrect.');
+        redirect('/reseller/settings.php?tab=security');
     }
 
-    $hash = password_hash($newPass, PASSWORD_DEFAULT);
-    $updated = DB::execute("UPDATE users SET password_hash = ? WHERE id = ?", [$hash, $userId]);
-
-    if ($updated !== false) {
+    try {
+        DB::execute("UPDATE users SET password_hash = ? WHERE id = ?", [password_hash($newPass, PASSWORD_BCRYPT), $userId]);
         flash_set('success', 'Password changed successfully.');
-    } else {
-        flash_set('error', 'Failed to change password.');
+    } catch (Exception $e) {
+        flash_set('danger', 'Failed to change password.');
     }
 }
 
-header('Location: ../settings.php?tab=' . $tab);
-exit;
+redirect('/reseller/settings.php?tab=' . $tab);

@@ -12,25 +12,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('/reseller/clients.php');
     }
 
-    $id = (int)($_POST['id'] ?? 0);
+    $id          = (int)($_POST['id'] ?? 0);
     $customPrice = (float)($_POST['custom_unit_price'] ?? 1.00);
-    $resellerId = $_SESSION['user_id'];
+    $resellerId  = current_user()['id'];
 
     // Verify the client belongs to this reseller
     $client = DB::queryOne("SELECT id FROM users WHERE id = ? AND parent_id = ? AND role = 'client'", [$id, $resellerId]);
-    
+
     if (!$client) {
-        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Client not found or access denied.'];
+        flash_set('danger', 'Client not found or access denied.');
         redirect('/reseller/clients.php');
     }
 
-    $success = DB::execute("UPDATE users SET custom_unit_price = ? WHERE id = ?", [$customPrice, $id]);
-
-    if ($success !== false) {
-        $_SESSION['flash'] = ['type' => 'success', 'message' => "Client rate updated successfully!"];
-    } else {
-        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Failed to update client.'];
-    }
-
+    DB::execute("UPDATE users SET custom_unit_price = ? WHERE id = ?", [$customPrice, $id]);
+    flash_set('success', 'Client rate updated successfully!');
     redirect('/reseller/clients.php');
 }

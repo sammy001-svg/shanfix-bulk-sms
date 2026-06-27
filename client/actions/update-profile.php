@@ -1,7 +1,4 @@
 <?php
-/**
- * Client Action: Update Profile - Shanfix Technology
- */
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/db.php';
 require_role('client');
@@ -11,11 +8,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 if (!csrf_verify()) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid security token.'];
+    flash_set('danger', 'Invalid security token.');
     redirect('/client/profile.php');
 }
 
-$uid     = $_SESSION['user_id'];
+$user    = current_user();
+$uid     = $user['id'];
 $name    = sanitize($_POST['name'] ?? '');
 $email   = trim($_POST['email'] ?? '');
 $phone   = sanitize($_POST['phone'] ?? '');
@@ -25,30 +23,30 @@ $newPass = $_POST['new_password'] ?? '';
 $confirm = $_POST['confirm_password'] ?? '';
 
 if (!$name) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Name is required.'];
+    flash_set('danger', 'Name is required.');
     redirect('/client/profile.php');
 }
 
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid email address.'];
+    flash_set('danger', 'Invalid email address.');
     redirect('/client/profile.php');
 }
 
 // Verify current password before allowing any changes
-$user = DB::queryOne("SELECT password_hash FROM users WHERE id = ?", [$uid]);
-if (!password_verify($current, $user['password_hash'])) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Incorrect current password.'];
+$row = DB::queryOne("SELECT password_hash FROM users WHERE id = ?", [$uid]);
+if (!password_verify($current, $row['password_hash'])) {
+    flash_set('danger', 'Incorrect current password.');
     redirect('/client/profile.php');
 }
 
 // Validate new password BEFORE touching the DB
 if ($newPass !== '') {
     if (strlen($newPass) < 8) {
-        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'New password must be at least 8 characters.'];
+        flash_set('danger', 'New password must be at least 8 characters.');
         redirect('/client/profile.php');
     }
     if ($newPass !== $confirm) {
-        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'New passwords do not match.'];
+        flash_set('danger', 'New passwords do not match.');
         redirect('/client/profile.php');
     }
 }
@@ -56,7 +54,7 @@ if ($newPass !== '') {
 // Email uniqueness check
 $existing = DB::queryOne("SELECT id FROM users WHERE email = ? AND id != ?", [strtolower($email), $uid]);
 if ($existing) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Email address is already in use.'];
+    flash_set('danger', 'Email address is already in use.');
     redirect('/client/profile.php');
 }
 

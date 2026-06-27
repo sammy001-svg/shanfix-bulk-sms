@@ -30,11 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $res = DB::execute($sql, [$uid, $unitPrice, $instructions]);
         }
         
-        if ($res !== false) {
-            flash_set('success', 'Billing settings updated successfully.');
-        } else {
-            flash_set('danger', 'Failed to update billing settings.');
-        }
+        flash_set('success', 'Billing settings updated successfully.');
     } else {
         $systemName   = sanitize($_POST['system_name']);
         $primaryColor = sanitize($_POST['primary_color']);
@@ -95,11 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $res = DB::execute($sql, [$uid, $systemName, $primaryColor, $sidebarColor, $logoPath, $supportEmail, $supportPhone, $smtpHost, $smtpPort, $smtpUser, $smtpPass]);
         }
 
-        if ($res !== false) {
-            flash_set('success', 'Branding settings updated successfully.');
-        } else {
-            flash_set('danger', 'Failed to update branding settings.');
-        }
+        flash_set('success', 'Branding settings updated successfully.');
     }
     redirect('/reseller/branding.php');
 }
