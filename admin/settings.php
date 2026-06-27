@@ -70,6 +70,18 @@ $s = fn(string $key, string $default='') => htmlspecialchars($settings[$key] ?? 
           <div class="form-group"><label class="form-label">Payhero API Username</label><input type="text" name="payhero_api_username" class="form-control" value="<?=$s('payhero_api_username')?>" placeholder="Found in Payhero Developer section"></div>
           <div class="form-group"><label class="form-label">Payhero API Password</label><input type="password" name="payhero_api_password" class="form-control" placeholder="Leave blank to keep current"></div>
           <div class="form-group"><label class="form-label">Payhero Channel ID</label><input type="text" name="payhero_channel_id" class="form-control" value="<?=$s('payhero_channel_id')?>" placeholder="Found under Payment Channels"></div>
+          <div class="form-group">
+            <label class="form-label">
+              Webhook Security Token
+              <?php if (!($settings['payhero_webhook_token'] ?? '')): ?>
+                <span class="badge badge-danger" style="font-size:10px;vertical-align:middle">Not Set — Webhook Open</span>
+              <?php else: ?>
+                <span class="badge badge-success" style="font-size:10px;vertical-align:middle">Configured</span>
+              <?php endif; ?>
+            </label>
+            <input type="password" name="payhero_webhook_token" class="form-control" placeholder="Leave blank to keep current">
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Set in your Payhero dashboard under Webhook settings. Without this, anyone can trigger payment callbacks.</div>
+          </div>
           <hr style="margin:24px 0;border-color:var(--border)">
           <div class="form-group"><label class="form-label">Default Unit Price (KES)</label><input type="number" step="0.0001" name="unit_price" class="form-control" value="<?=$s('unit_price','0.50')?>"></div>
         <?php elseif ($activeTab==='email'): ?>

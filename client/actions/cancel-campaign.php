@@ -24,11 +24,11 @@ if (!$id) {
     redirect(safe_referer('/client/campaigns.php'));
 }
 
-// Only campaigns that have not started sending can be cancelled.
-// 'sending' / 'completed' / 'failed' campaigns are immutable.
+// Allow cancellation of any campaign that hasn't finished.
+// completed/failed/cancelled are immutable.
 $updated = DB::execute(
     "UPDATE campaigns SET status = 'cancelled'
-     WHERE id = ? AND user_id = ? AND status IN ('queued', 'scheduled')",
+     WHERE id = ? AND user_id = ? AND status IN ('queued', 'scheduled', 'sending', 'running')",
     [$id, $user['id']]
 );
 

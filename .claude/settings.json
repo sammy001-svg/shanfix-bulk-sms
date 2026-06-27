@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(edit-group\")",
+      "Bash(grep -A 50 'view_details\\\\|edit.*$_GET' 'e:\\\\projects\\\\Bulk SMS\\\\shanfix-bulk-sms\\\\reseller\\\\campaigns.php')"
+    ]
+  }
+}

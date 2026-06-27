@@ -16,8 +16,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $error = 'Please enter a valid email address.';
         } else {
+            // Rate-limit: max 3 reset requests per email per hour, max 10 per IP per hour.
+            $ipBucket    = 'pwreset_ip:'    . ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+            $emailBucket = 'pwreset_email:' . $email;
+            try {
+                $ipHits    = (int)DB::queryValue("SELECT COUNT(*) FROM rate_limits WHERE bucket = ? AND hit_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)", [$ipBucket]);
+                $emailHits = (int)DB::queryValue("SELECT COUNT(*) FROM rate_limits WHERE bucket = ? AND hit_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)", [$emailBucket]);
+                if ($ipHits >= 10 || $emailHits >= 3) {
+                    $error = 'Too many reset attempts. Please wait before trying again.';
+                }
+            } catch (Exception $e) { /* rate_limits table not yet created */ }
+
+            if (!$error) {
             // Always show the success message — prevents user enumeration.
             $sent = true;
+
+            try {
+                DB::execute("INSERT INTO rate_limits (bucket, hit_at) VALUES (?, NOW())", [$ipBucket]);
+                DB::execute("INSERT INTO rate_limits (bucket, hit_at) VALUES (?, NOW())", [$emailBucket]);
+            } catch (Exception $e) {}
 
             $user = DB::queryOne(
                 "SELECT id, name, email FROM users WHERE email = ? AND status = 'active'",
@@ -53,6 +70,7 @@ BODY);
 
                 Mailer::send($email, $user['name'], 'Reset Your Password', $html);
             }
+            } // end if (!$error)
         }
     }
 }

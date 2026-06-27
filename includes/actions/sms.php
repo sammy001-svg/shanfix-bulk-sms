@@ -6,6 +6,8 @@
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers/Mailer.php';
 
+class CampaignCancelledException extends \RuntimeException {}
+
 class SMS {
 
     private const BATCH_SIZE   = 20; // Onfon hard limit: max 20 recipients per SendBulkSMS call
@@ -299,6 +301,12 @@ class SMS {
 
         try {
             self::runCampaign($campaign);
+        } catch (CampaignCancelledException $e) {
+            // User cancelled mid-flight — DB status is already 'cancelled'; just clear the lock
+            DB::execute(
+                "UPDATE campaigns SET locked_at = NULL, sent_at = NOW() WHERE id = ?",
+                [$campaignId]
+            );
         } catch (Throwable $e) {
             // Log the error and mark the campaign failed so it surfaces to the user
             error_log("processCampaign #$campaignId crashed: " . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
@@ -364,6 +372,11 @@ class SMS {
                 "UPDATE campaigns SET sent_count = ?, failed_count = ?, last_heartbeat_at = NOW() WHERE id = ?",
                 [$sent, $failed, $campaignId]
             );
+            // Check if the user cancelled the campaign between batches
+            $liveStatus = DB::queryValue("SELECT status FROM campaigns WHERE id = ?", [$campaignId]);
+            if ($liveStatus === 'cancelled') {
+                throw new CampaignCancelledException("Campaign #$campaignId cancelled by user");
+            }
         };
 
         // --- Source 1: Uploaded file (CSV or raw XLSX — convert first if needed) ---

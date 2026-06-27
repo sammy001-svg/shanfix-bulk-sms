@@ -7,7 +7,12 @@ require_once __DIR__ . '/../../includes/db.php';
 require_role('reseller');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $reseller_id = $_SESSION['user_id'];
+    if (!csrf_verify()) {
+        flash_set('danger', 'Security token mismatch. Please try again.');
+        redirect('/reseller/pricing.php');
+    }
+
+    $reseller_id = current_user()['id'];
     $id       = (int)($_POST['id'] ?? 0);
     $name     = sanitize($_POST['name'] ?? '');
     $units    = (int)($_POST['units'] ?? 0);
@@ -15,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $currency = sanitize($_POST['currency'] ?? 'KES');
     $popular  = isset($_POST['is_popular']) ? 1 : 0;
 
-    if ($name && $units > 0) {
+    if ($name && $units > 0 && $price > 0) {
         try {
             if ($id) {
                 // Ensure the reseller owns this plan
@@ -35,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Database error: ' . $e->getMessage()];
         }
     } else {
-        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Please fill in all required fields.'];
+        $_SESSION['flash'] = ['type' => 'danger', 'message' => $price <= 0 ? 'Price must be greater than zero.' : 'Please fill in all required fields.'];
     }
 
     redirect('/reseller/pricing.php');

@@ -29,6 +29,16 @@ $totalPages= ceil($total / $perPage);
 // Sender IDs for the create modal
 $senderIds = DB::query("SELECT sender_id FROM sender_ids WHERE user_id=? AND status='approved'", [$uid]);
 $groups    = DB::query("SELECT id, name FROM contact_groups WHERE user_id=?", [$uid]);
+
+// Campaign detail view
+$detailCampaign = null;
+$detailId = (int)($_GET['view_details'] ?? 0);
+if ($detailId) {
+    $detailCampaign = DB::queryOne(
+        "SELECT * FROM campaigns WHERE id = ? AND user_id = ?",
+        [$detailId, $uid]
+    );
+}
 ?>
 
 <div class="page-header">
@@ -120,6 +130,14 @@ $groups    = DB::query("SELECT id, name FROM contact_groups WHERE user_id=?", [$
                     <?php if ($c['status']==='draft'): ?>
                       <a href="/reseller/campaigns.php?view=campaigns&edit=<?=$c['id']?>" class="btn btn-outline btn-sm btn-icon" title="Edit"><i class="fa-solid fa-pen"></i></a>
                     <?php endif; ?>
+                    <?php if (in_array($c['status'], ['queued', 'scheduled', 'sending', 'running'])): ?>
+                      <form method="POST" action="/reseller/actions/cancel-campaign.php" style="display:inline"
+                            onsubmit="return confirm('Stop this campaign? Messages already sent will NOT be recalled.')">
+                        <input type="hidden" name="id" value="<?=$c['id']?>">
+                        <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
+                        <button type="submit" class="btn btn-warning btn-sm btn-icon" title="Cancel Campaign"><i class="fa-solid fa-stop"></i></button>
+                      </form>
+                    <?php endif; ?>
                   </div>
                 </td>
               </tr>
@@ -160,6 +178,94 @@ $groups    = DB::query("SELECT id, name FROM contact_groups WHERE user_id=?", [$
     </div>
   <?php endif; ?>
 </div>
+
+<!-- Campaign Detail Modal -->
+<?php if ($detailCampaign): ?>
+<?php
+$dc  = $detailCampaign;
+$dsc = ['completed'=>'success','sending'=>'info','queued'=>'warning','running'=>'info','failed'=>'danger','draft'=>'muted','cancelled'=>'secondary'][$dc['status']] ?? 'muted';
+$ddlv = $dc['total_count'] > 0 ? round($dc['sent_count'] / max($dc['total_count'],1) * 100) : 0;
+?>
+<div class="modal-overlay active" id="campaignDetailModal">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <h3 class="modal-title"><i class="fa-solid fa-chart-bar" style="color:var(--primary)"></i> Campaign Details</h3>
+      <a href="/reseller/campaigns.php?view=campaigns" class="modal-close">×</a>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px">
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px">Campaign Name</div>
+          <div style="font-weight:600"><?= htmlspecialchars($dc['name']) ?></div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px">Status</div>
+          <span class="badge badge-<?= $dsc ?>"><?= ucfirst($dc['status']) ?></span>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px">Sender ID</div>
+          <code><?= htmlspecialchars($dc['sender_id']) ?></code>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px">Units Used</div>
+          <div><?= number_format($dc['units_used'], 2) ?></div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px">Created</div>
+          <div style="font-size:13px"><?= date('d M Y H:i', strtotime($dc['created_at'])) ?></div>
+        </div>
+        <?php if ($dc['scheduled_at']): ?>
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px">Scheduled For</div>
+          <div style="font-size:13px"><?= date('d M Y H:i', strtotime($dc['scheduled_at'])) ?></div>
+        </div>
+        <?php endif; ?>
+        <?php if ($dc['sent_at']): ?>
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px">Completed At</div>
+          <div style="font-size:13px"><?= date('d M Y H:i', strtotime($dc['sent_at'])) ?></div>
+        </div>
+        <?php endif; ?>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
+        <div style="background:var(--bg-dark);border-radius:var(--radius-md);padding:14px;text-align:center">
+          <div style="font-size:22px;font-weight:700"><?= number_format($dc['total_count']) ?></div>
+          <div style="font-size:11px;color:var(--text-secondary)">Total</div>
+        </div>
+        <div style="background:var(--bg-dark);border-radius:var(--radius-md);padding:14px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--success)"><?= number_format($dc['sent_count']) ?></div>
+          <div style="font-size:11px;color:var(--text-secondary)">Sent</div>
+        </div>
+        <div style="background:var(--bg-dark);border-radius:var(--radius-md);padding:14px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--danger)"><?= number_format($dc['failed_count']) ?></div>
+          <div style="font-size:11px;color:var(--text-secondary)">Failed</div>
+        </div>
+        <div style="background:var(--bg-dark);border-radius:var(--radius-md);padding:14px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--primary)"><?= $ddlv ?>%</div>
+          <div style="font-size:11px;color:var(--text-secondary)">Delivery</div>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:6px">Message</div>
+        <div style="background:var(--bg-dark);border-radius:var(--radius-md);padding:14px;font-size:13px;white-space:pre-wrap;line-height:1.6"><?= htmlspecialchars($dc['message'] ?? '') ?></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <?php if (in_array($dc['status'], ['queued','scheduled','sending','running'])): ?>
+        <form method="POST" action="/reseller/actions/cancel-campaign.php" style="margin-right:auto"
+              onsubmit="return confirm('Stop this campaign? Messages already sent will NOT be recalled.')">
+          <input type="hidden" name="id" value="<?= $dc['id'] ?>">
+          <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+          <button type="submit" class="btn btn-warning"><i class="fa-solid fa-stop"></i> Cancel Campaign</button>
+        </form>
+      <?php endif; ?>
+      <a href="/reseller/campaigns.php?view=campaigns" class="btn btn-secondary">Close</a>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
 
 <!-- Create Campaign Modal -->
 <div class="modal-overlay" id="campaignModal">

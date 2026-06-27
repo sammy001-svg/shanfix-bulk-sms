@@ -129,6 +129,14 @@ $groups    = DB::query("SELECT id,name FROM contact_groups WHERE user_id=?",[$ui
                     <i class="fa-solid fa-triangle-exclamation"></i> <?=number_format($failCnt)?> Failed
                   </button>
                 <?php endif; ?>
+                <?php if (in_array($c['status'], ['queued', 'scheduled', 'sending', 'running'])): ?>
+                  <form method="POST" action="/client/actions/cancel-campaign.php" style="display:inline"
+                        onsubmit="return confirm('Stop this campaign? Messages already sent will NOT be recalled.')">
+                    <input type="hidden" name="id" value="<?=$c['id']?>">
+                    <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
+                    <button type="submit" class="btn btn-warning btn-sm btn-icon" title="Cancel Campaign"><i class="fa-solid fa-stop"></i></button>
+                  </form>
+                <?php endif; ?>
                 <?php if (in_array($c['status'],['draft','scheduled'])): ?>
                   <form method="POST" action="/client/actions/delete-campaign.php" style="display:inline">
                     <input type="hidden" name="id" value="<?=$c['id']?>">
