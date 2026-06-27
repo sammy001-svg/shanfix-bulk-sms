@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         [$name, $id, $user['id']]
     );
 
-    if ($updated !== false && $updated > 0) {
+    if ($updated > 0) {
         flash_set('success', 'Group updated successfully.');
     } else {
         flash_set('danger', 'Group not found or you do not have permission to edit it.');

@@ -27,7 +27,7 @@ $updated = DB::execute(
     [$name, $id, $user['id']]
 );
 
-if ($updated !== false && $updated > 0) {
+if ($updated > 0) {
     flash_set('success', 'Group renamed successfully.');
 } else {
     flash_set('danger', 'Group not found or you do not have permission to edit it.');

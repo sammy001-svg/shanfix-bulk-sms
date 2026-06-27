@@ -10,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 if (!csrf_verify()) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Security token mismatch. Please try again.'];
+    flash_set('danger', 'Security token mismatch. Please try again.');
     redirect(safe_referer('/client/campaigns.php'));
 }
 
@@ -33,15 +33,14 @@ $updated = DB::execute(
 );
 
 if ($updated) {
-    $_SESSION['flash'] = ['type' => 'success', 'message' => 'Campaign cancelled successfully.'];
+    flash_set('success', 'Campaign cancelled successfully.');
 } else {
     // Could be: not owned by user, wrong status, or ID doesn't exist
     $campaign = DB::queryOne("SELECT status FROM campaigns WHERE id = ? AND user_id = ?", [$id, $user['id']]);
-    if (!$campaign) {
-        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Campaign not found.'];
-    } else {
-        $_SESSION['flash'] = ['type' => 'warning', 'message' => 'Campaign cannot be cancelled — it is already ' . $campaign['status'] . '.'];
-    }
+    flash_set(
+        $campaign ? 'warning' : 'danger',
+        $campaign ? 'Campaign cannot be cancelled — it is already ' . $campaign['status'] . '.' : 'Campaign not found.'
+    );
 }
 
 redirect(safe_referer('/client/campaigns.php'));

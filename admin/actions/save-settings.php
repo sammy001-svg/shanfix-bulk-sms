@@ -10,8 +10,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     redirect('/admin/settings.php');
 }
 
-if (!validate_csrf($_POST['csrf_token'] ?? '')) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid security token.'];
+if (!csrf_verify()) {
+    flash_set('danger', 'Invalid security token.');
     redirect('/admin/settings.php');
 }
 
@@ -73,8 +73,9 @@ foreach ($_POST as $key => $value) {
     }
 }
 
-$_SESSION['flash'] = $errors === 0
-    ? ['type' => 'success', 'message' => 'System settings updated successfully.']
-    : ['type' => 'warning', 'message' => 'Settings saved with some errors. Check server logs.'];
+flash_set(
+    $errors === 0 ? 'success' : 'warning',
+    $errors === 0 ? 'System settings updated successfully.' : 'Settings saved with some errors. Check server logs.'
+);
 
 redirect('/admin/settings.php');

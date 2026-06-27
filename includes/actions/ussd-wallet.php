@@ -22,7 +22,7 @@ class USSD_Wallet {
             // 2. Mark Transaction as Completed
             $marked = DB::execute("UPDATE ussd_transactions SET status = 'completed', reference = ? WHERE id = ?", [$mpesaCode ?? $trans['reference'], $transactionId]);
 
-            if ($updated !== false && $marked !== false) {
+            if ($updated > 0 && $marked > 0) {
                 DB::commit();
                 
                 // Notify User
@@ -65,7 +65,7 @@ class USSD_Wallet {
                 VALUES (?, ?, ?, 'completed', ?, 'MANUAL', NOW())
             ", [$userId, $amount, $type, $description]);
 
-            if ($updated !== false && $transId) {
+            if ($updated > 0 && $transId) {
                 DB::commit();
                 notify($userId, 'USSD Wallet Adjusted', "Your USSD wallet has been adjusted: $description", 'info');
                 return true;

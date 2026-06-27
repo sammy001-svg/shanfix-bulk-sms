@@ -10,8 +10,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     redirect('/admin/resellers.php');
 }
 
-if (!validate_csrf($_POST['csrf_token'] ?? '')) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid security token.'];
+if (!csrf_verify()) {
+    flash_set('danger', 'Invalid security token.');
     redirect('/admin/resellers.php');
 }
 
@@ -30,35 +30,35 @@ $waRate      = (float)($_POST['whatsapp_rate'] ?? 1.00);
 $password    = $_POST['password'] ?? '';
 
 if (!$id || !$name || !$email) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Name and Email are required.'];
+    flash_set('danger', 'Name and Email are required.');
     redirect(safe_referer('/admin/resellers.php'));
 }
 
 // Whitelist role and status — admin role cannot be assigned via this handler
 if (!in_array($role, ['reseller', 'client'], true)) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid role.'];
+    flash_set('danger', 'Invalid role.');
     redirect(safe_referer('/admin/resellers.php'));
 }
 if (!in_array($status, ['active', 'suspended', 'pending'], true)) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid status.'];
+    flash_set('danger', 'Invalid status.');
     redirect(safe_referer('/admin/resellers.php'));
 }
 
 // Email format check
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid email address format.'];
+    flash_set('danger', 'Invalid email address format.');
     redirect(safe_referer('/admin/resellers.php'));
 }
 
 // Financial fields must not be negative
-if ($units < 0 || $waUnits < 0 || $waRate <= 0 || ($customPrice !== null && $customPrice < 0)) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Unit balances and prices must be non-negative.'];
+if ($units < 0 || $waUnits < 0 || $waRate <= 0 || $customPrice !== null && $customPrice < 0) {
+    flash_set('danger', 'Unit balances and prices must be non-negative.');
     redirect(safe_referer('/admin/resellers.php'));
 }
 
 $existing = DB::queryOne("SELECT id FROM users WHERE email = ? AND id != ?", [$email, $id]);
 if ($existing) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Email address is already in use.'];
+    flash_set('danger', 'Email address is already in use.');
     redirect(safe_referer('/admin/resellers.php'));
 }
 
@@ -81,12 +81,12 @@ try {
     }
 
     DB::commit();
-    $_SESSION['flash'] = ['type' => 'success', 'message' => 'User account updated successfully.'];
+    flash_set('success', 'User account updated successfully.');
 
 } catch (Exception $e) {
     DB::rollback();
     error_log("edit-user failed for id=$id: " . $e->getMessage());
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Failed to update user. Please try again.'];
+    flash_set('danger', 'Failed to update user. Please try again.');
 }
 
 redirect('/admin/edit-user.php?id=' . $id);

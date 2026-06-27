@@ -8,7 +8,7 @@ require_role('admin');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) {
-        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid security token.'];
+        flash_set('danger', 'Invalid security token.');
         redirect('/admin/clients.php');
     }
 
@@ -19,18 +19,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $userToDelete = DB::queryOne("SELECT role, name FROM users WHERE id = ?", [$userId]);
         
         if (!$userToDelete) {
-            $_SESSION['flash'] = ['type' => 'danger', 'message' => 'User not found.'];
+            flash_set('danger', 'User not found.');
         } elseif ($userToDelete['role'] === 'admin') {
-            $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Administrator accounts cannot be deleted.'];
+            flash_set('danger', 'Administrator accounts cannot be deleted.');
         } else {
-            // Hard delete - Database constraints will handle related data (ON DELETE CASCADE)
-            $success = DB::execute("DELETE FROM users WHERE id = ? AND role != 'admin'", [$userId]);
+            DB::execute("DELETE FROM users WHERE id = ? AND role != 'admin'", [$userId]);
             
-            if ($success) {
-                $_SESSION['flash'] = ['type' => 'success', 'message' => "User account ({$userToDelete['name']}) has been permanently deleted."];
-            } else {
-                $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Failed to delete user account.'];
-            }
+            flash_set('success', "User account ({$userToDelete['name']}) has been permanently deleted.");
         }
     }
 

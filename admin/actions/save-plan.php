@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 if (!csrf_verify()) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid security token.'];
+    flash_set('danger', 'Invalid security token.');
     redirect('/admin/pricing.php');
 }
 
@@ -29,19 +29,19 @@ if ($name && $units > 0 && $price >= 0) {
                 "UPDATE pricing_plans SET name = ?, units = ?, price = ?, currency = ?, is_popular = ? WHERE id = ?",
                 [$name, $units, $price, $currency, $popular, $id]
             );
-            $_SESSION['flash'] = ['type' => 'success', 'message' => 'Pricing plan updated successfully!'];
+            flash_set('success', 'Pricing plan updated successfully!');
         } else {
             DB::execute(
                 "INSERT INTO pricing_plans (name, units, price, currency, is_active, is_popular, created_at) VALUES (?, ?, ?, ?, 1, ?, NOW())",
                 [$name, $units, $price, $currency, $popular]
             );
-            $_SESSION['flash'] = ['type' => 'success', 'message' => 'New pricing plan created successfully!'];
+            flash_set('success', 'New pricing plan created successfully!');
         }
     } catch (Exception $e) {
-        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Database error: ' . $e->getMessage()];
+        flash_set('danger', 'Database error: ' . $e->getMessage());
     }
 } else {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'All required fields must be filled correctly (Units must be > 0, Price must be non-negative).'];
+    flash_set('danger', 'All required fields must be filled correctly (Units must be > 0, Price must be non-negative).');
 }
 
 redirect('/admin/pricing.php');

@@ -23,24 +23,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($name && $units > 0 && $price > 0) {
         try {
             if ($id) {
-                // Ensure the reseller owns this plan
-                $sql = "UPDATE pricing_plans SET name = ?, units = ?, price = ?, currency = ?, is_popular = ? WHERE id = ? AND owner_id = ?";
-                $success = DB::execute($sql, [$name, $units, $price, $currency, $popular, $id, $reseller_id]);
-                if ($success) {
-                    $_SESSION['flash'] = ['type' => 'success', 'message' => 'Pricing plan updated successfully!'];
-                } else {
-                    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Failed to update plan. You may not have permission.'];
-                }
+                // WHERE owner_id = ? enforces ownership — cannot edit another reseller's plan
+                $affected = DB::execute(
+                    "UPDATE pricing_plans SET name = ?, units = ?, price = ?, currency = ?, is_popular = ? WHERE id = ? AND owner_id = ?",
+                    [$name, $units, $price, $currency, $popular, $id, $reseller_id]
+                );
+                flash_set(
+                    $affected > 0 ? 'success' : 'danger',
+                    $affected > 0 ? 'Pricing plan updated successfully!' : 'Failed to update plan. You may not have permission.'
+                );
             } else {
-                $sql = "INSERT INTO pricing_plans (name, units, price, currency, is_active, is_popular, owner_id, created_at) VALUES (?, ?, ?, ?, 1, ?, ?, NOW())";
-                DB::execute($sql, [$name, $units, $price, $currency, $popular, $reseller_id]);
-                $_SESSION['flash'] = ['type' => 'success', 'message' => 'New pricing plan created successfully!'];
+                DB::execute(
+                    "INSERT INTO pricing_plans (name, units, price, currency, is_active, is_popular, owner_id, created_at) VALUES (?, ?, ?, ?, 1, ?, ?, NOW())",
+                    [$name, $units, $price, $currency, $popular, $reseller_id]
+                );
+                flash_set('success', 'New pricing plan created successfully!');
             }
         } catch (Exception $e) {
-            $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Database error: ' . $e->getMessage()];
+            flash_set('danger', 'Database error: ' . $e->getMessage());
         }
     } else {
-        $_SESSION['flash'] = ['type' => 'danger', 'message' => $price <= 0 ? 'Price must be greater than zero.' : 'Please fill in all required fields.'];
+        flash_set('danger', $price <= 0 ? 'Price must be greater than zero.' : 'Please fill in all required fields.');
     }
 
     redirect('/reseller/pricing.php');
