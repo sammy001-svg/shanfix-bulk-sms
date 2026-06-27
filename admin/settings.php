@@ -119,6 +119,12 @@ $s = fn(string $key, string $default='') => htmlspecialchars($settings[$key] ?? 
           </div>
           <div class="form-group"><label class="form-label">Registration</label><select name="allow_registration" class="form-control"><option value="1" <?=$s('allow_registration','0')==='1'?'selected':''?>>Open</option><option value="0" <?=$s('allow_registration','0')==='0'?'selected':''?>>Invite Only</option></select></div>
           <div class="form-group"><label class="form-label">Maintenance Mode</label><select name="maintenance_mode" class="form-control"><option value="0">Off</option><option value="1" <?=$s('maintenance_mode')==='1'?'selected':''?>>On</option></select></div>
+          <hr style="margin:24px 0;border-color:var(--border)">
+          <div class="form-group">
+            <label class="form-label">API CORS Allowed Origins</label>
+            <input type="text" name="api_cors_origins" class="form-control" value="<?=$s('api_cors_origins')?>" placeholder="https://yourapp.com, https://app2.com">
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Comma-separated list of origins allowed to call the API from a browser. Leave blank to allow any origin (<code>*</code>). Example: <code>https://yourapp.com</code></div>
+          </div>
         <?php endif; ?>
       </div>
       <div class="card-footer" style="padding:16px 20px">

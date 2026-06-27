@@ -5,6 +5,7 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/_cors.php';
 require_once __DIR__ . '/../../includes/actions/sms.php';
 
 // Support both POST and JSON body
@@ -28,29 +29,25 @@ if (!$user) {
     exit;
 }
 
-// Rate limit: 60 requests per minute per user (fixed 1-minute window, atomic counter)
+// Rate limit: 60 requests per minute per user
 try {
     $bucket = 'api:' . $user['id'];
-    $window = date('Y-m-d H:i:00'); // truncate to current minute
-    // Atomic increment — LAST_INSERT_ID(expr) sets the connection-local last_insert_id
-    // so the subsequent SELECT LAST_INSERT_ID() returns *this* connection's new value.
+    $window = date('Y-m-d H:i:00');
     DB::execute(
         "INSERT INTO api_rate_counters (bucket, window_start, hits)
          VALUES (?, ?, 1)
-         ON DUPLICATE KEY UPDATE hits = LAST_INSERT_ID(hits + 1)",
+         ON DUPLICATE KEY UPDATE hits = hits + 1",
         [$bucket, $window]
     );
-    $hitCount = (int)DB::queryValue("SELECT LAST_INSERT_ID()");
+    $hitCount = (int)DB::queryValue(
+        "SELECT hits FROM api_rate_counters WHERE bucket = ? AND window_start = ?",
+        [$bucket, $window]
+    );
     if ($hitCount > 60) {
-        DB::execute(
-            "UPDATE api_rate_counters SET hits = hits - 1 WHERE bucket = ? AND window_start = ?",
-            [$bucket, $window]
-        );
         http_response_code(429);
         echo json_encode(['success' => false, 'error' => 'Rate limit exceeded. Max 60 requests per minute.']);
         exit;
     }
-    // Periodic cleanup: remove stale windows (~1% of requests)
     if (random_int(1, 100) === 1) {
         DB::execute("DELETE FROM api_rate_counters WHERE window_start < DATE_SUB(NOW(), INTERVAL 2 MINUTE)");
     }

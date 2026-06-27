@@ -171,6 +171,30 @@ print(res.json())
 
                 <hr style="border:none; border-top:1px solid var(--border); margin:40px 0">
 
+                <!-- Bulk Send Section -->
+                <div class="api-section">
+                    <h4 style="margin-bottom:15px; display:flex; align-items:center; gap:10px">
+                        <span style="background:var(--primary); color:#000; font-size:11px; padding:2px 8px; border-radius:4px; font-weight:800">POST</span>
+                        Bulk Send SMS
+                        <code style="background:var(--bg-muted); padding:5px 10px; border-radius:4px; color:var(--primary); font-size:12px; margin-left:auto"><?= SITE_URL ?>/api/v1/bulksend.php</code>
+                    </h4>
+                    <p style="font-size:13px; color:var(--text-secondary); margin-bottom:15px">Send the same message to up to 1,000 recipients in a single request. Duplicates are deduplicated automatically.</p>
+                    <pre style="background:#0f172a; color:#f8fafc; padding:20px; border-radius:12px; font-size:13px; line-height:1.6; overflow-x:auto">
+curl -X POST <?= SITE_URL ?>/api/v1/bulksend.php \
+  -H "X-Client-ID: <?= htmlspecialchars($u['api_client_id']) ?>" \
+  -H "X-API-Key: <?= htmlspecialchars($u['api_key']) ?>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": ["2547XXXXXXXX", "2547YYYYYYYY", "2547ZZZZZZZZ"],
+    "message": "Hello from <?= htmlspecialchars(get_setting('site_name','Shanfix')) ?>!",
+    "sender_id": "<?= htmlspecialchars($exampleSender) ?>"
+  }'
+</pre>
+                    <p style="font-size:12px; color:var(--text-secondary); margin-top:10px">Response includes <code>total_submitted</code>, <code>sent</code>, <code>failed</code>, <code>invalid_numbers</code>, <code>units_charged</code>, and <code>remaining_units</code>.</p>
+                </div>
+
+                <hr style="border:none; border-top:1px solid var(--border); margin:40px 0">
+
                 <!-- Balance Check Section -->
                 <div class="api-section">
                     <h4 style="margin-bottom:15px; display:flex; align-items:center; gap:10px">

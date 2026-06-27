@@ -7,12 +7,15 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/_cors.php';
 
-$input  = json_decode(file_get_contents('php://input'), true) ?: [];
-$params = array_merge($_GET, $_POST, $input);
+$input      = json_decode(file_get_contents('php://input'), true) ?: [];
+$authParams = array_merge($_POST, $input);
+// message_id / message_ids may come from GET, but credentials must not
+$params     = array_merge($_GET, $_POST, $input);
 
-$clientId = $_SERVER['HTTP_X_CLIENT_ID'] ?? ($params['client_id'] ?? '');
-$apiKey   = $_SERVER['HTTP_X_API_KEY']   ?? ($params['api_key']   ?? '');
+$clientId = $_SERVER['HTTP_X_CLIENT_ID'] ?? ($authParams['client_id'] ?? '');
+$apiKey   = $_SERVER['HTTP_X_API_KEY']   ?? ($authParams['api_key']   ?? '');
 
 if (!$clientId || !$apiKey) {
     http_response_code(401);

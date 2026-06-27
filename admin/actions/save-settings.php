@@ -33,6 +33,7 @@ const ALLOWED_SETTING_KEYS = [
     'low_balance_threshold',
     // Security & access
     'session_timeout', 'max_login_attempts', 'allow_registration', 'maintenance_mode',
+    'api_cors_origins',
     // Performance
     'max_concurrent_campaigns',
 ];
