@@ -43,10 +43,10 @@ $sUpdated = $settings['updated_at'] ?? null;
 
   <!-- ── Left: Tabbed form ── -->
   <div>
-    <div class="card" style="overflow:hidden">
+    <div class="card">
 
       <!-- Tab strip -->
-      <div style="display:flex;border-bottom:2px solid var(--border);background:var(--bg-dark)">
+      <div style="display:flex;border-bottom:2px solid var(--border);background:var(--bg-dark);border-radius:var(--radius-md) var(--radius-md) 0 0;overflow:hidden">
         <?php
         $tabs = [
           'identity' => ['fa-solid fa-tag',    'Identity'],
@@ -486,7 +486,7 @@ function switchTab(name, btn) {
   document.querySelectorAll('.branding-tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   document.querySelectorAll('.btab-panel').forEach(p => {
-    p.style.display = p.id === 'tab-' + name ? '' : 'none';
+    p.style.display = p.id === 'tab-' + name ? 'block' : 'none';
   });
 }
 
