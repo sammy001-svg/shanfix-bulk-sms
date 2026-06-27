@@ -2,21 +2,35 @@
 /**
  * Reseller: API Documentation & Integration - Shanfix Technology
  */
-$pageTitle = 'API & Integration';
-$breadcrumb = [['label' => 'Account'], ['label' => 'API & Integration']];
-require_once __DIR__ . '/layout.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_role('reseller');
+$user = current_user();
 
-// Handle Regeneration
+// Handle Regeneration — must run before layout.php to allow header() redirect
 if (isset($_POST['regenerate'])) {
     if (csrf_verify()) {
         generate_user_api_keys($user['id']);
         flash_set('success', 'New API credentials generated successfully!');
-        header("Location: " . $_SERVER['PHP_SELF']);
+        header('Location: /reseller/api.php');
         exit;
     }
 }
 
+// Auto-generate keys for users who have never had them
 $u = DB::queryOne("SELECT api_client_id, api_key FROM users WHERE id = ?", [$user['id']]);
+if (empty($u['api_client_id'])) {
+    generate_user_api_keys($user['id']);
+    $u = DB::queryOne("SELECT api_client_id, api_key FROM users WHERE id = ?", [$user['id']]);
+}
+
+$exampleSender = DB::queryValue(
+    "SELECT sender_id FROM sender_ids WHERE user_id = ? AND status = 'approved' ORDER BY id LIMIT 1",
+    [$user['id']]
+) ?: 'YOUR_SENDER_ID';
+
+$pageTitle = 'API & Integration';
+$breadcrumb = [['label' => 'Account'], ['label' => 'API & Integration']];
+require_once __DIR__ . '/layout.php';
 ?>
 
 <div class="page-header">
@@ -101,36 +115,36 @@ $u = DB::queryOne("SELECT api_client_id, api_key FROM users WHERE id = ?", [$use
                 <div id="php_example" class="api-tab-panel active">
 <pre style="background:#0f172a; color:#f8fafc; padding:20px; border-radius:12px; font-size:13px; line-height:1.6; overflow-x:auto">
 <span style="color:#94a3b8">&lt;?php</span>
-<span style="color:#64748b">// Shanfix Technology SMS API Example</span>
-$url = <span style="color:#00c896">"<?= SITE_URL ?>/api/v1/sendsms.php"</span>;
+$url  = <span style="color:#00c896">"<?= SITE_URL ?>/api/v1/sendsms.php"</span>;
 $data = [
-    <span style="color:#e2e8f0">'client_id'</span> => <span style="color:#00c896">'<?= $u['api_client_id'] ?>'</span>,
-    <span style="color:#e2e8f0">'api_key'</span>   => <span style="color:#00c896">'<?= $u['api_key'] ?>'</span>,
+    <span style="color:#e2e8f0">'client_id'</span> => <span style="color:#00c896">'<?= htmlspecialchars($u['api_client_id']) ?>'</span>,
+    <span style="color:#e2e8f0">'api_key'</span>   => <span style="color:#00c896">'<?= htmlspecialchars($u['api_key']) ?>'</span>,
     <span style="color:#e2e8f0">'to'</span>        => <span style="color:#00c896">'2547XXXXXXXX'</span>,
-    <span style="color:#e2e8f0">'message'</span>   => <span style="color:#00c896">'Hello from Shanfix API!'</span>,
-    <span style="color:#e2e8f0">'sender_id'</span> => <span style="color:#00c896">'SHANFIX'</span>
+    <span style="color:#e2e8f0">'message'</span>   => <span style="color:#00c896">'Hello from <?= htmlspecialchars(get_setting('site_name','Shanfix')) ?>!'</span>,
+    <span style="color:#e2e8f0">'sender_id'</span> => <span style="color:#00c896">'<?= htmlspecialchars($exampleSender) ?>'</span>,
 ];
 
 $ch = curl_init($url);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, <span style="color:#00c896">true</span>);
-curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
-$response = curl_exec($ch);
+curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_POSTFIELDS => http_build_query($data)]);
+$result = json_decode(curl_exec($ch), true);
 curl_close($ch);
 
-echo $response;
+<span style="color:#64748b">// $result['success'] === true on success</span>
+<span style="color:#64748b">// $result['message_id'], $result['units_charged'], $result['remaining_units']</span>
+print_r($result);
 </pre>
                 </div>
 
                 <div id="curl_example" class="api-tab-panel" style="display:none">
 <pre style="background:#0f172a; color:#f8fafc; padding:20px; border-radius:12px; font-size:13px; line-height:1.6; overflow-x:auto">
 curl -X POST <?= SITE_URL ?>/api/v1/sendsms.php \
+  -H "X-Client-ID: <?= htmlspecialchars($u['api_client_id']) ?>" \
+  -H "X-API-Key: <?= htmlspecialchars($u['api_key']) ?>" \
   -H "Content-Type: application/json" \
   -d '{
-    "client_id": "<?= $u['api_client_id'] ?>",
-    "api_key": "<?= $u['api_key'] ?>",
     "to": "2547XXXXXXXX",
-    "message": "Hello from Shanfix API!",
-    "sender_id": "SHANFIX"
+    "message": "Hello from <?= htmlspecialchars(get_setting('site_name','Shanfix')) ?>!",
+    "sender_id": "<?= htmlspecialchars($exampleSender) ?>"
   }'
 </pre>
                 </div>
@@ -139,17 +153,18 @@ curl -X POST <?= SITE_URL ?>/api/v1/sendsms.php \
 <pre style="background:#0f172a; color:#f8fafc; padding:20px; border-radius:12px; font-size:13px; line-height:1.6; overflow-x:auto">
 <span style="color:#94a3b8">import</span> requests
 
-url = <span style="color:#00c896">"<?= SITE_URL ?>/api/v1/sendsms.php"</span>
-payload = {
-    <span style="color:#00c896">"client_id"</span>: <span style="color:#00c896">"<?= $u['api_client_id'] ?>"</span>,
-    <span style="color:#00c896">"api_key"</span>: <span style="color:#00c896">"<?= $u['api_key'] ?>"</span>,
-    <span style="color:#00c896">"to"</span>: <span style="color:#00c896">"2547XXXXXXXX"</span>,
-    <span style="color:#00c896">"message"</span>: <span style="color:#00c896">"Hello from Shanfix API!"</span>,
-    <span style="color:#00c896">"sender_id"</span>: <span style="color:#00c896">"SHANFIX"</span>
+url     = <span style="color:#00c896">"<?= SITE_URL ?>/api/v1/sendsms.php"</span>
+headers = {
+    <span style="color:#00c896">"X-Client-ID"</span>: <span style="color:#00c896">"<?= htmlspecialchars($u['api_client_id']) ?>"</span>,
+    <span style="color:#00c896">"X-API-Key"</span>:   <span style="color:#00c896">"<?= htmlspecialchars($u['api_key']) ?>"</span>,
 }
-
-response = requests.post(url, json=payload)
-print(response.json())
+payload = {
+    <span style="color:#00c896">"to"</span>:        <span style="color:#00c896">"2547XXXXXXXX"</span>,
+    <span style="color:#00c896">"message"</span>:   <span style="color:#00c896">"Hello from <?= htmlspecialchars(get_setting('site_name','Shanfix')) ?>!"</span>,
+    <span style="color:#00c896">"sender_id"</span>: <span style="color:#00c896">"<?= htmlspecialchars($exampleSender) ?>"</span>,
+}
+res = requests.post(url, headers=headers, json=payload)
+print(res.json())
 </pre>
                 </div>
 
@@ -241,9 +256,19 @@ curl -X GET "<?= SITE_URL ?>/api/v1/status.php?message_id=MESSAGE_ID" \
 <script>
 function copyToClipboard(id) {
     const el = document.getElementById(id);
-    el.select();
-    document.execCommand('copy');
-    alert('Copied to clipboard!');
+    const val = el.value;
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(val).then(function() { showCopied(el); });
+    } else {
+        el.select();
+        document.execCommand('copy');
+        showCopied(el);
+    }
+}
+function showCopied(el) {
+    const orig = el.style.outline;
+    el.style.outline = '2px solid var(--success)';
+    setTimeout(function() { el.style.outline = orig; }, 1200);
 }
 
 function toggleVisibility(id, btn) {

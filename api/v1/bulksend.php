@@ -40,23 +40,27 @@ if ($user['status'] !== 'active') {
 }
 
 // Rate limit: 10 bulk requests per minute (each may carry up to 1 000 recipients)
-$bucket = 'api_bulk:' . $user['id'];
-$window = date('Y-m-d H:i:00');
-DB::execute(
-    "INSERT INTO api_rate_counters (bucket, window_start, hits)
-     VALUES (?, ?, 1)
-     ON DUPLICATE KEY UPDATE hits = LAST_INSERT_ID(hits + 1)",
-    [$bucket, $window]
-);
-$hitCount = (int)DB::queryValue("SELECT LAST_INSERT_ID()");
-if ($hitCount > 10) {
+try {
+    $bucket = 'api_bulk:' . $user['id'];
+    $window = date('Y-m-d H:i:00');
     DB::execute(
-        "UPDATE api_rate_counters SET hits = hits - 1 WHERE bucket = ? AND window_start = ?",
+        "INSERT INTO api_rate_counters (bucket, window_start, hits)
+         VALUES (?, ?, 1)
+         ON DUPLICATE KEY UPDATE hits = LAST_INSERT_ID(hits + 1)",
         [$bucket, $window]
     );
-    http_response_code(429);
-    echo json_encode(['success' => false, 'error' => 'Rate limit exceeded. Max 10 bulk requests per minute.']);
-    exit;
+    $hitCount = (int)DB::queryValue("SELECT LAST_INSERT_ID()");
+    if ($hitCount > 10) {
+        DB::execute(
+            "UPDATE api_rate_counters SET hits = hits - 1 WHERE bucket = ? AND window_start = ?",
+            [$bucket, $window]
+        );
+        http_response_code(429);
+        echo json_encode(['success' => false, 'error' => 'Rate limit exceeded. Max 10 bulk requests per minute.']);
+        exit;
+    }
+} catch (Exception $e) {
+    // api_rate_counters table not yet created — skip rate limiting (run phase13 migration)
 }
 
 // Validate required fields

@@ -59,14 +59,38 @@ try {
 }
 
 // Request Data
-$to = sanitize($params['to'] ?? '');
-$message = $params['message'] ?? '';
-$senderId = sanitize($params['sender_id'] ?? 'SHANFIX');
+$toRaw    = trim($params['to'] ?? '');
+$message  = $params['message'] ?? '';
+$senderIdRaw = trim($params['sender_id'] ?? '');
 
-if (!$to || !$message) {
+if (!$toRaw || !$message) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Missing required fields: to, message']);
     exit;
+}
+
+// Normalize phone number (handles 07XX, +254XX, 254XX formats)
+$to = SMS::normalizePhone($toRaw);
+if ($to === null) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => "Invalid phone number: $toRaw"]);
+    exit;
+}
+
+// Resolve sender ID: use provided value or fall back to user's first approved sender
+if ($senderIdRaw !== '') {
+    $senderId = $senderIdRaw;
+} else {
+    $firstSender = DB::queryOne(
+        "SELECT sender_id FROM sender_ids WHERE user_id = ? AND status = 'approved' ORDER BY id LIMIT 1",
+        [$user['id']]
+    );
+    if (!$firstSender) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'No approved sender ID on your account. Please specify sender_id.']);
+        exit;
+    }
+    $senderId = $firstSender['sender_id'];
 }
 
 // Send SMS
