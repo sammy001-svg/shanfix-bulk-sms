@@ -23,7 +23,9 @@ $sEnc     = $settings['smtp_encryption'] ?? 'tls';
 $sHasPass = !empty($settings['smtp_pass']);
 $sPrice   = $settings['unit_price'] ?? '';
 $sInstr   = htmlspecialchars($settings['payment_instructions'] ?? '');
-$sUpdated = $settings['updated_at'] ?? null;
+$sUpdated  = $settings['updated_at'] ?? null;
+$activeTab = in_array($_GET['tab'] ?? '', ['identity','colors','contact','email','billing'])
+             ? $_GET['tab'] : '';
 ?>
 
 <div class="page-header">
@@ -39,7 +41,7 @@ $sUpdated = $settings['updated_at'] ?? null;
   <?php endif; ?>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 320px;gap:24px;align-items:start">
+<div class="branding-layout">
 
   <!-- ── Left: Tabbed form ── -->
   <div>
@@ -58,7 +60,7 @@ $sUpdated = $settings['updated_at'] ?? null;
         foreach ($tabs as $key => [$icon, $label]):
         ?>
           <button type="button"
-            class="branding-tab <?= $key === 'identity' ? 'active' : '' ?>"
+            class="branding-tab <?= ($activeTab ?: 'identity') === $key ? 'active' : '' ?>"
             data-tab="<?= $key ?>"
             onclick="switchTab('<?= $key ?>', this)">
             <i class="<?= $icon ?>"></i>
@@ -71,9 +73,10 @@ $sUpdated = $settings['updated_at'] ?? null;
       <form method="POST" action="/reseller/actions/save-branding.php" enctype="multipart/form-data" id="brandingForm">
         <?= csrf_field() ?>
         <input type="hidden" name="remove_logo" id="removeLogoFlag" value="">
+        <input type="hidden" name="active_tab"  id="activeTabField"  value="<?= $activeTab ?: 'identity' ?>">
 
         <!-- ── Tab: Identity ── -->
-        <div class="btab-panel" id="tab-identity">
+        <div class="btab-panel" id="tab-identity" style="<?= $activeTab && $activeTab !== 'identity' ? 'display:none' : '' ?>">
           <div class="card-body" style="display:flex;flex-direction:column;gap:22px">
 
             <div class="form-group" style="margin:0">
@@ -132,7 +135,7 @@ $sUpdated = $settings['updated_at'] ?? null;
         </div>
 
         <!-- ── Tab: Colors ── -->
-        <div class="btab-panel" id="tab-colors" style="display:none">
+        <div class="btab-panel" id="tab-colors" style="<?= $activeTab === 'colors' ? '' : 'display:none' ?>">
           <div class="card-body" style="display:flex;flex-direction:column;gap:24px">
 
             <div class="alert alert-info" style="font-size:12px;margin:0">
@@ -203,7 +206,7 @@ $sUpdated = $settings['updated_at'] ?? null;
         </div>
 
         <!-- ── Tab: Support Contact ── -->
-        <div class="btab-panel" id="tab-contact" style="display:none">
+        <div class="btab-panel" id="tab-contact" style="<?= $activeTab === 'contact' ? '' : 'display:none' ?>">
           <div class="card-body" style="display:flex;flex-direction:column;gap:20px">
 
             <p style="font-size:13px;color:var(--text-secondary);margin:0">
@@ -232,7 +235,7 @@ $sUpdated = $settings['updated_at'] ?? null;
         </div>
 
         <!-- ── Tab: Email / SMTP ── -->
-        <div class="btab-panel" id="tab-email" style="display:none">
+        <div class="btab-panel" id="tab-email" style="<?= $activeTab === 'email' ? '' : 'display:none' ?>">
           <div class="card-body" style="display:flex;flex-direction:column;gap:20px">
 
             <div class="alert alert-info" style="font-size:12px;margin:0">
@@ -285,11 +288,19 @@ $sUpdated = $settings['updated_at'] ?? null;
               </div>
             </div>
 
+            <!-- Test email -->
+            <div style="display:flex;align-items:center;gap:12px;padding-top:4px">
+              <button type="button" id="smtpTestBtn" onclick="sendTestEmail()" class="btn btn-secondary">
+                <i class="fa-solid fa-paper-plane"></i> Send Test Email
+              </button>
+              <div id="smtpTestResult" style="display:none;font-size:12px;align-items:center;gap:6px"></div>
+            </div>
+
           </div>
         </div>
 
         <!-- ── Tab: Billing ── -->
-        <div class="btab-panel" id="tab-billing" style="display:none">
+        <div class="btab-panel" id="tab-billing" style="<?= $activeTab === 'billing' ? '' : 'display:none' ?>">
           <div class="card-body" style="display:flex;flex-direction:column;gap:20px">
 
             <p style="font-size:13px;color:var(--text-secondary);margin:0">
@@ -318,7 +329,7 @@ $sUpdated = $settings['updated_at'] ?? null;
 
         <!-- Form footer -->
         <div class="card-footer" style="display:flex;justify-content:flex-end;gap:10px">
-          <button type="reset" class="btn btn-secondary">Discard Changes</button>
+          <button type="reset" class="btn btn-secondary" onclick="formDirty=false">Discard Changes</button>
           <button type="submit" class="btn btn-primary">
             <i class="fa-solid fa-floppy-disk"></i> Save Settings
           </button>
@@ -352,8 +363,10 @@ $sUpdated = $settings['updated_at'] ?? null;
         <div style="display:flex;height:210px;overflow:hidden">
           <!-- Preview sidebar -->
           <div id="previewSidebar" style="width:90px;padding:12px 8px;display:flex;flex-direction:column;gap:6px;flex-shrink:0;background:<?= $sSidebar ?>">
+            <img id="previewLogoPanel" src="<?= htmlspecialchars($sLogo) ?>" alt=""
+                 style="max-height:22px;max-width:76px;object-fit:contain;margin:0 auto 8px;display:<?= $sLogo ? 'block' : 'none' ?>">
             <div id="previewLogoText"
-                 style="font-size:9px;font-weight:800;color:<?= $sPrimary ?>;margin-bottom:8px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                 style="font-size:9px;font-weight:800;color:<?= $sPrimary ?>;margin-bottom:8px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:<?= $sLogo ? 'none' : 'block' ?>">
               <?= $sName ?: 'MY BRAND' ?>
             </div>
             <?php
@@ -432,6 +445,28 @@ $sUpdated = $settings['updated_at'] ?? null;
 </div>
 
 <style>
+.branding-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .branding-layout {
+    grid-template-columns: 1fr;
+  }
+  .branding-layout > div:last-child {
+    position: static !important;
+  }
+  .branding-tab span {
+    display: none;
+  }
+  .branding-tab {
+    padding: 14px 14px;
+    justify-content: center;
+  }
+}
+
 .branding-tab {
   display: flex;
   align-items: center;
@@ -488,7 +523,22 @@ function switchTab(name, btn) {
   document.querySelectorAll('.btab-panel').forEach(p => {
     p.style.display = p.id === 'tab-' + name ? 'block' : 'none';
   });
+  document.getElementById('activeTabField').value = name;
+  try { localStorage.setItem('brandingTab', name); } catch(e) {}
 }
+
+// Restore last active tab from localStorage if no server-side tab was specified
+<?php if (!$activeTab): ?>
+(function() {
+  try {
+    const saved = localStorage.getItem('brandingTab');
+    if (saved) {
+      const btn = document.querySelector('.branding-tab[data-tab="' + saved + '"]');
+      if (btn) switchTab(saved, btn);
+    }
+  } catch(e) {}
+})();
+<?php endif; ?>
 
 /* ── Color syncing ── */
 function syncColor(which, val) {
@@ -548,8 +598,13 @@ function previewLogo(input) {
   const reader = new FileReader();
   reader.onload = e => {
     document.getElementById('logoPreviewImg').src = e.target.result;
-    document.getElementById('logoPreviewWrap').style.display = '';
+    document.getElementById('logoPreviewWrap').style.display = 'block';
     document.getElementById('logoUploadHint').style.display  = 'none';
+    // Sync brand preview panel
+    const panel = document.getElementById('previewLogoPanel');
+    panel.src = e.target.result;
+    panel.style.display = 'block';
+    document.getElementById('previewLogoText').style.display = 'none';
   };
   reader.readAsDataURL(file);
 }
@@ -558,13 +613,17 @@ function removeLogo() {
   document.getElementById('removeLogoFlag').value = '1';
   document.getElementById('logoFileInput').value  = '';
   document.getElementById('logoPreviewWrap').style.display = 'none';
-  document.getElementById('logoUploadHint').style.display  = '';
+  document.getElementById('logoUploadHint').style.display  = 'block';
+  document.getElementById('previewLogoPanel').style.display = 'none';
+  document.getElementById('previewLogoText').style.display  = 'block';
 }
 
 function clearLogoSelect() {
   document.getElementById('logoFileInput').value  = '';
   document.getElementById('logoPreviewWrap').style.display = 'none';
-  document.getElementById('logoUploadHint').style.display  = '';
+  document.getElementById('logoUploadHint').style.display  = 'block';
+  document.getElementById('previewLogoPanel').style.display = 'none';
+  document.getElementById('previewLogoText').style.display  = 'block';
 }
 
 /* ── Drag & drop ── */
@@ -607,6 +666,53 @@ function copyText(id) {
   navigator.clipboard?.writeText(text).then(() => {
     const btn = document.querySelector(`#${id} + button, button[onclick="copyText('${id}')"]`);
     if (btn) { const orig = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-check"></i>'; setTimeout(()=>btn.innerHTML=orig,1200); }
+  });
+}
+
+/* ── Dirty state — warn on unsaved changes ── */
+let formDirty = false;
+const brandingForm = document.getElementById('brandingForm');
+brandingForm.addEventListener('change', () => formDirty = true);
+brandingForm.addEventListener('input',  () => formDirty = true);
+brandingForm.addEventListener('submit', () => formDirty = false);
+window.addEventListener('beforeunload', e => {
+  if (formDirty) { e.preventDefault(); e.returnValue = ''; }
+});
+
+/* ── Send Test Email (AJAX) ── */
+function sendTestEmail() {
+  const btn    = document.getElementById('smtpTestBtn');
+  const result = document.getElementById('smtpTestResult');
+  btn.disabled  = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending…';
+  result.style.display = 'none';
+
+  const csrf = document.querySelector('input[name="csrf_token"]')?.value ?? '';
+
+  fetch('/reseller/actions/test-smtp.php', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body:    new URLSearchParams({ csrf_token: csrf })
+  })
+  .then(r => r.json())
+  .then(data => {
+    result.style.display = 'inline-flex';
+    if (data.success) {
+      result.innerHTML   = '<i class="fa-solid fa-circle-check" style="color:var(--success)"></i>&nbsp;' + (data.message ?? 'Sent!');
+      result.style.color = 'var(--success)';
+    } else {
+      result.innerHTML   = '<i class="fa-solid fa-circle-xmark" style="color:var(--danger)"></i>&nbsp;' + (data.error ?? 'Failed');
+      result.style.color = 'var(--danger)';
+    }
+  })
+  .catch(() => {
+    result.style.display = 'inline-flex';
+    result.innerHTML   = '<i class="fa-solid fa-circle-xmark" style="color:var(--danger)"></i>&nbsp;Network error';
+    result.style.color = 'var(--danger)';
+  })
+  .finally(() => {
+    btn.disabled  = false;
+    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Test Email';
   });
 }
 </script>

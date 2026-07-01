@@ -13,6 +13,8 @@ if (!csrf_verify()) {
 }
 
 $uid = current_user()['id'];
+$tab = in_array($_POST['active_tab'] ?? '', ['identity','colors','contact','email','billing'])
+       ? $_POST['active_tab'] : 'identity';
 
 // ── Text field sanitisation ──────────────────────────────────────────────────
 $systemName   = sanitize($_POST['system_name'] ?? '');
@@ -35,12 +37,12 @@ $sidebarColor = preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['sidebar_color'] ?? '')
 // ── Basic validation ─────────────────────────────────────────────────────────
 if (!$systemName) {
     flash_set('danger', 'Platform name is required.');
-    redirect('/reseller/branding.php');
+    redirect('/reseller/branding.php?tab=' . $tab);
 }
 
 if ($supportEmail && !filter_var($supportEmail, FILTER_VALIDATE_EMAIL)) {
     flash_set('danger', 'Invalid support email address.');
-    redirect('/reseller/branding.php');
+    redirect('/reseller/branding.php?tab=contact');
 }
 
 // ── SMTP password — preserve existing if blank ────────────────────────────────
@@ -61,12 +63,12 @@ if (!empty($_POST['remove_logo'])) {
 
     if ($file['size'] > 2 * 1024 * 1024) {
         flash_set('danger', 'Logo file is too large. Maximum size is 2 MB.');
-        redirect('/reseller/branding.php');
+        redirect('/reseller/branding.php?tab=identity');
     }
 
     if (!in_array($ext, ['png', 'jpg', 'jpeg', 'svg', 'webp'], true)) {
         flash_set('danger', 'Logo must be PNG, JPG, SVG, or WebP.');
-        redirect('/reseller/branding.php');
+        redirect('/reseller/branding.php?tab=identity');
     }
 
     $uploadDir = __DIR__ . '/../../uploads/branding/';
@@ -79,7 +81,7 @@ if (!empty($_POST['remove_logo'])) {
         $logoPath = '/uploads/branding/' . $filename;
     } else {
         flash_set('danger', 'Failed to save logo. Check server upload permissions.');
-        redirect('/reseller/branding.php');
+        redirect('/reseller/branding.php?tab=identity');
     }
 }
 
@@ -124,4 +126,4 @@ DB::execute(
 );
 
 flash_set('success', 'Branding settings saved successfully.');
-redirect('/reseller/branding.php');
+redirect('/reseller/branding.php?tab=' . $tab);

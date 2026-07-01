@@ -25,19 +25,45 @@ $to   = date('Y-m-d', $toTs);
 $validStatuses = ['sent', 'delivered', 'failed', 'queued', 'undelivered'];
 $statusFilter  = in_array($_GET['status'] ?? '', $validStatuses, true) ? $_GET['status'] : '';
 
-const MAX_ROWS = 100_000;
+// ── Build network scope (reseller + clients) ──────────────────────────────────
+$clientRows  = DB::query("SELECT id, name FROM users WHERE role='client' AND parent_id=?", [$uid]);
+$clients     = [];
+foreach ($clientRows as $c) {
+    $clients[(int)$c['id']] = $c['name'];
+}
 
-$sql    = "SELECT id, campaign_id, sender_id, recipient, message, units_charged, status, failed_reason, sent_at, created_at
-           FROM messages
-           WHERE user_id = ? AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY)";
-$params = [$uid, $from, $to];
+$clientFilter = (int)($_GET['client_id'] ?? 0);
+$showSelf     = ($clientFilter === -1);
+
+if ($showSelf) {
+    $networkIds = [$uid];
+} elseif ($clientFilter > 0 && isset($clients[$clientFilter])) {
+    $networkIds = [$clientFilter];
+} else {
+    $networkIds = array_merge([$uid], array_keys($clients));
+}
+
+if (empty($networkIds)) {
+    $networkIds = [0];
+}
+
+$in = implode(',', array_fill(0, count($networkIds), '?'));
+
+$sql    = "SELECT m.id, m.campaign_id, u.name as sender_name, m.user_id, m.sender_id,
+                  m.recipient, m.message, m.units_charged, m.status, m.failed_reason,
+                  m.sent_at, m.created_at
+           FROM messages m
+           JOIN users u ON m.user_id = u.id
+           WHERE m.user_id IN ($in) AND m.created_at >= ? AND m.created_at < DATE_ADD(?, INTERVAL 1 DAY)";
+$params = array_merge($networkIds, [$from, $to]);
 
 if ($statusFilter) {
-    $sql    .= " AND status = ?";
+    $sql    .= " AND m.status = ?";
     $params[] = $statusFilter;
 }
 
-$sql .= " ORDER BY created_at DESC LIMIT " . (MAX_ROWS + 1);
+const MAX_ROWS = 100_000;
+$sql .= " ORDER BY m.created_at DESC LIMIT " . (MAX_ROWS + 1);
 $data = DB::query($sql, $params);
 
 $truncated = count($data) > MAX_ROWS;
@@ -56,12 +82,14 @@ if ($truncated) {
     fputcsv($output, ["NOTE: Results capped at " . number_format(MAX_ROWS) . " rows. Narrow the date range to see all records."]);
 }
 
-fputcsv($output, ['Message ID', 'Campaign ID', 'Sender ID', 'Recipient', 'Message', 'Units Charged', 'Status', 'Failure Reason', 'Sent At', 'Created At']);
+fputcsv($output, ['Message ID', 'Campaign ID', 'Account', 'Sender ID', 'Recipient', 'Message', 'Units Charged', 'Status', 'Failure Reason', 'Sent At', 'Created At']);
 
 foreach ($data as $row) {
+    $accountName = ((int)$row['user_id'] === $uid) ? $user['name'] . ' (You)' : $row['sender_name'];
     fputcsv($output, [
         $row['id'],
         $row['campaign_id'] ?: '',
+        $accountName,
         $row['sender_id'],
         $row['recipient'],
         $row['message'],
