@@ -51,7 +51,7 @@ $in = implode(',', array_fill(0, count($networkIds), '?'));
 
 $sql    = "SELECT m.id, m.campaign_id, u.name as sender_name, m.user_id, m.sender_id,
                   m.recipient, m.message, m.units_charged, m.status, m.failed_reason,
-                  m.sent_at, m.created_at
+                  m.delivered_at, m.sent_at, m.created_at
            FROM messages m
            JOIN users u ON m.user_id = u.id
            WHERE m.user_id IN ($in) AND m.created_at >= ? AND m.created_at < DATE_ADD(?, INTERVAL 1 DAY)";
@@ -82,7 +82,7 @@ if ($truncated) {
     fputcsv($output, ["NOTE: Results capped at " . number_format(MAX_ROWS) . " rows. Narrow the date range to see all records."]);
 }
 
-fputcsv($output, ['Message ID', 'Campaign ID', 'Account', 'Sender ID', 'Recipient', 'Message', 'Units Charged', 'Status', 'Failure Reason', 'Sent At', 'Created At']);
+fputcsv($output, ['Message ID', 'Campaign ID', 'Account', 'Sender ID', 'Recipient', 'Message', 'Units Charged', 'Status', 'Failure Reason', 'Delivered At', 'Sent At', 'Created At']);
 
 foreach ($data as $row) {
     $accountName = ((int)$row['user_id'] === $uid) ? $user['name'] . ' (You)' : $row['sender_name'];
@@ -96,6 +96,7 @@ foreach ($data as $row) {
         $row['units_charged'],
         ucfirst($row['status']),
         $row['failed_reason'] ?? '',
+        $row['delivered_at'] ?? '',
         $row['sent_at'] ?: '',
         $row['created_at'],
     ]);

@@ -49,6 +49,30 @@ if (random_int(1, 60) === 1) {
 }
 
 // ------------------------------------------------------------------
+// Housekeeping: mark stale 'queued' standalone messages as 'failed'.
+//
+// When a PHP-FPM worker is killed mid-request (request_terminate_timeout,
+// OOM, server restart) while waiting for Onfon's response, the message
+// row stays in 'queued' status permanently — the gateway may have
+// already accepted and delivered the message, but our record is orphaned.
+//
+// After 5 minutes with no update, it is safe to assume the request
+// died.  We mark these 'failed' so they surface in reports and
+// the customer can investigate or retry.  campaign_id IS NULL because
+// campaign messages are tracked by a separate heartbeat mechanism.
+// ------------------------------------------------------------------
+$stale = (int)DB::execute(
+    "UPDATE messages
+     SET status = 'failed', failed_reason = 'Request timed out before gateway responded — check if the message was delivered, then retry if needed.'
+     WHERE status = 'queued'
+       AND campaign_id IS NULL
+       AND created_at < NOW() - INTERVAL 5 MINUTE"
+);
+if ($stale > 0) {
+    $log("Marked {$stale} stale standalone queued message(s) as failed.");
+}
+
+// ------------------------------------------------------------------
 // Read worker cap — DB setting overrides the compile-time constant.
 // ------------------------------------------------------------------
 $capRow = DB::queryOne("SELECT value FROM system_settings WHERE `key` = 'max_concurrent_campaigns'");

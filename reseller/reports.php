@@ -211,12 +211,14 @@ $csvQs = http_build_query(array_filter([
           <th>Message</th>
           <th>Units</th>
           <th>Status</th>
+          <th>Failure Reason</th>
+          <th>Delivered At</th>
           <th>Date</th>
         </tr>
       </thead>
       <tbody>
         <?php if (empty($messages)): ?>
-          <tr><td colspan="<?= (!$showSelf && !($clientFilter > 0)) ? 8 : 7 ?>" class="text-center text-muted" style="padding:30px">No messages in selected date range</td></tr>
+          <tr><td colspan="<?= (!$showSelf && !($clientFilter > 0)) ? 10 : 9 ?>" class="text-center text-muted" style="padding:30px">No messages in selected date range</td></tr>
         <?php else: ?>
           <?php foreach ($messages as $i => $m):
             $sc = ['sent'=>'success','delivered'=>'success','failed'=>'danger','queued'=>'warning','undelivered'=>'warning'][$m['status']] ?? 'muted';
@@ -240,6 +242,13 @@ $csvQs = http_build_query(array_filter([
               </td>
               <td><?=$m['units_charged']?></td>
               <td><span class="badge badge-<?=$sc?>"><?=ucfirst($m['status'])?></span></td>
+              <td style="font-size:11px;color:var(--danger);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                  title="<?=htmlspecialchars($m['failed_reason']??'')?>">
+                <?=htmlspecialchars($m['failed_reason']??'')?>&nbsp;
+              </td>
+              <td style="font-size:11px;white-space:nowrap;color:var(--text-secondary)">
+                <?=$m['delivered_at'] ? date('d M Y H:i', strtotime($m['delivered_at'])) : '—'?>
+              </td>
               <td style="font-size:11px"><?=$m['created_at'] ? date('d M Y H:i', strtotime($m['created_at'])) : '—'?></td>
             </tr>
           <?php endforeach; ?>
