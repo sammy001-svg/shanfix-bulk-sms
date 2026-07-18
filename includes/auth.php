@@ -225,6 +225,41 @@ function safe_referer(string $default = '/'): string {
     return $ref;
 }
 
+/**
+ * Render windowed pagination links: first, last, and ±2 around the current
+ * page, with ellipses in between.  Replaces the old 1..N loop that emitted
+ * every page as an <a> — with a large table (e.g. millions of messages at
+ * 30/page) that generated tens of thousands of DOM nodes and froze the
+ * browser tab on render.
+ *
+ * @param int    $page       Current page (1-based)
+ * @param int    $totalPages Total number of pages
+ * @param array  $query      Extra query params to keep in each link (page is added automatically)
+ */
+function render_pagination(int $page, int $totalPages, array $query = []): void {
+    if ($totalPages <= 1) return;
+
+    $link = function (int $p) use ($query): string {
+        return '?' . http_build_query(array_merge($query, ['page' => $p]));
+    };
+
+    // Build the visible page set: 1, last, current ±2
+    $pages = [1, $totalPages];
+    for ($p = max(1, $page - 2); $p <= min($totalPages, $page + 2); $p++) $pages[] = $p;
+    $pages = array_unique($pages);
+    sort($pages);
+
+    $prev = 0;
+    foreach ($pages as $p) {
+        if ($p - $prev > 1) {
+            echo '<span class="page-btn" style="pointer-events:none;border:none;background:none">…</span>';
+        }
+        $active = $p === $page ? ' active' : '';
+        echo '<a href="' . htmlspecialchars($link($p)) . '" class="page-btn' . $active . '">' . $p . '</a>';
+        $prev = $p;
+    }
+}
+
 function flash_set($type, $message) {
     $_SESSION['flash'] = compact('type', 'message');
 }

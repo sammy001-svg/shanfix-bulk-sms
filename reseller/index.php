@@ -8,7 +8,7 @@ $uid           = $user['id'];
 $totalClients  = DB::queryOne("SELECT COUNT(*) as c FROM users WHERE role='client' AND parent_id=?",[$uid])['c'] ?? 0;
 $totalCampaigns= DB::queryOne("SELECT COUNT(*) as c FROM campaigns WHERE user_id=?",[$uid])['c'] ?? 0;
 $msgSent       = DB::queryOne("SELECT COUNT(*) as c FROM messages WHERE user_id=? AND status='sent'",[$uid])['c'] ?? 0;
-$msgToday      = DB::queryOne("SELECT COUNT(*) as c FROM messages WHERE user_id=? AND DATE(created_at)=CURDATE()",[$uid])['c'] ?? 0;
+$msgToday      = DB::queryOne("SELECT COUNT(*) as c FROM messages WHERE user_id=? AND created_at>=CURDATE()",[$uid])['c'] ?? 0;
 $units         = $user['sms_units'];
 $isNewUser     = $totalCampaigns == 0;
 

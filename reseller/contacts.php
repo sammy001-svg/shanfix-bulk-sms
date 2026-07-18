@@ -110,9 +110,7 @@ $totalPages = ceil($total/$perPage);
       <?php if ($totalPages > 1): ?>
         <div class="card-footer">
           <div class="pagination">
-            <?php for ($p=1;$p<=$totalPages;$p++): ?>
-              <a href="?page=<?=$p?>&group=<?=$grpId?>&q=<?=urlencode($search)?>" class="page-btn <?=$p===$page?'active':''?>"><?=$p?></a>
-            <?php endfor; ?>
+            <?php render_pagination($page, (int)$totalPages, array_filter(['group' => $grpId, 'q' => $search])); ?>
           </div>
         </div>
       <?php endif; ?>

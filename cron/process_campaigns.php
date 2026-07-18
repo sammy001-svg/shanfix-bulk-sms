@@ -46,6 +46,22 @@ if (random_int(1, 60) === 1) {
     $c1 = (int)DB::execute("DELETE FROM api_rate_counters WHERE window_start < NOW() - INTERVAL 2 HOUR");
     $c2 = (int)DB::execute("DELETE FROM rate_limits WHERE hit_at < NOW() - INTERVAL 48 HOUR");
     if ($c1 + $c2 > 0) $log("Pruned {$c1} rate-counter row(s) and {$c2} rate-limit row(s).");
+
+    // Rotate gateway debug logs — they grow unbounded (one line per gateway
+    // call / DLR).  When a log passes 10 MB keep only the newest ~2 MB.
+    foreach (['onfon_debug.log', 'dlr_debug.log'] as $logFile) {
+        $path = __DIR__ . '/../includes/gateways/' . $logFile;
+        if (is_file($path) && filesize($path) > 10 * 1024 * 1024) {
+            $fh = fopen($path, 'rb');
+            fseek($fh, -2 * 1024 * 1024, SEEK_END);
+            $tail = stream_get_contents($fh);
+            fclose($fh);
+            // Drop the partial first line, then atomically replace
+            $tail = substr($tail, (int)strpos($tail, "\n") + 1);
+            file_put_contents($path, $tail, LOCK_EX);
+            $log("Rotated {$logFile} (kept newest 2 MB).");
+        }
+    }
 }
 
 // ------------------------------------------------------------------

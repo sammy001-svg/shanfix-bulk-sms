@@ -145,6 +145,7 @@ CREATE TABLE IF NOT EXISTS `messages` (
   KEY `idx_status` (`status`),
   KEY `idx_campaign_status` (`campaign_id`, `status`),
   KEY `idx_user_created`    (`user_id`, `created_at`),
+  KEY `idx_gateway_msg_id`  (`gateway_msg_id`),
   CONSTRAINT `fk_msg_campaign` FOREIGN KEY (`campaign_id`) REFERENCES `campaigns`(`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_msg_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

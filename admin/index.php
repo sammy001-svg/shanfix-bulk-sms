@@ -29,16 +29,17 @@ if (!isset($_SESSION['_dash_stable_ts']) || ($_now - $_SESSION['_dash_stable_ts'
     $_SESSION['_dash_stable']['chartLabels'] = json_encode(array_column($chartData, 'day'));
     $_SESSION['_dash_stable']['chartValues'] = json_encode(array_column($chartData, 'total'));
 
-    // Top resellers (heavy 3-table JOIN + GROUP BY)
+    // Top resellers — correlated subqueries instead of joining campaigns ×
+    // messages, which multiplied into (campaigns × messages) rows per user
+    // and could freeze the page for minutes on a large messages table.
+    // (The old SUM(m.id) also summed message IDs instead of counting them.)
     $_SESSION['_dash_stable']['topResellers'] = DB::query("
         SELECT u.name, u.email, u.sms_units,
-               COUNT(c.id) as campaigns,
-               COALESCE(SUM(m.id),0) as messages_sent
+               (SELECT COUNT(*) FROM campaigns c WHERE c.user_id = u.id) as campaigns,
+               (SELECT COUNT(*) FROM messages  m WHERE m.user_id = u.id) as messages_sent
         FROM users u
-        LEFT JOIN campaigns c ON c.user_id = u.id
-        LEFT JOIN messages  m ON m.user_id = u.id
         WHERE u.role = 'reseller'
-        GROUP BY u.id ORDER BY messages_sent DESC LIMIT 5
+        ORDER BY messages_sent DESC LIMIT 5
     ");
     $_SESSION['_dash_stable_ts'] = $_now;
 }
@@ -54,7 +55,7 @@ $topResellers   = $_SESSION['_dash_stable']['topResellers'];
 
 // Today's send count — refreshes every 5 minutes
 if (!isset($_SESSION['_dash_today_ts']) || ($_now - $_SESSION['_dash_today_ts']) > 300) {
-    $_SESSION['_dash_today']    = (int)(DB::queryOne("SELECT COUNT(*) as c FROM messages WHERE DATE(created_at) = CURDATE()")['c'] ?? 0);
+    $_SESSION['_dash_today']    = (int)(DB::queryOne("SELECT COUNT(*) as c FROM messages WHERE created_at >= CURDATE()")['c'] ?? 0);
     $_SESSION['_dash_today_ts'] = $_now;
 }
 $sentToday = $_SESSION['_dash_today'];

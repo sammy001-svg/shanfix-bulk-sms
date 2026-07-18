@@ -83,7 +83,7 @@ $totalPages = ceil($total/$perPage);
   </div>
   <?php if ($totalPages>1): ?>
     <div class="card-footer"><div class="pagination">
-      <?php for($p=1;$p<=$totalPages;$p++): ?><a href="?page=<?=$p?>&q=<?=urlencode($search)?>" class="page-btn <?=$p===$page?'active':''?>"><?=$p?></a><?php endfor; ?>
+      <?php render_pagination($page, (int)$totalPages, array_filter(['q' => $search])); ?>
     </div></div>
   <?php endif; ?>
 </div>

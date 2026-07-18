@@ -48,11 +48,22 @@ $envInfo = [
 ];
 
 // ── Read last N lines of the debug log ────────────────────────────────────────
+// Read only the tail of the file — file() loads the ENTIRE log into memory,
+// and this log grows unbounded (every gateway call appends).  A few hundred
+// MB of log froze the page and could exhaust memory_limit.
 $logLines = [];
 if (file_exists($logPath)) {
-    $lines = file($logPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    $logLines = array_slice($lines, -150); // last 150 entries
-    $logLines = array_reverse($logLines);  // newest first
+    $fh = fopen($logPath, 'rb');
+    if ($fh) {
+        $size  = filesize($logPath);
+        $chunk = 256 * 1024; // 256 KB tail is plenty for 150 lines
+        fseek($fh, max(0, $size - $chunk));
+        $tail = stream_get_contents($fh);
+        fclose($fh);
+        $lines = array_values(array_filter(explode("\n", $tail), 'strlen'));
+        if ($size > $chunk && count($lines) > 1) array_shift($lines); // drop partial first line
+        $logLines = array_reverse(array_slice($lines, -150)); // newest first
+    }
 }
 
 // ── Sender IDs for test form ───────────────────────────────────────────────────
