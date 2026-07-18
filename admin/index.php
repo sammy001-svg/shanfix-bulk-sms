@@ -114,7 +114,7 @@ $recentCampaigns = $_SESSION['_dash_campaigns'];
     </div>
   </div>
   <!-- Provider Balance Card -->
-  <div class="stat-card" style="border: 1px solid var(--primary-light); background: rgba(0, 200, 150, 0.03);">
+  <div class="stat-card">
     <div class="stat-icon blue" style="position:relative; z-index:2;"><i class="fa-solid fa-cloud-arrow-down"></i></div>
     <div class="stat-info" style="position:relative; z-index:2;">
       <div class="stat-label">Onfon Live Balance</div>

@@ -8,6 +8,7 @@
 :root {
   /* Brand Colors - Stable across themes */
   --primary: #00c896;
+  --primary-rgb: 0, 200, 150; /* overridden by Branding::renderStyles() on white-label panels */
   --primary-dark: #00a87e;
   --primary-light: #e6faf5;
   --accent: #1de9b6;
@@ -1878,6 +1879,97 @@ body.modal-open .page-content {
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(30px) scale(0.95); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ─── 3D Neon Cards ──────────────────────────────────────────
+   Every .card / .stat-card gets a neon ring drawn as a conic-
+   gradient border plus a soft outer glow.  On hover the ring's
+   start angle (--neon-angle) is animated, so the light visibly
+   orbits the card, and the card tilts in 3D perspective.
+   --neon-angle must be a registered @property so browsers can
+   interpolate it; without support the ring shows statically.  */
+@property --neon-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* All neon hues derive from --primary-rgb, so white-labeled reseller/client
+   panels automatically glow in their own brand colour. neon-2 is the bright
+   "hot core" of the comet, neon-1/3 the coloured halo trailing it. */
+:root {
+  --neon-1: rgba(var(--primary-rgb), 0.55);
+  --neon-2: rgba(var(--primary-rgb), 0.95);
+  --neon-3: rgba(var(--primary-rgb), 0.40);
+  --neon-glow-soft:
+    0 0 10px rgba(var(--primary-rgb), 0.12),
+    0 0 26px rgba(var(--primary-rgb), 0.07);
+  --neon-glow-strong:
+    0 0 14px rgba(var(--primary-rgb), 0.30),
+    0 0 40px rgba(var(--primary-rgb), 0.18),
+    0 0 80px rgba(var(--primary-rgb), 0.10);
+}
+html.dark-mode body {
+  --neon-1: rgba(var(--primary-rgb), 0.85);
+  --neon-2: rgba(var(--primary-rgb), 1);
+  --neon-3: rgba(var(--primary-rgb), 0.60);
+  --neon-glow-soft:
+    0 0 12px rgba(var(--primary-rgb), 0.20),
+    0 0 32px rgba(var(--primary-rgb), 0.12);
+  --neon-glow-strong:
+    0 0 18px rgba(var(--primary-rgb), 0.45),
+    0 0 48px rgba(var(--primary-rgb), 0.28),
+    0 0 96px rgba(var(--primary-rgb), 0.16);
+}
+
+@keyframes neon-orbit {
+  to { --neon-angle: 360deg; }
+}
+
+.card,
+.stat-card {
+  /* Transparent border + two-layer background: the card colour fills the
+     padding-box, the conic neon ring shows through in the border area. */
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--bg-card), var(--bg-card)) padding-box,
+    conic-gradient(from var(--neon-angle),
+      var(--neon-1)   0deg,
+      var(--neon-2)  45deg,
+      transparent   115deg,
+      transparent   170deg,
+      var(--neon-3) 225deg,
+      var(--neon-1) 268deg,
+      transparent   335deg,
+      var(--neon-1) 360deg) border-box;
+  box-shadow: var(--shadow-card), var(--neon-glow-soft);
+  transform-style: preserve-3d;
+}
+
+.card {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card:hover {
+  transform: perspective(1200px) rotateX(1.2deg) translateY(-3px);
+  box-shadow: var(--shadow-md), var(--neon-glow-strong);
+  animation: neon-orbit 2.6s linear infinite;
+}
+
+.stat-card:hover {
+  transform: perspective(900px) rotateX(4deg) rotateY(-3deg) translateY(-6px) scale(1.015);
+  box-shadow: var(--shadow-md), var(--neon-glow-strong);
+  animation: neon-orbit 2.6s linear infinite;
+}
+
+/* Respect users who opt out of motion — keep the glow, skip the movement */
+@media (prefers-reduced-motion: reduce) {
+  .card:hover,
+  .stat-card:hover {
+    animation: none;
+    transform: none;
+  }
 }
 
 /* ─── Scrollbar ──────────────────────────────────────────── */
