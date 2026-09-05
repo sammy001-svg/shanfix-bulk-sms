@@ -125,6 +125,24 @@ $siteUrlSetting = rtrim((string)(DB::queryOne("SELECT value FROM system_settings
 // exactly like Onfon never calling at all — worth flagging explicitly.
 $dlrToken = (string)(DB::queryOne("SELECT value FROM system_settings WHERE `key` = 'dlr_webhook_token'")['value'] ?? '');
 
+// -- Message ID capture --------------------------------------------------------
+// A delivery receipt is matched to a message by gateway_msg_id. If Onfon's send
+// response does not return MessageId we store NULL, and then no receipt can
+// ever match anything - no amount of portal configuration would help. This is
+// the first thing to rule out when receipts never appear.
+$msgIdHealth = null;
+try {
+    $msgIdHealth = DB::queryOne(
+        "SELECT COUNT(*) AS total,
+                SUM(gateway_msg_id IS NOT NULL AND gateway_msg_id <> '') AS with_id
+         FROM messages
+         WHERE status IN ('sent','delivered','undelivered')
+           AND created_at >= NOW() - INTERVAL 30 DAY"
+    );
+} catch (Throwable $e) {
+    $msgIdHealth = null;
+}
+
 // -- DLR self-test -------------------------------------------------------------
 // Proves whether our own receipt endpoint works, so "no carrier receipts" can
 // be pinned on either our side or the Onfon portal configuration rather than
@@ -279,6 +297,35 @@ if (isset($_GET['cleared'])): ?>
               Paste into Onfon &rarr; Account &rarr; SMS Settings &rarr; Delivery Report URL.
               <?= htmlspecialchars($siteUrlSetting . '/webhooks/sms-dlr.php') ?> also works &mdash; both endpoints record identical statuses.
             </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="width:220px;font-weight:600;padding:8px 16px;vertical-align:top">Message ID capture</td>
+          <td style="padding:8px 16px">
+            <?php if ($msgIdHealth === null): ?>
+              <span class="badge badge-muted">Unavailable</span>
+            <?php else: ?>
+              <?php $mTot = (int)$msgIdHealth['total']; $mWith = (int)$msgIdHealth['with_id']; ?>
+              <?php if ($mTot === 0): ?>
+                <span class="badge badge-muted">No messages in the last 30 days</span>
+              <?php elseif ($mWith === 0): ?>
+                <span class="badge badge-danger">None captured</span>
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:6px">
+                  <strong>This is why no delivery receipts can ever be recorded.</strong>
+                  All <?= number_format($mTot) ?> sent messages have an empty <code>gateway_msg_id</code>, and a receipt is
+                  matched to a message by exactly that value. Onfon's send response is not returning
+                  <code>MessageId</code>, so even a correctly registered DLR URL would match nothing.
+                  Check <code>includes/gateways/onfon_debug.log</code> for a raw send response, and ask Onfon to
+                  enable message IDs / delivery reports on the account.
+                </div>
+              <?php elseif ($mWith < $mTot): ?>
+                <span class="badge badge-warning"><?= round($mWith / $mTot * 100, 1) ?>% captured</span>
+                <span style="font-size:12px;color:var(--text-secondary)"> &mdash; <?= number_format($mWith) ?> of <?= number_format($mTot) ?> messages can be matched to a receipt; the rest cannot.</span>
+              <?php else: ?>
+                <span class="badge badge-success">All captured</span>
+                <span style="font-size:12px;color:var(--text-secondary)"> &mdash; <?= number_format($mWith) ?> messages carry a gateway ID and can be matched to a receipt.</span>
+              <?php endif; ?>
+            <?php endif; ?>
           </td>
         </tr>
         <?php if ($dlrHealth === null): ?>

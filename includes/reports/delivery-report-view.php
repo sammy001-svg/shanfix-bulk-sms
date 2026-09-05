@@ -159,7 +159,14 @@ $drPresets = [
     <?php endif; ?>
     <?php if ($drTotalMsgs > 0): ?>
       <div style="margin-top:6px">
-        <?php if ($drWithDlr === 0): ?>
+        <?php if ($drWithDlr === 0 && $drWithGatewayId === 0): ?>
+          <span class="badge badge-danger">No gateway message IDs</span>
+          None of these messages carry a gateway message ID, so no delivery receipt can be matched to them.
+          Registering a delivery-report URL will not help until the gateway returns message IDs on send.
+          <?php if ((current_user()['role'] ?? '') === 'admin'): ?>
+            See <a href="/admin/gateway-diagnostics.php">Gateway Diag &rarr; Message ID capture</a>.
+          <?php endif; ?>
+        <?php elseif ($drWithDlr === 0): ?>
           <span class="badge badge-warning">No carrier receipts</span>
           Every status here is derived from our own send result. Register the delivery-report URL in the
           Onfon portal (Account &rarr; SMS Settings &rarr; Delivery Report URL) for the true carrier statuses.

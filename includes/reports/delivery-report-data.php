@@ -163,6 +163,17 @@ $drTotalMsgs   = (int)($drCoverage['total'] ?? 0);
 $drWithDlr     = (int)($drCoverage['with_dlr'] ?? 0);
 $drCoveragePct = $drTotalMsgs > 0 ? round($drWithDlr / $drTotalMsgs * 100, 1) : 0.0;
 
+// A receipt is matched to a message by gateway_msg_id. With none captured, no
+// receipt can ever match, and pointing at the portal configuration would be
+// misleading.
+$drIdCoverage = DB::queryOne(
+    "SELECT SUM(m.gateway_msg_id IS NOT NULL AND m.gateway_msg_id <> '') AS with_id
+     FROM messages m
+     $drWhere",
+    $drParams
+);
+$drWithGatewayId = (int)($drIdCoverage['with_id'] ?? 0);
+
 // ── Bucketing (Aggregate mode) ────────────────────────────────────────────────
 // Delivered / Pending / Failed, decided by the shared status vocabulary so the
 // two modes can never classify the same carrier state differently.
