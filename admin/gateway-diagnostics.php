@@ -102,6 +102,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['kk_test_phone'])) {
     }
 }
 
+// -- Delivery receipt health ---------------------------------------------------
+$dlrHealth = null;
+if (diagHasColumn('messages', 'dlr_status')) {
+    try {
+        $dlrHealth = DB::queryOne(
+            "SELECT COUNT(*) AS total,
+                    SUM(dlr_status IS NOT NULL AND dlr_status <> '') AS with_dlr,
+                    MAX(CASE WHEN dlr_status IS NOT NULL AND dlr_status <> '' THEN created_at END) AS last_dlr
+             FROM messages
+             WHERE created_at >= NOW() - INTERVAL 7 DAY"
+        );
+    } catch (Throwable $e) {
+        $dlrHealth = null;
+    }
+}
+
+$siteUrlSetting = rtrim((string)(DB::queryOne("SELECT value FROM system_settings WHERE `key` = 'site_url'")['value'] ?? ''), '/');
+
 // -- Environment info ----------------------------------------------------------
 $disabledFns = array_filter(array_map('trim', explode(',', ini_get('disable_functions'))));
 $checkFns    = ['exec', 'shell_exec', 'popen', 'proc_open', 'system'];
@@ -162,6 +180,61 @@ if (isset($_GET['cleared'])): ?>
     <?=htmlspecialchars($testResult['msg'])?>
   </div>
 <?php endif; ?>
+
+<!-- Delivery receipts -->
+<div class="card" style="margin-bottom:18px">
+  <div class="card-header"><h3 class="card-title"><i class="fa-solid fa-truck-fast" style="color:var(--primary)"></i> Delivery Receipts (DLR)</h3></div>
+  <div class="card-body" style="padding:0">
+    <table class="data-table" style="margin:0">
+      <tbody>
+        <tr>
+          <td style="width:220px;font-weight:600;padding:8px 16px">DLR URL to register</td>
+          <td style="padding:8px 16px;font-family:monospace;font-size:12px;word-break:break-all">
+            <?= htmlspecialchars($siteUrlSetting . '/api/v1/dlr.php') ?>
+            <div style="font-size:11px;color:var(--text-secondary);font-family:inherit;margin-top:3px">
+              Paste into Onfon &rarr; Account &rarr; SMS Settings &rarr; Delivery Report URL.
+              <?= htmlspecialchars($siteUrlSetting . '/webhooks/sms-dlr.php') ?> also works &mdash; both endpoints record identical statuses.
+            </div>
+          </td>
+        </tr>
+        <?php if ($dlrHealth === null): ?>
+          <tr>
+            <td style="width:220px;font-weight:600;padding:8px 16px">Receipts (last 7 days)</td>
+            <td style="padding:8px 16px">
+              <span class="badge badge-danger">Unavailable</span>
+              <span style="font-size:12px;color:var(--text-secondary)"> &mdash; messages.dlr_status is missing; run <code>database/dlr_status_migration.sql</code></span>
+            </td>
+          </tr>
+        <?php else: ?>
+          <tr>
+            <td style="width:220px;font-weight:600;padding:8px 16px">Receipts (last 7 days)</td>
+            <td style="padding:8px 16px">
+              <?php $tot = (int)$dlrHealth['total']; $wd = (int)$dlrHealth['with_dlr']; ?>
+              <?php if ($tot === 0): ?>
+                <span class="badge badge-muted">No messages sent</span>
+              <?php elseif ($wd === 0): ?>
+                <span class="badge badge-danger">None received</span>
+                <span style="font-size:12px;color:var(--text-secondary)"> &mdash; <?= number_format($tot) ?> messages sent, 0 receipts. Onfon is not calling the DLR URL above, so the granular delivery statuses cannot populate.</span>
+              <?php else: ?>
+                <span class="badge badge-success"><?= round($wd / $tot * 100, 1) ?>% covered</span>
+                <span style="font-size:12px;color:var(--text-secondary)"> &mdash; <?= number_format($wd) ?> of <?= number_format($tot) ?> messages. Last receipt: <?= htmlspecialchars($dlrHealth['last_dlr'] ?? 'never') ?></span>
+              <?php endif; ?>
+            </td>
+          </tr>
+        <?php endif; ?>
+        <tr>
+          <td style="width:220px;font-weight:600;padding:8px 16px">Raw DLR log</td>
+          <td style="padding:8px 16px;font-family:monospace;font-size:12px">
+            <?php $dlrLog = __DIR__ . '/../includes/gateways/dlr_debug.log'; ?>
+            <?= file_exists($dlrLog)
+                ? '<span class="badge badge-success">Exists</span> ' . number_format(filesize($dlrLog)) . ' bytes'
+                : '<span class="badge badge-warning">Not created yet</span> no DLR has reached /api/v1/dlr.php' ?>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
 <!-- Kopo Kopo -->
 <div class="card" style="margin-bottom:18px">

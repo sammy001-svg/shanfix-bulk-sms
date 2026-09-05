@@ -23,6 +23,7 @@
  */
 
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../helpers/dlr-status.php';
 
 // ── Filters ───────────────────────────────────────────────────────────────────
 $drToday = date('Y-m-d');
@@ -72,7 +73,7 @@ const DR_DERIVED_LABEL = "COALESCE(NULLIF(m.dlr_status, ''), CASE m.status
             WHEN 'sent'        THEN 'Submitted'
             WHEN 'failed'      THEN 'REJECTD'
             WHEN 'undelivered' THEN 'DeliveryImpossible'
-            WHEN 'queued'      THEN 'Queued'
+            WHEN 'queued'      THEN 'Submitted'
             ELSE 'Unknown' END)";
 
 $drWhere  = "WHERE ($drScopeSql) AND m.created_at >= ? AND m.created_at < DATE_ADD(?, INTERVAL 1 DAY)";
@@ -95,19 +96,24 @@ $drGrouped = DB::query(
     $drParams
 );
 
+// ── Receipt coverage ──────────────────────────────────────────────────────────
+// How much of this period is backed by a real carrier receipt rather than
+// derived from our own ENUM. If this stays at 0, Onfon is not calling the DLR
+// URL and the granular columns cannot populate.
+$drCoverage = DB::queryOne(
+    "SELECT COUNT(*) AS total,
+            SUM(m.dlr_status IS NOT NULL AND m.dlr_status <> '') AS with_dlr
+     FROM messages m
+     $drWhere",
+    $drParams
+);
+$drTotalMsgs   = (int)($drCoverage['total'] ?? 0);
+$drWithDlr     = (int)($drCoverage['with_dlr'] ?? 0);
+$drCoveragePct = $drTotalMsgs > 0 ? round($drWithDlr / $drTotalMsgs * 100, 1) : 0.0;
+
 // ── Bucketing (Aggregate mode) ────────────────────────────────────────────────
-/** Collapse a granular carrier status into Delivered / Pending / Failed. */
-function dr_bucket(string $label): string {
-    $key = strtolower(preg_replace('/[^a-z]/i', '', $label));
-
-    $delivered = ['delivrd', 'delivered', 'delivredtoterminal', 'deliveredtoterminal', 'success'];
-    $pending   = ['submitted', 'acceptd', 'accepted', 'enroute', 'buffered', 'pending', 'queued'];
-
-    if (in_array($key, $delivered, true)) return 'Delivered';
-    if (in_array($key, $pending, true))   return 'Pending';
-    if ($key === 'unknown')               return 'Unknown';
-    return 'Failed';
-}
+// Delivered / Pending / Failed, decided by the shared status vocabulary so the
+// two modes can never classify the same carrier state differently.
 
 // ── Pivot ─────────────────────────────────────────────────────────────────────
 $drRows    = [];   // day => ['cells' => [col => n], 'total_sms' => n, 'total_units' => f]
@@ -116,7 +122,10 @@ $drTotals  = ['cells' => [], 'total_sms' => 0, 'total_units' => 0.0];
 
 foreach ($drGrouped as $g) {
     $day   = $g['day'];
-    $col   = $drMode === 'aggregate' ? dr_bucket((string)$g['dlr']) : (string)$g['dlr'];
+    // Normalise on read as well: rows written before the shared vocabulary
+    // existed may hold a raw carrier string such as 'DeliveredToTerminal'.
+    $label = DlrStatus::normalise((string)$g['dlr']);
+    $col   = $drMode === 'aggregate' ? DlrStatus::bucket($label) : $label;
     $cnt   = (int)$g['cnt'];
     $units = (float)$g['units'];
 
@@ -135,26 +144,21 @@ foreach ($drGrouped as $g) {
 }
 
 // ── Column order ──────────────────────────────────────────────────────────────
-// Fixed priority for the statuses the carrier commonly reports, so the table
-// keeps a stable, readable shape; anything unrecognised is appended A-Z.
-$drPriority = $drMode === 'aggregate'
-    ? ['Delivered', 'Pending', 'Failed', 'Unknown']
-    : [
-        'DelivredToTerminal', 'DeliveredToTerminal', 'DELIVRD', 'Delivered',
-        'Submitted', 'Queued', 'ACCEPTD', 'ENROUTE', 'Buffered',
-        'AbsentSubscriber', 'DeliveryImpossible', 'REJECTD', 'Rejected',
-        'Sendername blacklisted', 'Expired', 'Unknown',
-      ];
+// The canonical statuses are always rendered, even with no traffic in the
+// period, so the table keeps the same shape as the Onfon report rather than
+// gaining and losing columns as the date range changes. Any carrier state we
+// have not catalogued is appended after them, A-Z, so it stays visible.
+if ($drMode === 'aggregate') {
+    $drPriority = ['Delivered', 'Pending', 'Failed', 'Unknown'];
+    $drColumns  = $drPriority;
+} else {
+    $drPriority = DlrStatus::CANONICAL;
+    $drColumns  = $drPriority;
+}
 
-$drColumns = array_keys($drColSeen);
-usort($drColumns, static function ($a, $b) use ($drPriority) {
-    $ia = array_search($a, $drPriority, true);
-    $ib = array_search($b, $drPriority, true);
-    if ($ia === false && $ib === false) return strcasecmp($a, $b);
-    if ($ia === false) return 1;
-    if ($ib === false) return -1;
-    return $ia <=> $ib;
-});
+$drExtra = array_diff(array_keys($drColSeen), $drPriority);
+sort($drExtra, SORT_NATURAL | SORT_FLAG_CASE);
+$drColumns = array_merge($drColumns, $drExtra);
 
 // Newest day first, as in the source report.
 krsort($drRows);

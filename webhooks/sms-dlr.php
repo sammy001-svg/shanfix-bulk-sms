@@ -26,45 +26,9 @@
  */
 header('Content-Type: application/json');
 
-/**
- * Classify a raw carrier status into ['enum' => ?string, 'label' => string].
- *
- * enum === null means the state is not terminal: record the label for
- * reporting but leave messages.status alone.
- */
-function dlr_classify($raw): array {
-    $trimmed = trim((string)$raw);
-
-    // Numeric Onfon codes — the documented default.
-    if ($trimmed !== '' && is_numeric($trimmed)) {
-        switch ((int)$trimmed) {
-            case 1:  return ['enum' => 'delivered', 'label' => 'DELIVRD'];
-            case 2:  return ['enum' => 'failed',    'label' => 'REJECTD'];
-            default: return ['enum' => null,        'label' => 'Submitted'];
-        }
-    }
-
-    // Carrier status strings, matched case-insensitively and space-insensitively.
-    $key = strtolower(preg_replace('/[^a-z]/i', '', $trimmed));
-
-    $delivered = ['delivrd', 'delivered', 'delivredtoterminal', 'deliveredtoterminal', 'success'];
-    $failed    = [
-        'rejectd', 'rejected', 'failed', 'undeliv', 'undelivered', 'undeliverable',
-        'absentsubscriber', 'deliveryimpossible', 'expired', 'deleted',
-        'sendernameblacklisted', 'blacklisted', 'unknownsubscriber', 'invalidnumber',
-    ];
-    $pending   = ['submitted', 'acceptd', 'accepted', 'enroute', 'buffered', 'pending', 'queued'];
-
-    if (in_array($key, $delivered, true)) return ['enum' => 'delivered',   'label' => $trimmed];
-    if (in_array($key, $failed, true))    return ['enum' => 'undelivered', 'label' => $trimmed];
-    if (in_array($key, $pending, true))   return ['enum' => null,          'label' => $trimmed];
-
-    // Unrecognised but non-empty — keep it for the report, don't guess the ENUM.
-    return ['enum' => null, 'label' => $trimmed !== '' ? $trimmed : 'Unknown'];
-}
-
 try {
     require_once __DIR__ . '/../includes/db.php';
+    require_once __DIR__ . '/../includes/helpers/dlr-status.php';
 
     $logFile = __DIR__ . '/../tmp/dlr.log';
     if (!is_dir(__DIR__ . '/../tmp')) @mkdir(__DIR__ . '/../tmp', 0777, true);
@@ -116,10 +80,10 @@ try {
     }
 
     // Classify on the descriptive value when it is usable, else the code.
-    $source     = ($descriptive !== null && trim((string)$descriptive) !== '') ? $descriptive : $status;
-    $classified = dlr_classify($source);
-    $dlrLabel   = substr($classified['label'], 0, 60);
-    $newStatus  = $classified['enum'];
+    // DlrStatus is shared with api/v1/dlr.php and the Delivery Reports page.
+    $source    = ($descriptive !== null && trim((string)$descriptive) !== '') ? $descriptive : $status;
+    $dlrLabel  = DlrStatus::normalise($source);
+    $newStatus = DlrStatus::toEnum($dlrLabel);
 
     if ($newStatus === 'delivered') {
         $ts           = $tsRaw ? @strtotime($tsRaw) : false;

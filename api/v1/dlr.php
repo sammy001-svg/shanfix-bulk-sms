@@ -19,6 +19,7 @@
  */
 
 require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/helpers/dlr-status.php';
 
 header('Content-Type: application/json');
 
@@ -72,62 +73,46 @@ if (!$gatewayMsgId) {
     exit;
 }
 
-// ── Map Onfon status → our internal status ────────────────────────────────────
+// ── Classify the carrier status ───────────────────────────────────────────────
 //
-// Onfon status codes (when present):
-//   1 or 2 = Delivered
-//   3      = Not delivered (network error, handset off, etc.)
-//   4      = Expired (message TTL elapsed)
-//   5      = Unknown / buffered
+// DlrStatus is shared with webhooks/sms-dlr.php and the Delivery Reports page,
+// so whichever endpoint Onfon is pointed at produces identical reporting.
 //
-// Onfon status strings (when present):
-//   "DeliveredToTerminal", "Delivered", "DELIVERED"   → delivered
-//   "DeliveryFailed", "UnDeliverable", "FAILED",
-//   "NotDelivered", "UNDELIVERED", "Expired"          → undelivered
-//   "DeliveredToNetwork", "Sent", "SENT", "Buffered"  → still in transit (ignore)
+// The granular label is preserved in messages.dlr_status. That is the column
+// the report pivots on — collapsing straight to delivered/undelivered here is
+// what previously made AbsentSubscriber, DeliveryImpossible and the rest
+// impossible to report on.
 
-$newStatus = null;
-
-// Try numeric code first
-if ($statusCode !== '') {
-    $code = (int)$statusCode;
-    if ($code === 1 || $code === 2) {
-        $newStatus = 'delivered';
-    } elseif ($code === 3 || $code === 4) {
-        $newStatus = 'undelivered';
+// Prefer a descriptive string over a bare numeric code; the description field
+// often carries the most specific state ("Absent Subscriber", "Expired").
+$dlrSource = '';
+foreach ([$description, $rawStatus, $statusCode] as $candidate) {
+    if (trim((string)$candidate) !== '' && !is_numeric(trim((string)$candidate))) {
+        $dlrSource = $candidate;
+        break;
     }
-    // code 5 / unknown = still in transit → leave as 'sent'
+}
+if ($dlrSource === '') {
+    $dlrSource = $statusCode !== '' ? $statusCode : $rawStatus;
 }
 
-// Fall back to string matching
-if ($newStatus === null && $rawStatus !== '') {
-    $sl = strtolower($rawStatus);
-    if (
-        str_contains($sl, 'deliveredtoterm') ||
-        str_contains($sl, 'delivered')       ||
-        $sl === '1' || $sl === '2'           ||
-        $sl === 'success' || $sl === 'ok'
-    ) {
-        $newStatus = 'delivered';
-    } elseif (
-        str_contains($sl, 'fail')         ||
-        str_contains($sl, 'undeliver')    ||
-        str_contains($sl, 'notdeliver')   ||
-        str_contains($sl, 'expired')      ||
-        str_contains($sl, 'rejected')     ||
-        $sl === '3' || $sl === '4'
-    ) {
-        $newStatus = 'undelivered';
-    }
-    // "deliveredtonetwork", "sent", "buffered" → still in transit → ignore
-}
+$dlrLabel  = DlrStatus::normalise($dlrSource);
+$newStatus = DlrStatus::toEnum($dlrLabel);
+
+// Always record the carrier state, even for a non-terminal one such as
+// Submitted — the report shows those as their own column.
+DB::execute(
+    "UPDATE messages SET dlr_status = ? WHERE gateway_msg_id = ?",
+    [$dlrLabel, $gatewayMsgId]
+);
 
 if ($newStatus === null) {
-    // Transit status or unrecognised — do not update the record yet
+    // Still in transit: dlr_status is updated above, messages.status untouched.
     echo json_encode([
-        'status'  => 'ignored',
-        'reason'  => 'Transit or unrecognised status: ' . $rawStatus . ' (code: ' . $statusCode . ')',
-        'msg_id'  => $gatewayMsgId,
+        'status'     => 'ok',
+        'terminal'   => false,
+        'dlr_status' => $dlrLabel,
+        'msg_id'     => $gatewayMsgId,
     ]);
     exit;
 }
@@ -151,22 +136,26 @@ $updated = DB::execute(
     "UPDATE messages
      SET status       = ?,
          delivered_at = ?,
+         dlr_status   = ?,
          failed_reason = CASE WHEN ? = 'undelivered' THEN ? ELSE failed_reason END
      WHERE gateway_msg_id = ?
        AND status IN ('sent', 'queued')",
     [
         $newStatus,
         $deliveredAt,
+        $dlrLabel,
         $newStatus,
-        $description ?: 'Delivery failed — carrier returned undeliverable status',
+        $description ?: ('Undelivered: ' . $dlrLabel),
         $gatewayMsgId,
     ]
 );
 
 echo json_encode([
     'status'       => 'ok',
+    'terminal'     => true,
     'msg_id'       => $gatewayMsgId,
     'new_status'   => $newStatus,
+    'dlr_status'   => $dlrLabel,
     'delivered_at' => $deliveredAt,
     'rows_updated' => $updated,
 ]);

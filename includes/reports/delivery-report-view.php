@@ -143,6 +143,19 @@ $drPresets = [
     <?php if ($drMode === 'aggregate'): ?>
       &middot; carrier statuses collapsed into Delivered / Pending / Failed
     <?php endif; ?>
+    <?php if ($drTotalMsgs > 0): ?>
+      <div style="margin-top:6px">
+        <?php if ($drWithDlr === 0): ?>
+          <span class="badge badge-warning">No carrier receipts</span>
+          Every status here is derived from our own send result. Register the delivery-report URL in the
+          Onfon portal (Account &rarr; SMS Settings &rarr; Delivery Report URL) for the true carrier statuses.
+        <?php else: ?>
+          <span class="badge badge-success"><?= $drCoveragePct ?>% carrier-confirmed</span>
+          <?= number_format($drWithDlr) ?> of <?= number_format($drTotalMsgs) ?> messages carry a delivery receipt;
+          the rest fall back to our send result.
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
   </div>
 </div>
 
