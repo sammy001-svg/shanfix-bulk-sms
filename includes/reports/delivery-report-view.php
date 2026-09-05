@@ -159,6 +159,61 @@ $drPresets = [
   </div>
 </div>
 
+<?php if (!empty($drSources)): ?>
+<details class="card" style="margin-top:18px">
+  <summary style="padding:14px 18px;cursor:pointer;font-weight:700;font-size:13px">
+    <i class="fa-solid fa-circle-question" style="color:var(--primary)"></i>
+    Where these statuses came from
+    <span style="font-weight:400;color:var(--text-secondary)">&mdash; open this if a column is unexpectedly empty</span>
+  </summary>
+  <div class="table-wrapper" style="border-top:1px solid var(--border-color)">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Carrier receipt</th>
+          <th>Our status</th>
+          <th>Failure reason recorded at send</th>
+          <th style="text-align:right">Messages</th>
+          <th>Counted under</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($drSources as $src): ?>
+          <?php
+            $hasReceipt = $src['source'] !== '(no carrier receipt)';
+            $resolved   = $hasReceipt
+                ? DlrStatus::normalise($src['source'])
+                : ($src['reason'] !== '' && in_array($src['enum_status'], ['failed','undelivered'], true)
+                    ? DlrStatus::fromFailureReason($src['reason'])
+                    : DlrStatus::fromEnum($src['enum_status']));
+          ?>
+          <tr>
+            <td style="font-size:12px">
+              <?php if ($hasReceipt): ?>
+                <code><?= htmlspecialchars($src['source']) ?></code>
+              <?php else: ?>
+                <span class="badge badge-warning" style="font-size:10px">none</span>
+              <?php endif; ?>
+            </td>
+            <td style="font-size:12px"><?= htmlspecialchars($src['enum_status']) ?></td>
+            <td style="font-size:12px;max-width:320px;word-break:break-word;color:var(--text-secondary)">
+              <?= $src['reason'] !== '' ? htmlspecialchars($src['reason']) : '&mdash;' ?>
+            </td>
+            <td style="text-align:right;font-weight:700"><?= number_format($src['cnt']) ?></td>
+            <td style="font-size:12px;font-weight:600"><?= htmlspecialchars($resolved) ?></td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer" style="font-size:11px;color:var(--text-secondary)">
+    A column stays empty when no message reached that state. If the left column reads
+    &ldquo;none&rdquo; for everything, no delivery receipts are arriving &mdash; register the DLR URL in the
+    Onfon portal, then check Admin &rarr; Gateway Diag &rarr; Delivery Receipts.
+  </div>
+</details>
+<?php endif; ?>
+
 <?php
 $extraScript = <<<'JS'
 <script>

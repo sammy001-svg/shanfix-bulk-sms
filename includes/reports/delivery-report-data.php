@@ -68,13 +68,36 @@ if ($drUserId > 0 && !in_array($drUserId, array_map('intval', array_column($drUs
 // ── Query ─────────────────────────────────────────────────────────────────────
 // Derived label: the carrier's own status when we have it, otherwise mapped
 // from our ENUM so historical messages still appear somewhere.
-const DR_DERIVED_LABEL = "COALESCE(NULLIF(m.dlr_status, ''), CASE m.status
-            WHEN 'delivered'   THEN 'DELIVRD'
-            WHEN 'sent'        THEN 'Submitted'
-            WHEN 'failed'      THEN 'REJECTD'
-            WHEN 'undelivered' THEN 'DeliveryImpossible'
-            WHEN 'queued'      THEN 'Submitted'
-            ELSE 'Unknown' END)";
+// Derived label, most specific source first:
+//   1. the carrier receipt, when the DLR webhook recorded one;
+//   2. the send-time failure text, which distinguishes an absent subscriber
+//      from a blacklisted sender ID and so on;
+//   3. our own ENUM, which can only ever say delivered / sent / failed.
+// Kept in step with DlrStatus::normalise() so both agree on every label.
+const DR_DERIVED_LABEL = "COALESCE(
+        NULLIF(m.dlr_status, ''),
+        CASE
+            WHEN m.status IN ('failed','undelivered') AND COALESCE(m.failed_reason,'') <> '' THEN
+                CASE
+                    WHEN m.failed_reason LIKE '%unregistered%'
+                      OR m.failed_reason LIKE '%invalid%number%'
+                      OR m.failed_reason LIKE '%invalid%mobile%'
+                      OR m.failed_reason LIKE '%absent%'                THEN 'AbsentSubscriber'
+                    WHEN m.failed_reason LIKE '%sender%not approved%'
+                      OR m.failed_reason LIKE '%sender id%'
+                      OR m.failed_reason LIKE '%blacklist%'             THEN 'Sendername blacklisted'
+                    WHEN m.failed_reason LIKE '%expired%'
+                      OR m.failed_reason LIKE '%timed out%'             THEN 'Expired'
+                    WHEN m.failed_reason LIKE '%reject%'                THEN 'REJECTD'
+                    ELSE 'DeliveryImpossible'
+                END
+            WHEN m.status = 'delivered'   THEN 'DELIVRD'
+            WHEN m.status = 'sent'        THEN 'Submitted'
+            WHEN m.status = 'queued'      THEN 'Submitted'
+            WHEN m.status = 'failed'      THEN 'REJECTD'
+            WHEN m.status = 'undelivered' THEN 'DeliveryImpossible'
+            ELSE 'Unknown'
+        END)";
 
 $drWhere  = "WHERE ($drScopeSql) AND m.created_at >= ? AND m.created_at < DATE_ADD(?, INTERVAL 1 DAY)";
 $drParams = array_merge($drScopeParams, [$drFrom, $drTo]);
@@ -93,6 +116,22 @@ $drGrouped = DB::query(
      $drWhere
      GROUP BY day, dlr
      ORDER BY day DESC",
+    $drParams
+);
+
+// ── Where the labels came from ────────────────────────────────────────────────
+// Lets an empty column be explained: either no message reached that state, or
+// no receipt ever arrived to say so.
+$drSources = DB::query(
+    "SELECT COALESCE(NULLIF(m.dlr_status, ''), '(no carrier receipt)') AS source,
+            m.status AS enum_status,
+            COALESCE(NULLIF(m.failed_reason, ''), '') AS reason,
+            COUNT(*) AS cnt
+     FROM messages m
+     $drWhere
+     GROUP BY source, enum_status, reason
+     ORDER BY cnt DESC
+     LIMIT 25",
     $drParams
 );
 

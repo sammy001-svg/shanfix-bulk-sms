@@ -123,6 +123,22 @@ class DlrStatus {
             if (strlen($needle) >= 7 && strpos($key, $needle) !== false) return $label;
         }
 
+        // Onfon send-time failure text (messages.failed_reason). Without a
+        // carrier receipt this is the most specific thing we hold, so it is
+        // what lets AbsentSubscriber and Sendername blacklisted populate at all.
+        // Mirrored in SQL by the report's derived-label CASE.
+        static $reasons = [
+            'AbsentSubscriber'       => ['unregisteredmobile', 'invalidorunregistered', 'invalidmobile', 'invalidnumber', 'absent'],
+            'Sendername blacklisted' => ['senderidnotapproved', 'sendernotapproved', 'senderid', 'blacklist'],
+            'DeliveryImpossible'     => ['networknotsupported', 'mobilenetworknot', 'gatewayerror', 'internalservererror', 'insufficient', 'texttoolong'],
+            'Expired'                => ['expired', 'timedout'],
+        ];
+        foreach ($reasons as $label => $needles) {
+            foreach ($needles as $needle) {
+                if (strpos($key, $needle) !== false) return $label;
+            }
+        }
+
         // New to us — keep it verbatim so it is visible rather than mislabelled.
         return mb_substr($trimmed, 0, 60);
     }
@@ -145,6 +161,32 @@ class DlrStatus {
         // An uncatalogued carrier state is not evidence of failure, and
         // toEnum() likewise refuses to guess — keep the two consistent.
         return 'Unknown';
+    }
+
+    /**
+     * Column for a messages.failed_reason, mirroring the report's SQL CASE
+     * exactly. Any unmatched reason lands on DeliveryImpossible, so an
+     * account-level error such as "Invalid Onfon API key" is not promoted into
+     * a column of its own — SQL would have bucketed it, and the two must agree.
+     *
+     * Use this for failed_reason; use normalise() for carrier status values.
+     */
+    public static function fromFailureReason(string $reason): string {
+        $key = strtolower(preg_replace('/[^a-z]/i', '', $reason));
+        if ($key === '') return 'DeliveryImpossible';
+
+        foreach (['unregistered', 'invalidnumber', 'invalidmobile', 'absent'] as $n) {
+            if (strpos($key, $n) !== false) return 'AbsentSubscriber';
+        }
+        foreach (['sendernotapproved', 'senderidnotapproved', 'senderid', 'blacklist'] as $n) {
+            if (strpos($key, $n) !== false) return 'Sendername blacklisted';
+        }
+        foreach (['expired', 'timedout'] as $n) {
+            if (strpos($key, $n) !== false) return 'Expired';
+        }
+        if (strpos($key, 'reject') !== false) return 'REJECTD';
+
+        return 'DeliveryImpossible';
     }
 
     /**
