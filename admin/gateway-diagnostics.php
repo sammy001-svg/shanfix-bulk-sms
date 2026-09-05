@@ -120,6 +120,90 @@ if (diagHasColumn('messages', 'dlr_status')) {
 
 $siteUrlSetting = rtrim((string)(DB::queryOne("SELECT value FROM system_settings WHERE `key` = 'site_url'")['value'] ?? ''), '/');
 
+// webhooks/sms-dlr.php enforces dlr_webhook_token when one is set. A URL
+// registered without the matching ?token= is rejected with 403, which looks
+// exactly like Onfon never calling at all — worth flagging explicitly.
+$dlrToken = (string)(DB::queryOne("SELECT value FROM system_settings WHERE `key` = 'dlr_webhook_token'")['value'] ?? '');
+
+// -- DLR self-test -------------------------------------------------------------
+// Proves whether our own receipt endpoint works, so "no carrier receipts" can
+// be pinned on either our side or the Onfon portal configuration rather than
+// guessed at. Posts a synthetic receipt for a real recent message over HTTP,
+// exactly as Onfon would, then checks whether the row actually changed.
+$dlrTestResult = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dlr_selftest'])) {
+    if (!csrf_verify()) {
+        $dlrTestResult = ['ok' => false, 'steps' => [['Security', false, 'CSRF token mismatch.']]];
+    } else {
+        $steps = [];
+
+        // 1. Find a real message to test against; its status is restored after.
+        $probe = DB::queryOne(
+            "SELECT id, gateway_msg_id, status, dlr_status
+             FROM messages
+             WHERE gateway_msg_id IS NOT NULL AND gateway_msg_id <> ''
+             ORDER BY id DESC LIMIT 1"
+        );
+
+        if (!$probe) {
+            $steps[] = ['Find a sent message', false,
+                'No message has a gateway_msg_id yet. Send one SMS first, then run this test.'];
+            $dlrTestResult = ['ok' => false, 'steps' => $steps];
+        } else {
+            $steps[] = ['Find a sent message', true,
+                'Message #' . $probe['id'] . ' (gateway id ' . $probe['gateway_msg_id'] . ')'];
+
+            $before = $probe['dlr_status'];
+
+            // 2. POST a synthetic receipt to our own DLR URL, as Onfon would.
+            $target = rtrim($siteUrlSetting, '/') . '/api/v1/dlr.php';
+            $ch = curl_init($target);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => http_build_query([
+                    'MessageId'         => $probe['gateway_msg_id'],
+                    'Status'            => 'DeliveredToTerminal',
+                    'StatusDescription' => 'DeliveredToTerminal',
+                    'MobileNumber'      => '254700000000',
+                    'Timestamp'         => date('Y-m-d H:i:s'),
+                ]),
+                CURLOPT_TIMEOUT        => 15,
+                CURLOPT_CONNECTTIMEOUT => 8,
+                CURLOPT_SSL_VERIFYPEER => false, // self-call; cert chain is not what we are testing
+                CURLOPT_FOLLOWLOCATION => true,
+            ]);
+            $body = curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $cerr = curl_error($ch);
+            curl_close($ch);
+
+            if ($body === false) {
+                $steps[] = ['Reach ' . $target, false, 'Could not connect: ' . $cerr
+                    . ' — the server may block requests to itself, which does not by itself mean Onfon cannot reach it.'];
+            } elseif ($code !== 200) {
+                $steps[] = ['Reach ' . $target, false, "HTTP $code returned. "
+                    . ($code === 403 ? 'Blocked — check .htaccess and any firewall or ModSecurity rule.' : 'Response: ' . substr((string)$body, 0, 200))];
+            } else {
+                $steps[] = ['Reach ' . $target, true, "HTTP 200 — " . substr((string)$body, 0, 160)];
+            }
+
+            // 3. Did the receipt actually land on the row?
+            $after = DB::queryOne("SELECT dlr_status FROM messages WHERE id = ?", [$probe['id']]);
+            $wrote = ($after['dlr_status'] ?? null) === 'DelivredToTerminal';
+            $steps[] = ['Record the status', $wrote, $wrote
+                ? 'messages.dlr_status was set to DelivredToTerminal — the receiving side works end to end.'
+                : 'dlr_status is ' . var_export($after['dlr_status'] ?? null, true) . ' — the endpoint did not record the receipt.'];
+
+            // 4. Put the row back exactly as it was; this is a test, not a change.
+            DB::execute("UPDATE messages SET dlr_status = ? WHERE id = ?", [$before, $probe['id']]);
+            $steps[] = ['Restore the message', true, 'Message #' . $probe['id'] . ' returned to its previous state.'];
+
+            $dlrTestResult = ['ok' => $wrote, 'steps' => $steps];
+        }
+    }
+}
+
 // -- Environment info ----------------------------------------------------------
 $disabledFns = array_filter(array_map('trim', explode(',', ini_get('disable_functions'))));
 $checkFns    = ['exec', 'shell_exec', 'popen', 'proc_open', 'system'];
@@ -222,6 +306,71 @@ if (isset($_GET['cleared'])): ?>
             </td>
           </tr>
         <?php endif; ?>
+        <tr>
+          <td style="width:220px;font-weight:600;padding:8px 16px;vertical-align:top">Token protection</td>
+          <td style="padding:8px 16px">
+            <?php if ($dlrToken === ''): ?>
+              <span class="badge badge-success">Not set</span>
+              <span style="font-size:12px;color:var(--text-secondary)"> &mdash; both DLR URLs accept receipts as-is. Nothing to match in the Onfon portal.</span>
+            <?php else: ?>
+              <span class="badge badge-warning">Enabled</span>
+              <div style="font-size:12px;color:var(--text-secondary);margin-top:6px">
+                <strong>A token is configured</strong>, so <code>/webhooks/sms-dlr.php</code> rejects any receipt whose
+                <code>?token=</code> does not match &mdash; which looks identical to Onfon never calling at all.
+                Either register the URL below verbatim, token included, or clear the token in
+                Settings &rarr; Email &amp; Alerts and register the plain URL.
+              </div>
+              <div style="font-family:monospace;font-size:12px;margin-top:6px;word-break:break-all;padding:8px;background:rgba(127,127,127,.08);border-radius:4px">
+                <?= htmlspecialchars(rtrim($siteUrlSetting, '/') . '/webhooks/sms-dlr.php?token=' . $dlrToken) ?>
+              </div>
+              <div style="font-size:12px;color:var(--text-secondary);margin-top:6px">
+                Simpler alternative: register <code><?= htmlspecialchars(rtrim($siteUrlSetting, '/') . '/api/v1/dlr.php') ?></code>,
+                which is not token-protected and records identical statuses.
+              </div>
+            <?php endif; ?>
+          </td>
+        </tr>
+        <tr>
+          <td style="width:220px;font-weight:600;padding:8px 16px;vertical-align:top">Self-test</td>
+          <td style="padding:8px 16px">
+            <form method="POST" style="margin:0">
+              <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
+              <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">
+                Posts a synthetic receipt to our own DLR endpoint for the most recent sent message,
+                checks whether it was recorded, then puts the message back exactly as it was.
+                If this passes but real receipts never arrive, the problem is the Onfon portal
+                configuration rather than this server.
+              </div>
+              <button type="submit" name="dlr_selftest" value="1" class="btn btn-secondary">
+                <i class="fa-solid fa-vial"></i> Run DLR Self-Test
+              </button>
+            </form>
+            <?php if ($dlrTestResult): ?>
+              <div style="margin-top:12px">
+                <?php foreach ($dlrTestResult['steps'] as [$label, $ok, $detail]): ?>
+                  <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;font-size:12px">
+                    <span class="badge badge-<?=$ok ? 'success' : 'danger'?>" style="font-size:10px;flex-shrink:0">
+                      <?=$ok ? 'PASS' : 'FAIL'?>
+                    </span>
+                    <div>
+                      <strong><?=htmlspecialchars($label)?></strong>
+                      <div style="color:var(--text-secondary);word-break:break-all"><?=htmlspecialchars($detail)?></div>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+                <div class="alert alert-<?=$dlrTestResult['ok'] ? 'success' : 'warning'?>" style="margin-top:10px;font-size:12px">
+                  <?php if ($dlrTestResult['ok']): ?>
+                    Our receiving side is working. If the Delivery Reports page still says
+                    &ldquo;No carrier receipts&rdquo;, Onfon is not calling the URL above &mdash; register it in
+                    the Onfon portal under Account &rarr; SMS Settings &rarr; Delivery Report URL.
+                  <?php else: ?>
+                    The receipt was not recorded. Fix the failing step above before looking at the Onfon portal.
+                  <?php endif; ?>
+                </div>
+              </div>
+            <?php endif; ?>
+          </td>
+        </tr>
         <tr>
           <td style="width:220px;font-weight:600;padding:8px 16px">Raw DLR log</td>
           <td style="padding:8px 16px;font-family:monospace;font-size:12px">
