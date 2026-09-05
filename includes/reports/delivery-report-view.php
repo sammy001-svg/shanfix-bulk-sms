@@ -71,6 +71,20 @@ $drPresets = [
   </div>
 </div>
 
+<?php if (!$drHasDlrColumn): ?>
+  <div class="alert alert-warning" style="margin-bottom:18px">
+    <i class="fa-solid fa-database"></i>
+    <strong>Database update required.</strong>
+    The <code>messages.dlr_status</code> column does not exist yet, so carrier delivery statuses
+    cannot be stored and every column below is derived from our own send result.
+    <?php if ((current_user()['role'] ?? '') === 'admin'): ?>
+      Apply it in one click at <a href="/admin/database-updates.php">Admin &rarr; Database Updates</a>.
+    <?php else: ?>
+      Ask your administrator to apply the pending database updates.
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
+
 <!-- Report -->
 <div class="card">
   <div class="card-header" style="justify-content:space-between">

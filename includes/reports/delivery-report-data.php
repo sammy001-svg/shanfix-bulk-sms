@@ -24,6 +24,7 @@
 
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers/dlr-status.php';
+require_once __DIR__ . '/../helpers/schema.php';
 
 // ── Filters ───────────────────────────────────────────────────────────────────
 $drToday = date('Y-m-d');
@@ -66,17 +67,18 @@ if ($drUserId > 0 && !in_array($drUserId, array_map('intval', array_column($drUs
 }
 
 // ── Query ─────────────────────────────────────────────────────────────────────
-// Derived label: the carrier's own status when we have it, otherwise mapped
-// from our ENUM so historical messages still appear somewhere.
+// messages.dlr_status only exists once the delivery-report migration has run.
+// Referencing a column that is not there throws and takes the whole page down,
+// so the label is built to match what the database actually has.
+$drHasDlrColumn = Schema::hasColumn('messages', 'dlr_status');
+
 // Derived label, most specific source first:
 //   1. the carrier receipt, when the DLR webhook recorded one;
 //   2. the send-time failure text, which distinguishes an absent subscriber
 //      from a blacklisted sender ID and so on;
 //   3. our own ENUM, which can only ever say delivered / sent / failed.
 // Kept in step with DlrStatus::normalise() so both agree on every label.
-const DR_DERIVED_LABEL = "COALESCE(
-        NULLIF(m.dlr_status, ''),
-        CASE
+$drFallbackLabel = "CASE
             WHEN m.status IN ('failed','undelivered') AND COALESCE(m.failed_reason,'') <> '' THEN
                 CASE
                     WHEN m.failed_reason LIKE '%unregistered%'
@@ -97,7 +99,11 @@ const DR_DERIVED_LABEL = "COALESCE(
             WHEN m.status = 'failed'      THEN 'REJECTD'
             WHEN m.status = 'undelivered' THEN 'DeliveryImpossible'
             ELSE 'Unknown'
-        END)";
+        END";
+
+$drDerivedLabel = $drHasDlrColumn
+    ? "COALESCE(NULLIF(m.dlr_status, ''), $drFallbackLabel)"
+    : $drFallbackLabel;
 
 $drWhere  = "WHERE ($drScopeSql) AND m.created_at >= ? AND m.created_at < DATE_ADD(?, INTERVAL 1 DAY)";
 $drParams = array_merge($drScopeParams, [$drFrom, $drTo]);
@@ -109,7 +115,7 @@ if ($drUserId > 0) {
 
 $drGrouped = DB::query(
     "SELECT DATE(m.created_at) AS day,
-            " . DR_DERIVED_LABEL . " AS dlr,
+            $drDerivedLabel AS dlr,
             COUNT(*) AS cnt,
             COALESCE(SUM(m.units_charged), 0) AS units
      FROM messages m
@@ -122,8 +128,12 @@ $drGrouped = DB::query(
 // ── Where the labels came from ────────────────────────────────────────────────
 // Lets an empty column be explained: either no message reached that state, or
 // no receipt ever arrived to say so.
+$drSourceCol = $drHasDlrColumn
+    ? "COALESCE(NULLIF(m.dlr_status, ''), '(no carrier receipt)')"
+    : "'(no carrier receipt)'";
+
 $drSources = DB::query(
-    "SELECT COALESCE(NULLIF(m.dlr_status, ''), '(no carrier receipt)') AS source,
+    "SELECT $drSourceCol AS source,
             m.status AS enum_status,
             COALESCE(NULLIF(m.failed_reason, ''), '') AS reason,
             COUNT(*) AS cnt
@@ -139,9 +149,12 @@ $drSources = DB::query(
 // How much of this period is backed by a real carrier receipt rather than
 // derived from our own ENUM. If this stays at 0, Onfon is not calling the DLR
 // URL and the granular columns cannot populate.
+$drWithDlrExpr = $drHasDlrColumn
+    ? "SUM(m.dlr_status IS NOT NULL AND m.dlr_status <> '')"
+    : "0";
+
 $drCoverage = DB::queryOne(
-    "SELECT COUNT(*) AS total,
-            SUM(m.dlr_status IS NOT NULL AND m.dlr_status <> '') AS with_dlr
+    "SELECT COUNT(*) AS total, $drWithDlrExpr AS with_dlr
      FROM messages m
      $drWhere",
     $drParams

@@ -6,6 +6,8 @@ $pageTitle = $pageTitle ?? 'Dashboard';
 $breadcrumb = $breadcrumb ?? [];
 $user = current_user();
 
+require_once __DIR__ . '/../includes/helpers/schema.php';
+
 // Fetch pending counts for badges — cached in session for 5 minutes to avoid
 // hitting the DB on every admin page load.
 $_now = time();
@@ -14,12 +16,16 @@ if (!isset($_SESSION['_admin_badge_ts']) || ($_now - $_SESSION['_admin_badge_ts'
         'sender_ids'    => (int)DB::queryValue("SELECT COUNT(*) FROM sender_ids WHERE status = 'pending'"),
         'ussd_requests' => (int)DB::queryValue("SELECT COUNT(*) FROM ussd_codes WHERE status = 'pending'"),
         'purchases'     => (int)DB::queryValue("SELECT COUNT(*) FROM purchases WHERE status = 'pending'"),
+        // Outstanding schema changes, so a feature is never silently broken by
+        // a migration nobody remembered to run.
+        'schema'        => Schema::pendingCount(),
     ];
     $_SESSION['_admin_badge_ts'] = $_now;
 }
 $pendingSenderIds    = $_SESSION['_admin_badge']['sender_ids'];
 $pendingUssdRequests = $_SESSION['_admin_badge']['ussd_requests'];
 $pendingPurchases    = $_SESSION['_admin_badge']['purchases'];
+$pendingSchema       = $_SESSION['_admin_badge']['schema'] ?? 0;
 
 $navItems = [
   ['type'=>'section','label'=>'MAIN'],
@@ -81,6 +87,9 @@ $navItems = [
   ['icon'=>'<i class="fa-solid fa-bell"></i>',      'label'=>'Notifications',  'url'=>'/admin/notifications.php'],
   ['icon'=>'<i class="fa-solid fa-gear"></i>',      'label'=>'Settings',       'url'=>'/admin/settings.php'],
   ['icon'=>'<i class="fa-solid fa-stethoscope"></i>','label'=>'Gateway Diag',  'url'=>'/admin/gateway-diagnostics.php'],
+  ['icon'=>'<i class="fa-solid fa-database"></i>',  'label'=>'Database Updates','url'=>'/admin/database-updates.php',
+   'badge'=> $pendingSchema > 0 ? $pendingSchema : null
+  ],
 ];
 ?>
 <!DOCTYPE html>
