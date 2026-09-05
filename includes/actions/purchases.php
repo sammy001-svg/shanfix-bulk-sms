@@ -8,7 +8,23 @@ require_once __DIR__ . '/../auth.php';
 require_once __DIR__ . '/../gateways/kopokopo.php';
 
 class Purchase {
+    /**
+     * Public entry point. Wraps the real work so a database or gateway problem
+     * comes back as ['success' => false, 'error' => ...] instead of an uncaught
+     * exception, which would print an HTML fatal and break the AJAX caller's
+     * response.json().
+     */
     public static function create($userId, $data) {
+        try {
+            return self::doCreate($userId, $data);
+        } catch (Throwable $e) {
+            error_log('Purchase::create failed: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+            require_once __DIR__ . '/../helpers/json-fatal-guard.php';
+            return ['success' => false, 'error' => json_fatal_hint($e->getMessage())];
+        }
+    }
+
+    private static function doCreate($userId, $data) {
         $planId  = (int)($data['plan_id'] ?? 0);
         $units   = (float)($data['custom_units'] ?? 0);
         $amount  = (float)($data['amount'] ?? 0);
@@ -85,8 +101,17 @@ class Purchase {
                 // Keep the payment resource URL: it lets us confirm the outcome
                 // directly with Kopo Kopo if the webhook is delayed or blocked,
                 // so units are still credited automatically.
+                //
+                // The STK push has already gone to the customer's phone by now,
+                // so a bookkeeping failure here must not fail the request. If
+                // the column is missing (migration not run) we log it and carry
+                // on; the webhook still credits the account.
                 if (!empty($res['location'])) {
-                    DB::execute("UPDATE purchases SET gateway_ref = ? WHERE id = ?", [$res['location'], $id]);
+                    try {
+                        DB::execute("UPDATE purchases SET gateway_ref = ? WHERE id = ?", [$res['location'], $id]);
+                    } catch (Throwable $e) {
+                        error_log("Purchase #$id: could not store gateway_ref (run database/kopokopo_autocredit_migration.sql): " . $e->getMessage());
+                    }
                 }
                 return ['success' => true, 'id' => $id, 'manual' => false];
             } else {

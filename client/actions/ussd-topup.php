@@ -4,6 +4,11 @@
  */
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/gateways/kopokopo.php';
+require_once __DIR__ . '/../../includes/helpers/json-fatal-guard.php';
+
+// Answer AJAX callers with JSON even on a fatal, so the UI can show the
+// real reason instead of a generic "unexpected error".
+json_fatal_guard(isset($_POST['ajax']));
 require_role('client');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

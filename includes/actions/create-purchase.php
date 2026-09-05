@@ -3,6 +3,12 @@
  * Action: Create Purchase Request - Shanfix Technology
  */
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/helpers/json-fatal-guard.php';
+
+// Installed before any work so even a fatal answers with JSON — otherwise the
+// browser gets an HTML error page and can only say "unexpected error".
+json_fatal_guard(isset($_POST['ajax']));
+
 require_once __DIR__ . '/../../includes/actions/purchases.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

@@ -33,7 +33,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['test_phone'])) {
     }
 }
 
-// ── Environment info ───────────────────────────────────────────────────────────
+// -- Kopo Kopo checks ----------------------------------------------------------
+require_once __DIR__ . '/../includes/gateways/kopokopo.php';
+
+/** Does a column exist? A missing one means a migration has not been run. */
+function diagHasColumn(string $table, string $column): bool {
+    try {
+        return (bool)DB::queryOne(
+            "SELECT 1 FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+            [$table, $column]
+        );
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+$kkSet = function (string $key): string {
+    $r = DB::queryOne("SELECT value FROM system_settings WHERE `key` = ?", ["kk_$key"]);
+    return trim((string)($r['value'] ?? ''));
+};
+
+$kkChecks = [
+    'Client ID'     => ['set' => $kkSet('client_id')     !== '', 'required' => true],
+    'Client Secret' => ['set' => $kkSet('client_secret') !== '', 'required' => true],
+    'Till Number'   => ['set' => $kkSet('till_number')   !== '', 'required' => true],
+    'API Key'       => ['set' => KopoKopo::apiKey()      !== '', 'required' => false],
+    'Base URL'      => ['set' => true, 'required' => true, 'note' => KopoKopo::baseUrl()],
+    'Callback URL'  => ['set' => true, 'required' => true, 'note' => KopoKopo::callbackUrl()],
+];
+
+// Migrations the payment flow depends on.
+$kkMigrations = [
+    'purchases.gateway_ref'         => diagHasColumn('purchases', 'gateway_ref'),
+    'ussd_transactions.gateway_ref' => diagHasColumn('ussd_transactions', 'gateway_ref'),
+    'messages.dlr_status'           => diagHasColumn('messages', 'dlr_status'),
+];
+
+// -- Kopo Kopo token / STK tests -----------------------------------------------
+$kkTokenResult = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['kk_test_token'])) {
+    if (!csrf_verify()) {
+        $kkTokenResult = ['ok' => false, 'msg' => 'CSRF token mismatch.'];
+    } else {
+        $tok = KopoKopo::getToken();
+        $kkTokenResult = $tok
+            ? ['ok' => true,  'msg' => 'Authenticated. Token received (' . strlen($tok) . ' chars).']
+            : ['ok' => false, 'msg' => 'Could not obtain a token. Check the Client ID, Client Secret and Base URL, then see the PHP error log.'];
+    }
+}
+
+$kkStkResult = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['kk_test_phone'])) {
+    if (!csrf_verify()) {
+        $kkStkResult = ['ok' => false, 'msg' => 'CSRF token mismatch.'];
+    } else {
+        $kkPhone  = trim($_POST['kk_test_phone'] ?? '');
+        $kkAmount = max(1, (int)($_POST['kk_test_amount'] ?? 1));
+        if ($kkPhone === '') {
+            $kkStkResult = ['ok' => false, 'msg' => 'Phone number is required.'];
+        } else {
+            // DIAG prefix - the webhook ignores it, so no wallet is touched.
+            $r = KopoKopo::initiateSTKPush($kkPhone, $kkAmount, 'DIAG' . time());
+            $kkStkResult = $r['success']
+                ? ['ok' => true,  'msg' => 'STK push accepted by Kopo Kopo. Check the phone for the PIN prompt. Resource: ' . ($r['location'] ?: 'no Location header returned')]
+                : ['ok' => false, 'msg' => $r['error'] ?? 'Unknown error'];
+        }
+    }
+}
+
+// -- Environment info ----------------------------------------------------------
 $disabledFns = array_filter(array_map('trim', explode(',', ini_get('disable_functions'))));
 $checkFns    = ['exec', 'shell_exec', 'popen', 'proc_open', 'system'];
 $envInfo = [
@@ -93,6 +162,70 @@ if (isset($_GET['cleared'])): ?>
     <?=htmlspecialchars($testResult['msg'])?>
   </div>
 <?php endif; ?>
+
+<!-- Kopo Kopo -->
+<div class="card" style="margin-bottom:18px">
+  <div class="card-header"><h3 class="card-title"><i class="fa-solid fa-money-bill-transfer" style="color:var(--primary)"></i> Kopo Kopo Payments</h3></div>
+  <div class="card-body" style="padding:0">
+    <table class="data-table" style="margin:0">
+      <tbody>
+        <?php foreach ($kkChecks as $label => $c): ?>
+          <tr>
+            <td style="width:200px;font-weight:600;padding:8px 16px"><?=htmlspecialchars($label)?></td>
+            <td style="padding:8px 16px;font-family:monospace;font-size:12px;word-break:break-all">
+              <?php if (!$c['set']): ?>
+                <span class="badge badge-<?=$c['required'] ? 'danger' : 'warning'?>"><?=$c['required'] ? 'MISSING' : 'Not set'?></span>
+                <?php if (!$c['required']): ?><span style="color:var(--text-secondary)"> &mdash; webhook signatures cannot be verified</span><?php endif; ?>
+              <?php else: ?>
+                <span class="badge badge-success">OK</span>
+                <?php if (!empty($c['note'])): ?> <?=htmlspecialchars($c['note'])?><?php endif; ?>
+              <?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+        <?php foreach ($kkMigrations as $what => $present): ?>
+          <tr>
+            <td style="width:200px;font-weight:600;padding:8px 16px"><?=htmlspecialchars($what)?></td>
+            <td style="padding:8px 16px">
+              <?php if ($present): ?>
+                <span class="badge badge-success">Present</span>
+              <?php else: ?>
+                <span class="badge badge-danger">MISSING</span>
+                <span style="font-size:12px;color:var(--text-secondary)"> &mdash; run the matching file in <code>database/</code>; payments fail until you do</span>
+              <?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card-body" style="border-top:1px solid var(--border-color);display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px">1. Test credentials</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">Requests an OAuth token. Proves the Client ID and Secret are correct without moving money.</div>
+      <button type="submit" name="kk_test_token" value="1" class="btn btn-secondary"><i class="fa-solid fa-key"></i> Test Authentication</button>
+      <?php if ($kkTokenResult): ?>
+        <div class="alert alert-<?=$kkTokenResult['ok'] ? 'success' : 'danger'?>" style="margin-top:12px;font-size:12px"><?=htmlspecialchars($kkTokenResult['msg'])?></div>
+      <?php endif; ?>
+    </form>
+
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px">2. Test STK push</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">Sends a real prompt for a real amount. Uses a DIAG reference the webhook ignores, so no wallet is credited.</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input type="text" name="kk_test_phone" class="form-control" placeholder="0712345678" value="<?=htmlspecialchars($_POST['kk_test_phone'] ?? '')?>">
+        <input type="number" name="kk_test_amount" class="form-control" style="width:110px" min="1" value="<?=htmlspecialchars($_POST['kk_test_amount'] ?? '1')?>" title="Amount in KES">
+      </div>
+      <button type="submit" class="btn btn-primary"><i class="fa-solid fa-mobile-screen-button"></i> Send Test STK</button>
+      <?php if ($kkStkResult): ?>
+        <div class="alert alert-<?=$kkStkResult['ok'] ? 'success' : 'danger'?>" style="margin-top:12px;font-size:12px;word-break:break-all"><?=htmlspecialchars($kkStkResult['msg'])?></div>
+      <?php endif; ?>
+    </form>
+  </div>
+</div>
 
 <!-- ── Environment ─────────────────────────────────────────────────────────── -->
 <div class="card" style="margin-bottom:18px">
