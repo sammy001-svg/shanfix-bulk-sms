@@ -20,7 +20,7 @@ ALTER TABLE `messages`
 
 -- Drives the per-day / per-status pivot in the Delivery Reports page.
 ALTER TABLE `messages`
-  ADD INDEX `idx_user_created_dlr` (`user_id`, `created_at`, `dlr_status`);
+  ADD KEY IF NOT EXISTS `idx_user_created_dlr` (`user_id`, `created_at`, `dlr_status`);
 
 SELECT COUNT(*) AS messages_awaiting_dlr
 FROM `messages`

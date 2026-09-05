@@ -97,17 +97,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_whatsapp'])) {
             $count = 0;
             $rate = (float)($user['whatsapp_rate'] ?? 1.00);
             $totalCost = count($contacts) * $rate;
-            
+
             if ($user['whatsapp_balance'] < $totalCost) {
                 flash_set('danger', "Insufficient balance. This campaign requires KES " . number_format($totalCost, 2) . " but you only have KES " . number_format($user['whatsapp_balance'], 2));
             } else {
                 require_once __DIR__ . '/../includes/gateways/whatsapp.php';
                 $gateway = new WhatsApp_Gateway($account['instance_id'], $account['token'], $account['id']);
 
+                // Collect rows for a single batch INSERT instead of one INSERT+UPDATE per contact
+                $insertRows  = [];
+                $insertParams = [];
+
                 foreach ($contacts as $contact) {
                     $number = $contact['phone'];
-                    $data = $contact['data'] ?: [];
-                    
+                    $data   = $contact['data'] ?: [];
+
                     // Replace Placeholders
                     $personalizedMsg = $msgTemplate;
                     foreach ($data as $key => $val) {
@@ -116,21 +120,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_whatsapp'])) {
                     }
 
                     // Send via Gateway
-                    $res = $gateway->sendMessage($number, $personalizedMsg, $mediaUrl);
-                    
-                    // Log Message
+                    $res    = $gateway->sendMessage($number, $personalizedMsg, $mediaUrl);
                     $status = $res['success'] ? 'sent' : 'failed';
-                    $msgId = DB::insert("
-                        INSERT INTO whatsapp_messages (user_id, account_id, recipient, message, media_url, status, external_id)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ", [$uid, $account['id'], $number, $personalizedMsg, $mediaUrl, $status, $res['message_id'] ?? null]);
 
                     if ($res['success']) {
-                        DB::execute("UPDATE whatsapp_messages SET status = 'sent', external_id = ? WHERE id = ?", [$res['message_id'], $msgId]);
                         $count++;
-                    } else {
-                        DB::execute("UPDATE whatsapp_messages SET status = 'failed' WHERE id = ?", [$msgId]);
                     }
+
+                    $insertRows[]   = '(?,?,?,?,?,?,?)';
+                    $insertParams[] = $uid;
+                    $insertParams[] = $account['id'];
+                    $insertParams[] = $number;
+                    $insertParams[] = $personalizedMsg;
+                    $insertParams[] = $mediaUrl;
+                    $insertParams[] = $status;
+                    $insertParams[] = $res['message_id'] ?? null;
+                }
+
+                // One batch INSERT for all contacts — replaces N inserts + N updates
+                if (!empty($insertRows)) {
+                    DB::execute(
+                        "INSERT INTO whatsapp_messages (user_id, account_id, recipient, message, media_url, status, external_id) VALUES " . implode(',', $insertRows),
+                        $insertParams
+                    );
                 }
 
                 // Deduct balance

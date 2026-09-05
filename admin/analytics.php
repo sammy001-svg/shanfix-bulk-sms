@@ -22,115 +22,162 @@ function kpiDir($current, $prev): string {
     return $current >= $prev ? 'up' : 'down';
 }
 
-// ── Messages ────────────────────────────────────────────────────
-$msgCur  = (int)(DB::queryOne("SELECT COUNT(*) as c FROM messages WHERE created_at >= ? AND created_at <= ?", [$from, $to . ' 23:59:59'])['c'] ?? 0);
-$msgPrev = (int)(DB::queryOne("SELECT COUNT(*) as c FROM messages WHERE created_at >= ? AND created_at < ?",  [$prevFrom, $prevTo])['c'] ?? 0);
+// ── Analytics cache ──────────────────────────────────────────────
+// Results are keyed by period so switching 7/30/90/365 still hits the DB
+// once per combination, then serves from session for 1 hour.
+$_cacheKey = '_analytics_' . $period . '_' . $to;
+$_cacheTtl  = 3600; // 1 hour
 
-// ── Delivery breakdown (period) ───────────────────────────────────
-$delivery = DB::queryOne(
-    "SELECT COUNT(*) as total,
-            SUM(status='sent') as sent,
-            SUM(status='delivered') as delivered,
-            SUM(status='failed') as failed_count,
-            SUM(status='queued') as queued_count,
-            SUM(status='undelivered') as undelivered_count
-     FROM messages WHERE created_at >= ? AND created_at <= ?",
-    [$from, $to . ' 23:59:59']
-);
+if (
+    isset($_SESSION[$_cacheKey], $_SESSION[$_cacheKey . '_ts']) &&
+    (time() - $_SESSION[$_cacheKey . '_ts']) < $_cacheTtl
+) {
+    // Restore from cache
+    $cached       = $_SESSION[$_cacheKey];
+    $msgCur       = $cached['msgCur'];
+    $msgPrev      = $cached['msgPrev'];
+    $delivery     = $cached['delivery'];
+    $revCur       = $cached['revCur'];
+    $revPrev      = $cached['revPrev'];
+    $campCur      = $cached['campCur'];
+    $campPrev     = $cached['campPrev'];
+    $newUsersCur  = $cached['newUsersCur'];
+    $newUsersPrev = $cached['newUsersPrev'];
+    $totals       = $cached['totals'];
+    $trendDays    = $cached['trendDays'];
+    $trendTotal   = $cached['trendTotal'];
+    $trendSent    = $cached['trendSent'];
+    $trendFail    = $cached['trendFail'];
+    $revDays      = $cached['revDays'];
+    $revAmts      = $cached['revAmts'];
+    $growthDays   = $cached['growthDays'];
+    $growthCounts = $cached['growthCounts'];
+    $campStatus   = $cached['campStatus'];
+    $topSenders   = $cached['topSenders'];
+    $topRevenue   = $cached['topRevenue'];
+    $hourlyLabels = $cached['hourlyLabels'];
+    $hourlyValues = $cached['hourlyValues'];
+} else {
+    // ── Messages ────────────────────────────────────────────────────
+    $msgCur  = (int)(DB::queryOne("SELECT COUNT(*) as c FROM messages WHERE created_at >= ? AND created_at <= ?", [$from, $to . ' 23:59:59'])['c'] ?? 0);
+    $msgPrev = (int)(DB::queryOne("SELECT COUNT(*) as c FROM messages WHERE created_at >= ? AND created_at < ?",  [$prevFrom, $prevTo])['c'] ?? 0);
 
-// ── Revenue ─────────────────────────────────────────────────────
-$revCur  = (float)(DB::queryOne("SELECT COALESCE(SUM(amount),0) as t FROM purchases WHERE status='completed' AND created_at >= ? AND created_at <= ?", [$from, $to . ' 23:59:59'])['t'] ?? 0);
-$revPrev = (float)(DB::queryOne("SELECT COALESCE(SUM(amount),0) as t FROM purchases WHERE status='completed' AND created_at >= ? AND created_at < ?",  [$prevFrom, $prevTo])['t'] ?? 0);
+    // ── Delivery breakdown (period) ───────────────────────────────────
+    $delivery = DB::queryOne(
+        "SELECT COUNT(*) as total,
+                SUM(status='sent') as sent,
+                SUM(status='delivered') as delivered,
+                SUM(status='failed') as failed_count,
+                SUM(status='queued') as queued_count,
+                SUM(status='undelivered') as undelivered_count
+         FROM messages WHERE created_at >= ? AND created_at <= ?",
+        [$from, $to . ' 23:59:59']
+    );
 
-// ── Campaigns ───────────────────────────────────────────────────
-$campCur  = (int)(DB::queryOne("SELECT COUNT(*) as c FROM campaigns WHERE created_at >= ? AND created_at <= ?", [$from, $to . ' 23:59:59'])['c'] ?? 0);
-$campPrev = (int)(DB::queryOne("SELECT COUNT(*) as c FROM campaigns WHERE created_at >= ? AND created_at < ?",  [$prevFrom, $prevTo])['c'] ?? 0);
+    // ── Revenue ─────────────────────────────────────────────────────
+    $revCur  = (float)(DB::queryOne("SELECT COALESCE(SUM(amount),0) as t FROM purchases WHERE status='completed' AND created_at >= ? AND created_at <= ?", [$from, $to . ' 23:59:59'])['t'] ?? 0);
+    $revPrev = (float)(DB::queryOne("SELECT COALESCE(SUM(amount),0) as t FROM purchases WHERE status='completed' AND created_at >= ? AND created_at < ?",  [$prevFrom, $prevTo])['t'] ?? 0);
 
-// ── New users ────────────────────────────────────────────────────
-$newUsersCur  = (int)(DB::queryOne("SELECT COUNT(*) as c FROM users WHERE role!='admin' AND created_at >= ? AND created_at <= ?", [$from, $to . ' 23:59:59'])['c'] ?? 0);
-$newUsersPrev = (int)(DB::queryOne("SELECT COUNT(*) as c FROM users WHERE role!='admin' AND created_at >= ? AND created_at < ?",  [$prevFrom, $prevTo])['c'] ?? 0);
+    // ── Campaigns ───────────────────────────────────────────────────
+    $campCur  = (int)(DB::queryOne("SELECT COUNT(*) as c FROM campaigns WHERE created_at >= ? AND created_at <= ?", [$from, $to . ' 23:59:59'])['c'] ?? 0);
+    $campPrev = (int)(DB::queryOne("SELECT COUNT(*) as c FROM campaigns WHERE created_at >= ? AND created_at < ?",  [$prevFrom, $prevTo])['c'] ?? 0);
 
-// ── All-time totals ──────────────────────────────────────────────
-$totals = [
-    'users'     => (int)(DB::queryOne("SELECT COUNT(*) as c FROM users WHERE role!='admin'")['c'] ?? 0),
-    'revenue'   => (float)(DB::queryOne("SELECT COALESCE(SUM(amount),0) as t FROM purchases WHERE status='completed'")['t'] ?? 0),
-    'units_sold' => (float)(DB::queryOne("SELECT COALESCE(SUM(units),0) as t FROM purchases WHERE status='completed'")['t'] ?? 0),
-    'active_users'=> (int)(DB::queryOne("SELECT COUNT(*) as c FROM users WHERE role!='admin' AND status='active'")['c'] ?? 0),
-];
+    // ── New users ────────────────────────────────────────────────────
+    $newUsersCur  = (int)(DB::queryOne("SELECT COUNT(*) as c FROM users WHERE role!='admin' AND created_at >= ? AND created_at <= ?", [$from, $to . ' 23:59:59'])['c'] ?? 0);
+    $newUsersPrev = (int)(DB::queryOne("SELECT COUNT(*) as c FROM users WHERE role!='admin' AND created_at >= ? AND created_at < ?",  [$prevFrom, $prevTo])['c'] ?? 0);
 
-// ── Chart: Message volume per day ────────────────────────────────
-$msgTrend = DB::query(
-    "SELECT DATE(created_at) as day, COUNT(*) as total,
-            SUM(status='sent') as sent,
-            SUM(status='delivered') as delivered,
-            SUM(status='failed') as failed_count
-     FROM messages WHERE created_at >= ? AND created_at <= ?
-     GROUP BY day ORDER BY day",
-    [$from, $to . ' 23:59:59']
-);
-$trendDays  = json_encode(array_column($msgTrend, 'day'));
-$trendTotal = json_encode(array_column($msgTrend, 'total'));
-$trendSent  = json_encode(array_column($msgTrend, 'sent'));
-$trendFail  = json_encode(array_column($msgTrend, 'failed_count'));
+    // ── All-time totals ──────────────────────────────────────────────
+    $totals = [
+        'users'       => (int)(DB::queryOne("SELECT COUNT(*) as c FROM users WHERE role!='admin'")['c'] ?? 0),
+        'revenue'     => (float)(DB::queryOne("SELECT COALESCE(SUM(amount),0) as t FROM purchases WHERE status='completed'")['t'] ?? 0),
+        'units_sold'  => (float)(DB::queryOne("SELECT COALESCE(SUM(units),0) as t FROM purchases WHERE status='completed'")['t'] ?? 0),
+        'active_users'=> (int)(DB::queryOne("SELECT COUNT(*) as c FROM users WHERE role!='admin' AND status='active'")['c'] ?? 0),
+    ];
 
-// ── Chart: Revenue per day ────────────────────────────────────────
-$revTrend = DB::query(
-    "SELECT DATE(created_at) as day, SUM(amount) as total
-     FROM purchases WHERE status='completed' AND created_at >= ? AND created_at <= ?
-     GROUP BY day ORDER BY day",
-    [$from, $to . ' 23:59:59']
-);
-$revDays = json_encode(array_column($revTrend, 'day'));
-$revAmts = json_encode(array_column($revTrend, 'total'));
+    // ── Chart: Message volume per day ────────────────────────────────
+    $msgTrend = DB::query(
+        "SELECT DATE(created_at) as day, COUNT(*) as total,
+                SUM(status='sent') as sent,
+                SUM(status='delivered') as delivered,
+                SUM(status='failed') as failed_count
+         FROM messages WHERE created_at >= ? AND created_at <= ?
+         GROUP BY day ORDER BY day",
+        [$from, $to . ' 23:59:59']
+    );
+    $trendDays  = json_encode(array_column($msgTrend, 'day'));
+    $trendTotal = json_encode(array_column($msgTrend, 'total'));
+    $trendSent  = json_encode(array_column($msgTrend, 'sent'));
+    $trendFail  = json_encode(array_column($msgTrend, 'failed_count'));
 
-// ── Chart: User signups per week ──────────────────────────────────
-$userGrowth = DB::query(
-    "SELECT DATE(created_at) as day, COUNT(*) as total
-     FROM users WHERE role!='admin' AND created_at >= ? AND created_at <= ?
-     GROUP BY day ORDER BY day",
-    [$from, $to . ' 23:59:59']
-);
-$growthDays   = json_encode(array_column($userGrowth, 'day'));
-$growthCounts = json_encode(array_column($userGrowth, 'total'));
+    // ── Chart: Revenue per day ────────────────────────────────────────
+    $revTrend = DB::query(
+        "SELECT DATE(created_at) as day, SUM(amount) as total
+         FROM purchases WHERE status='completed' AND created_at >= ? AND created_at <= ?
+         GROUP BY day ORDER BY day",
+        [$from, $to . ' 23:59:59']
+    );
+    $revDays = json_encode(array_column($revTrend, 'day'));
+    $revAmts = json_encode(array_column($revTrend, 'total'));
 
-// ── Campaign status breakdown ─────────────────────────────────────
-$campStatus = DB::queryOne(
-    "SELECT SUM(status='completed') as completed, SUM(status='failed') as failed_count,
-            SUM(status IN ('queued','running','sending')) as active,
-            SUM(status='draft') as draft, SUM(status='scheduled') as scheduled
-     FROM campaigns WHERE created_at >= ? AND created_at <= ?",
-    [$from, $to . ' 23:59:59']
-);
+    // ── Chart: User signups per day ───────────────────────────────────
+    $userGrowth = DB::query(
+        "SELECT DATE(created_at) as day, COUNT(*) as total
+         FROM users WHERE role!='admin' AND created_at >= ? AND created_at <= ?
+         GROUP BY day ORDER BY day",
+        [$from, $to . ' 23:59:59']
+    );
+    $growthDays   = json_encode(array_column($userGrowth, 'day'));
+    $growthCounts = json_encode(array_column($userGrowth, 'total'));
 
-// ── Top senders ───────────────────────────────────────────────────
-$topSenders = DB::query(
-    "SELECT u.name, u.role, COUNT(m.id) as msgs, COALESCE(SUM(m.units_charged),0) as units
-     FROM messages m JOIN users u ON m.user_id = u.id
-     WHERE m.created_at >= ? AND m.created_at <= ?
-     GROUP BY m.user_id ORDER BY msgs DESC LIMIT 8",
-    [$from, $to . ' 23:59:59']
-);
+    // ── Campaign status breakdown ─────────────────────────────────────
+    $campStatus = DB::queryOne(
+        "SELECT SUM(status='completed') as completed, SUM(status='failed') as failed_count,
+                SUM(status IN ('queued','running','sending')) as active,
+                SUM(status='draft') as draft, SUM(status='scheduled') as scheduled
+         FROM campaigns WHERE created_at >= ? AND created_at <= ?",
+        [$from, $to . ' 23:59:59']
+    );
 
-// ── Top revenue earners ──────────────────────────────────────────
-$topRevenue = DB::query(
-    "SELECT u.name, u.role, COUNT(p.id) as purchases, COALESCE(SUM(p.amount),0) as revenue, COALESCE(SUM(p.units),0) as units
-     FROM purchases p JOIN users u ON p.user_id = u.id
-     WHERE p.status = 'completed' AND p.created_at >= ? AND p.created_at <= ?
-     GROUP BY p.user_id ORDER BY revenue DESC LIMIT 8",
-    [$from, $to . ' 23:59:59']
-);
+    // ── Top senders ───────────────────────────────────────────────────
+    $topSenders = DB::query(
+        "SELECT u.name, u.role, COUNT(m.id) as msgs, COALESCE(SUM(m.units_charged),0) as units
+         FROM messages m JOIN users u ON m.user_id = u.id
+         WHERE m.created_at >= ? AND m.created_at <= ?
+         GROUP BY m.user_id ORDER BY msgs DESC LIMIT 8",
+        [$from, $to . ' 23:59:59']
+    );
 
-// ── Hourly message distribution ───────────────────────────────────
-$hourly = DB::query(
-    "SELECT HOUR(created_at) as hr, COUNT(*) as total
-     FROM messages WHERE created_at >= ? AND created_at <= ?
-     GROUP BY hr ORDER BY hr",
-    [$from, $to . ' 23:59:59']
-);
-$hourlyHrs  = array_fill(0, 24, 0);
-foreach ($hourly as $h) { $hourlyHrs[(int)$h['hr']] = (int)$h['total']; }
-$hourlyLabels = json_encode(array_map(fn($h) => str_pad($h,2,'0',STR_PAD_LEFT).':00', range(0,23)));
-$hourlyValues = json_encode(array_values($hourlyHrs));
+    // ── Top revenue earners ───────────────────────────────────────────
+    $topRevenue = DB::query(
+        "SELECT u.name, u.role, COUNT(p.id) as purchases, COALESCE(SUM(p.amount),0) as revenue, COALESCE(SUM(p.units),0) as units
+         FROM purchases p JOIN users u ON p.user_id = u.id
+         WHERE p.status = 'completed' AND p.created_at >= ? AND p.created_at <= ?
+         GROUP BY p.user_id ORDER BY revenue DESC LIMIT 8",
+        [$from, $to . ' 23:59:59']
+    );
+
+    // ── Hourly message distribution ───────────────────────────────────
+    $hourly = DB::query(
+        "SELECT HOUR(created_at) as hr, COUNT(*) as total
+         FROM messages WHERE created_at >= ? AND created_at <= ?
+         GROUP BY hr ORDER BY hr",
+        [$from, $to . ' 23:59:59']
+    );
+    $hourlyHrs = array_fill(0, 24, 0);
+    foreach ($hourly as $h) { $hourlyHrs[(int)$h['hr']] = (int)$h['total']; }
+    $hourlyLabels = json_encode(array_map(fn($h) => str_pad($h, 2, '0', STR_PAD_LEFT) . ':00', range(0, 23)));
+    $hourlyValues = json_encode(array_values($hourlyHrs));
+
+    // ── Store in session cache ────────────────────────────────────────
+    $_SESSION[$_cacheKey] = compact(
+        'msgCur', 'msgPrev', 'delivery', 'revCur', 'revPrev',
+        'campCur', 'campPrev', 'newUsersCur', 'newUsersPrev', 'totals',
+        'trendDays', 'trendTotal', 'trendSent', 'trendFail',
+        'revDays', 'revAmts', 'growthDays', 'growthCounts',
+        'campStatus', 'topSenders', 'topRevenue', 'hourlyLabels', 'hourlyValues'
+    );
+    $_SESSION[$_cacheKey . '_ts'] = time();
+}
 
 // ── JS vars ──────────────────────────────────────────────────────
 $dSent        = (int)($delivery['sent']        ?? 0);

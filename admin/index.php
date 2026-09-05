@@ -4,48 +4,79 @@ $breadcrumb = [['label'=>'Admin'],['label'=>'Dashboard']];
 
 require_once __DIR__ . '/layout.php';
 
-// ── Stats ──────────────────────────────────────────────────────
-$totalUsers     = DB::queryOne("SELECT COUNT(*) as c FROM users WHERE role != 'admin'")['c'] ?? 0;
-$totalResellers = DB::queryOne("SELECT COUNT(*) as c FROM users WHERE role = 'reseller'")['c'] ?? 0;
-$totalClients   = DB::queryOne("SELECT COUNT(*) as c FROM users WHERE role = 'client'")['c'] ?? 0;
-$totalCampaigns = DB::queryOne("SELECT COUNT(*) as c FROM campaigns")['c'] ?? 0;
-$sentToday      = DB::queryOne("SELECT COUNT(*) as c FROM messages WHERE DATE(created_at) = CURDATE()")['c'] ?? 0;
-$totalRevenue   = DB::queryOne("SELECT COALESCE(SUM(amount),0) as s FROM purchases WHERE status='completed'")['s'] ?? 0;
-$pendingIds     = DB::queryOne("SELECT COUNT(*) as c FROM sender_ids WHERE status='pending'")['c'] ?? 0;
+// ── Stats — split by cache lifetime ───────────────────────────
+// Stable counts (users, campaigns, revenue) refresh every hour.
+// Today's messages refresh every 5 minutes since it updates throughout the day.
+$_now = time();
+
+if (!isset($_SESSION['_dash_stable_ts']) || ($_now - $_SESSION['_dash_stable_ts']) > 3600) {
+    $_SESSION['_dash_stable'] = [
+        'totalUsers'     => (int)(DB::queryOne("SELECT COUNT(*) as c FROM users WHERE role != 'admin'")['c'] ?? 0),
+        'totalResellers' => (int)(DB::queryOne("SELECT COUNT(*) as c FROM users WHERE role = 'reseller'")['c'] ?? 0),
+        'totalClients'   => (int)(DB::queryOne("SELECT COUNT(*) as c FROM users WHERE role = 'client'")['c'] ?? 0),
+        'totalCampaigns' => (int)(DB::queryOne("SELECT COUNT(*) as c FROM campaigns")['c'] ?? 0),
+        'totalRevenue'   => (float)(DB::queryOne("SELECT COALESCE(SUM(amount),0) as s FROM purchases WHERE status='completed'")['s'] ?? 0),
+        'chartLabels'    => null,
+        'chartValues'    => null,
+        'topResellers'   => null,
+    ];
+    // Chart data (last 7 days) — historical, cache with stable data
+    $chartData = DB::query("
+        SELECT DATE(created_at) as day, COUNT(*) as total
+        FROM messages WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+        GROUP BY DATE(created_at) ORDER BY day ASC
+    ");
+    $_SESSION['_dash_stable']['chartLabels'] = json_encode(array_column($chartData, 'day'));
+    $_SESSION['_dash_stable']['chartValues'] = json_encode(array_column($chartData, 'total'));
+
+    // Top resellers — correlated subqueries instead of joining campaigns ×
+    // messages, which multiplied into (campaigns × messages) rows per user
+    // and could freeze the page for minutes on a large messages table.
+    // (The old SUM(m.id) also summed message IDs instead of counting them.)
+    $_SESSION['_dash_stable']['topResellers'] = DB::query("
+        SELECT u.name, u.email, u.sms_units,
+               (SELECT COUNT(*) FROM campaigns c WHERE c.user_id = u.id) as campaigns,
+               (SELECT COUNT(*) FROM messages  m WHERE m.user_id = u.id) as messages_sent
+        FROM users u
+        WHERE u.role = 'reseller'
+        ORDER BY messages_sent DESC LIMIT 5
+    ");
+    $_SESSION['_dash_stable_ts'] = $_now;
+}
+
+$totalUsers     = $_SESSION['_dash_stable']['totalUsers'];
+$totalResellers = $_SESSION['_dash_stable']['totalResellers'];
+$totalClients   = $_SESSION['_dash_stable']['totalClients'];
+$totalCampaigns = $_SESSION['_dash_stable']['totalCampaigns'];
+$totalRevenue   = $_SESSION['_dash_stable']['totalRevenue'];
+$chartLabels    = $_SESSION['_dash_stable']['chartLabels'];
+$chartValues    = $_SESSION['_dash_stable']['chartValues'];
+$topResellers   = $_SESSION['_dash_stable']['topResellers'];
+
+// Today's send count — refreshes every 5 minutes
+if (!isset($_SESSION['_dash_today_ts']) || ($_now - $_SESSION['_dash_today_ts']) > 300) {
+    $_SESSION['_dash_today']    = (int)(DB::queryOne("SELECT COUNT(*) as c FROM messages WHERE created_at >= CURDATE()")['c'] ?? 0);
+    $_SESSION['_dash_today_ts'] = $_now;
+}
+$sentToday = $_SESSION['_dash_today'];
+
+$pendingIds = $pendingSenderIds; // already fetched by layout.php badge cache
 
 // ── Onfon Live Balance ─────────────────────────────────────────
 require_once __DIR__ . '/../includes/gateways/onfon.php';
-$adminUser = DB::queryOne("SELECT id, sms_units FROM users WHERE role = 'admin' LIMIT 1");
+$adminUser  = DB::queryOne("SELECT id, sms_units FROM users WHERE role = 'admin' LIMIT 1");
 $localUnits = $adminUser['sms_units'] ?? 0;
 
-// ── Chart data (last 7 days) ───────────────────────────────────
-$chartData = DB::query("
-  SELECT DATE(created_at) as day, COUNT(*) as total
-  FROM messages
-  WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-  GROUP BY DATE(created_at) ORDER BY day ASC
-");
-$chartLabels = json_encode(array_column($chartData, 'day'));
-$chartValues = json_encode(array_column($chartData, 'total'));
-
-// ── Recent Campaigns ───────────────────────────────────────────
-$recentCampaigns = DB::query("
-  SELECT c.*, u.name as user_name
-  FROM campaigns c JOIN users u ON c.user_id = u.id
-  ORDER BY c.created_at DESC LIMIT 8
-");
-
-// ── Top Resellers ──────────────────────────────────────────────
-$topResellers = DB::query("
-  SELECT u.name, u.email, u.sms_units,
-         COUNT(c.id) as campaigns,
-         COALESCE(SUM(m.id),0) as messages_sent
-  FROM users u
-  LEFT JOIN campaigns c ON c.user_id = u.id
-  LEFT JOIN messages  m ON m.user_id = u.id
-  WHERE u.role = 'reseller'
-  GROUP BY u.id ORDER BY messages_sent DESC LIMIT 5
-");
+// ── Recent Campaigns (short-lived — refreshes every 2 minutes) ─
+if (!isset($_SESSION['_dash_campaigns_ts']) || ($_now - $_SESSION['_dash_campaigns_ts']) > 120) {
+    $_SESSION['_dash_campaigns'] = DB::query("
+        SELECT c.*, u.name as user_name
+        FROM campaigns c JOIN users u ON c.user_id = u.id
+        ORDER BY c.created_at DESC LIMIT 8
+    ");
+    $_SESSION['_dash_campaigns_ts'] = $_now;
+}
+$recentCampaigns = $_SESSION['_dash_campaigns'];
 ?>
 
 <!-- Stats Grid -->
@@ -83,7 +114,7 @@ $topResellers = DB::query("
     </div>
   </div>
   <!-- Provider Balance Card -->
-  <div class="stat-card" style="border: 1px solid var(--primary-light); background: rgba(0, 200, 150, 0.03);">
+  <div class="stat-card">
     <div class="stat-icon blue" style="position:relative; z-index:2;"><i class="fa-solid fa-cloud-arrow-down"></i></div>
     <div class="stat-info" style="position:relative; z-index:2;">
       <div class="stat-label">Onfon Live Balance</div>
@@ -261,6 +292,15 @@ $extraScript = <<<JS
     }
   });
 })();
+
+function exportChart() {
+  const canvas = document.getElementById('messagesChart');
+  if (!canvas) return;
+  const link = document.createElement('a');
+  link.download = 'messages-last-7-days.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
 </script>
 JS;
 

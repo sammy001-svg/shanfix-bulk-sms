@@ -92,19 +92,28 @@ function auth_logout() {
 }
 
 function auth_user() {
+    static $cachedUser  = null;
+    static $resolved    = false;
+
+    if ($resolved) {
+        return $cachedUser;
+    }
+    $resolved = true;
+
     // Check session timeout
     if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > SESSION_TIMEOUT)) {
         auth_logout();
     }
     if (isset($_SESSION['user']['id'])) {
         $_SESSION['last_activity'] = time();
-        
-        // Refresh user data from DB to ensure units and status are always up-to-date
+
+        // Refresh user data from DB once per request to keep units/status current
         $user = DB::queryOne("SELECT * FROM users WHERE id = ? LIMIT 1", [$_SESSION['user']['id']]);
         if ($user) {
             unset($user['password_hash']);
             $_SESSION['user'] = $user;
             $_SESSION['user_id'] = $user['id'];
+            $cachedUser = $user;
             return $user;
         } else {
             auth_logout();
@@ -216,6 +225,41 @@ function safe_referer(string $default = '/'): string {
     return $ref;
 }
 
+/**
+ * Render windowed pagination links: first, last, and ±2 around the current
+ * page, with ellipses in between.  Replaces the old 1..N loop that emitted
+ * every page as an <a> — with a large table (e.g. millions of messages at
+ * 30/page) that generated tens of thousands of DOM nodes and froze the
+ * browser tab on render.
+ *
+ * @param int    $page       Current page (1-based)
+ * @param int    $totalPages Total number of pages
+ * @param array  $query      Extra query params to keep in each link (page is added automatically)
+ */
+function render_pagination(int $page, int $totalPages, array $query = []): void {
+    if ($totalPages <= 1) return;
+
+    $link = function (int $p) use ($query): string {
+        return '?' . http_build_query(array_merge($query, ['page' => $p]));
+    };
+
+    // Build the visible page set: 1, last, current ±2
+    $pages = [1, $totalPages];
+    for ($p = max(1, $page - 2); $p <= min($totalPages, $page + 2); $p++) $pages[] = $p;
+    $pages = array_unique($pages);
+    sort($pages);
+
+    $prev = 0;
+    foreach ($pages as $p) {
+        if ($p - $prev > 1) {
+            echo '<span class="page-btn" style="pointer-events:none;border:none;background:none">…</span>';
+        }
+        $active = $p === $page ? ' active' : '';
+        echo '<a href="' . htmlspecialchars($link($p)) . '" class="page-btn' . $active . '">' . $p . '</a>';
+        $prev = $p;
+    }
+}
+
 function flash_set($type, $message) {
     $_SESSION['flash'] = compact('type', 'message');
 }
@@ -246,12 +290,13 @@ function notify($userId, $title, $message, $type = 'info', $isPopup = false, $im
 function get_unread_notifications($userId) {
     // 1. Get personal notifications not in interactions (or marked not read)
     // 2. Get broadcast (user_id IS NULL) notifications not in interactions (or marked not read)
-    $sql = "SELECT n.* FROM notifications n 
+    $sql = "SELECT n.* FROM notifications n
             LEFT JOIN notification_interactions ni ON n.id = ni.notification_id AND ni.user_id = ?
             WHERE (n.user_id = ? OR n.user_id IS NULL)
             AND (ni.is_read IS NULL OR ni.is_read = 0)
             AND (ni.is_dismissed IS NULL OR ni.is_dismissed = 0)
-            ORDER BY n.created_at DESC";
+            ORDER BY n.created_at DESC
+            LIMIT 20";
     return DB::query($sql, [$userId, $userId]) ?: [];
 }
 
@@ -280,18 +325,27 @@ function dismiss_notification($userId, $notificationId) {
 }
 
 /**
- * Get persistent popup notifications for the dashboard.
- * Ignores the dismissed/read status to ensure they show on every refresh.
+ * Get undismissed popup notifications for a user.
+ * Returns at most 3, oldest first so they display in creation order.
  */
 function get_dashboard_popups($userId) {
-    return DB::query(
-        "SELECT * FROM notifications 
-         WHERE is_popup = 1 
-         AND (user_id = ? OR user_id IS NULL) 
-         AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-         ORDER BY created_at DESC",
-        [$userId]
-    ) ?: [];
+    try {
+        return DB::query(
+            "SELECT n.id, n.title, n.message, n.type, n.image_url
+             FROM notifications n
+             LEFT JOIN notification_interactions ni
+                ON n.id = ni.notification_id AND ni.user_id = ?
+             WHERE n.is_popup = 1
+               AND (n.user_id = ? OR n.user_id IS NULL)
+               AND n.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+               AND (ni.is_dismissed IS NULL OR ni.is_dismissed = 0)
+             ORDER BY n.created_at ASC
+             LIMIT 3",
+            [$userId, $userId]
+        ) ?: [];
+    } catch (Exception $e) {
+        return [];
+    }
 }
 
 /**

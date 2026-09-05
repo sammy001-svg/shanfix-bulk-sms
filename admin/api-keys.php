@@ -34,9 +34,10 @@ $offset = ($page - 1) * $perPage;
 $users = DB::query(
     "SELECT u.id, u.name, u.email, u.role, u.status, u.api_client_id, u.api_key,
             (SELECT COALESCE(SUM(arc.hits),0) FROM api_rate_counters arc
-             WHERE arc.bucket = CONCAT('api:', u.id) AND arc.window_start >= CURDATE()) as calls_today,
+             WHERE arc.bucket IN (CONCAT('api:', u.id), CONCAT('api_bulk:', u.id))
+               AND arc.window_start >= CURDATE()) as calls_today,
             (SELECT COALESCE(SUM(arc2.hits),0) FROM api_rate_counters arc2
-             WHERE arc2.bucket = CONCAT('api:', u.id)) as calls_total
+             WHERE arc2.bucket IN (CONCAT('api:', u.id), CONCAT('api_bulk:', u.id))) as calls_total
      FROM users u $where ORDER BY calls_today DESC, u.name ASC LIMIT $perPage OFFSET $offset",
     $params
 );
@@ -251,9 +252,16 @@ function copyField(id) {
     const el = document.getElementById(id);
     const prev = el.type;
     el.type = 'text';
-    el.select();
-    document.execCommand('copy');
+    const val = el.value;
     el.type = prev;
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(val).then(function() {
+            el.style.outline = '2px solid var(--success)';
+            setTimeout(function() { el.style.outline = ''; }, 1200);
+        });
+    } else {
+        el.type = 'text'; el.select(); document.execCommand('copy'); el.type = prev;
+    }
 }
 </script>
 JS;

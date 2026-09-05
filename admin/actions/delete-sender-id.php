@@ -9,20 +9,15 @@ require_role('admin');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) {
-        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid security token.'];
+        flash_set('danger', 'Invalid security token.');
         redirect('/admin/sender-ids.php');
     }
 
     $id = (int)($_POST['id'] ?? 0);
 
     if ($id) {
-        $success = DB::execute("DELETE FROM sender_ids WHERE id = ?", [$id]);
-        
-        if ($success) {
-            $_SESSION['flash'] = ['type' => 'success', 'message' => 'Sender ID deleted successfully.'];
-        } else {
-            $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Failed to delete Sender ID.'];
-        }
+        DB::execute("DELETE FROM sender_ids WHERE id = ?", [$id]);
+        flash_set('success', 'Sender ID deleted successfully.');
     }
 
     redirect('/admin/sender-ids.php');

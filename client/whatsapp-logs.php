@@ -5,12 +5,20 @@ require_once __DIR__ . '/layout.php';
 
 $uid = $user['id'];
 
-// Stats for logs
+// Stats for logs — one query instead of four separate COUNTs
+$statsRow = DB::queryOne(
+    "SELECT SUM(status = 'sent')      AS sent,
+            SUM(status = 'delivered') AS delivered,
+            SUM(status = 'read')      AS `read`,
+            SUM(status = 'failed')    AS failed
+     FROM whatsapp_messages WHERE user_id = ?",
+    [$uid]
+);
 $stats = [
-    'sent' => DB::queryValue("SELECT COUNT(*) FROM whatsapp_messages WHERE user_id = ? AND status = 'sent'", [$uid]),
-    'delivered' => DB::queryValue("SELECT COUNT(*) FROM whatsapp_messages WHERE user_id = ? AND status = 'delivered'", [$uid]),
-    'read' => DB::queryValue("SELECT COUNT(*) FROM whatsapp_messages WHERE user_id = ? AND status = 'read'", [$uid]),
-    'failed' => DB::queryValue("SELECT COUNT(*) FROM whatsapp_messages WHERE user_id = ? AND status = 'failed'", [$uid]),
+    'sent'      => (int)($statsRow['sent']      ?? 0),
+    'delivered' => (int)($statsRow['delivered'] ?? 0),
+    'read'      => (int)($statsRow['read']      ?? 0),
+    'failed'    => (int)($statsRow['failed']    ?? 0),
 ];
 
 // Fetch Messages

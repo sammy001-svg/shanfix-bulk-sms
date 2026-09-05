@@ -41,9 +41,8 @@ $resellers = DB::query("SELECT id,name FROM users WHERE role='reseller' AND stat
         <div class="form-group">
           <label class="form-label">Account Role <span class="required">*</span></label>
           <select name="role" class="form-control" required>
-            <option value="client" <?= $u['role']==='client'?'selected':'' ?>>Client</option>
-            <option value="reseller" <?= $u['role']==='reseller'?'selected':'' ?>>Reseller</option>
-            <option value="admin" <?= $u['role']==='admin'?'selected':'' ?>>Administrator</option>
+            <option value="client"   <?= $u['role']==='client'   ? 'selected' : '' ?>>Client</option>
+            <option value="reseller" <?= $u['role']==='reseller' ? 'selected' : '' ?>>Reseller</option>
           </select>
         </div>
         <div class="form-group">

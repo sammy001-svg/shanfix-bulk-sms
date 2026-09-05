@@ -69,6 +69,19 @@ try {
     $logFile = __DIR__ . '/../tmp/dlr.log';
     if (!is_dir(__DIR__ . '/../tmp')) @mkdir(__DIR__ . '/../tmp', 0777, true);
 
+    // Optional token authentication.  Set dlr_webhook_token in system_settings
+    // and configure the same value in the Onfon portal DLR URL as ?token=<value>.
+    $expectedToken = get_setting('dlr_webhook_token', '');
+    if ($expectedToken !== '') {
+        $receivedToken = $_GET['token'] ?? $_SERVER['HTTP_X_DLR_TOKEN'] ?? '';
+        if (!hash_equals($expectedToken, $receivedToken)) {
+            @file_put_contents($logFile, '[' . date('Y-m-d H:i:s') . "] AUTH_FAIL: invalid DLR token\n", FILE_APPEND);
+            http_response_code(403);
+            echo json_encode(['status' => 'error', 'message' => 'Forbidden']);
+            exit;
+        }
+    }
+
     // Accept both form-encoded POST and JSON body
     $raw  = file_get_contents('php://input');
     $data = [];

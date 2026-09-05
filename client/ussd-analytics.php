@@ -17,12 +17,13 @@ if ($codeId > 0) {
 }
 
 // Fetch Real Stats
-$whereCode = $codeId > 0 ? "AND code_id = $codeId" : "";
+$whereCode  = $codeId > 0 ? "AND code_id = ?" : "";
+$codeParams = $codeId > 0 ? [$codeId] : [];
 
-$totalReq = DB::queryValue("SELECT COUNT(*) FROM ussd_requests WHERE user_id = ? $whereCode", [$uid]) ?: 0;
-$successReq = DB::queryValue("SELECT COUNT(*) FROM ussd_requests WHERE user_id = ? AND http_status = 200 $whereCode", [$uid]) ?: 0;
-$totalSess = DB::queryValue("SELECT COUNT(*) FROM ussd_sessions WHERE user_id = ? $whereCode", [$uid]) ?: 0;
-$successSess = DB::queryValue("SELECT COUNT(*) FROM ussd_sessions WHERE user_id = ? AND status != 'timed_out' $whereCode", [$uid]) ?: 0;
+$totalReq   = DB::queryValue("SELECT COUNT(*) FROM ussd_requests WHERE user_id = ? $whereCode", array_merge([$uid], $codeParams)) ?: 0;
+$successReq = DB::queryValue("SELECT COUNT(*) FROM ussd_requests WHERE user_id = ? AND http_status = 200 $whereCode", array_merge([$uid], $codeParams)) ?: 0;
+$totalSess  = DB::queryValue("SELECT COUNT(*) FROM ussd_sessions WHERE user_id = ? $whereCode", array_merge([$uid], $codeParams)) ?: 0;
+$successSess= DB::queryValue("SELECT COUNT(*) FROM ussd_sessions WHERE user_id = ? AND status != 'timed_out' $whereCode", array_merge([$uid], $codeParams)) ?: 0;
 
 $stats = [
     'total_requests'    => $totalReq,
@@ -33,22 +34,22 @@ $stats = [
 
 // Fetch Chart Data (7 Days)
 $trafficData = DB::query("
-    SELECT DATE(created_at) as day, COUNT(*) as total 
-    FROM ussd_requests 
-    WHERE user_id = ? $whereCode AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) 
+    SELECT DATE(created_at) as day, COUNT(*) as total
+    FROM ussd_requests
+    WHERE user_id = ? $whereCode AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
     GROUP BY day ORDER BY day ASC
-", [$uid]) ?: [];
+", array_merge([$uid], $codeParams)) ?: [];
 
 $trafficLabels = json_encode(array_column($trafficData, 'day')) ?: '[]';
 $trafficValues = json_encode(array_column($trafficData, 'total')) ?: '[]';
 
 // Status Distribution
 $statusData = DB::query("
-    SELECT http_status, COUNT(*) as total 
-    FROM ussd_requests 
-    WHERE user_id = ? $whereCode 
+    SELECT http_status, COUNT(*) as total
+    FROM ussd_requests
+    WHERE user_id = ? $whereCode
     GROUP BY http_status
-", [$uid]) ?: [];
+", array_merge([$uid], $codeParams)) ?: [];
 
 // Top Sessions by Code
 $topCodes = DB::query("

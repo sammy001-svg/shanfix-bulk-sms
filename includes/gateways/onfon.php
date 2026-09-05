@@ -36,75 +36,28 @@ class Onfon {
     }
 
     /**
-     * Send SMS via Onfon Media (single recipient, used for one-off sends only).
+     * Send SMS via Onfon Media (single recipient).
+     *
+     * Delegates to sendBulkBatchMulti() so it inherits:
+     *  - 60 s timeout (vs the old 30 s)
+     *  - 3 retries with exponential back-off for transient 429 / 5xx / curl errors
+     *  - consistent debug logging
+     *
+     * Without retry, rapid back-to-back sendsms.php calls could hit Onfon's
+     * per-account concurrency limit, get a transient error, be marked 'failed'
+     * on our side — while Onfon still queued and delivered the message ~1 h later.
      */
-    public static function sendSMS($to, $message, $senderId, bool $isUnicode = false) {
-        $creds     = self::getSettings();
-        $apiKey    = $creds['onfon_api_key']    ?? '';
-        $clientId  = $creds['onfon_user_id']    ?? '';
-        $accessKey = $creds['onfon_access_key'] ?? '';
+    public static function sendSMS($to, $message, $senderId, bool $isUnicode = false): array {
+        $batch   = [['phone' => $to, 'message' => $message]];
+        $results = self::sendBulkBatchMulti([$batch], $senderId, $isUnicode);
+        $r       = $results[0] ?? null;
 
-        if (!$apiKey || !$clientId) {
-            return ['success' => false, 'error' => 'Onfon API not configured in system settings.'];
+        if ($r && !empty($r['sent'])) {
+            return ['success' => true, 'id' => $r['sent'][0]['msg_id'] ?? uniqid()];
         }
 
-        $phone = preg_replace('/[^0-9]/', '', $to);
-        if (strpos($phone, '0') === 0) {
-            $phone = '254' . substr($phone, 1);
-        } elseif (strpos($phone, '254') !== 0 && strlen($phone) == 9) {
-            $phone = '254' . $phone;
-        }
-
-        $senderId    = trim($senderId);
-        $url         = "https://api.onfonmedia.co.ke/v1/sms/SendBulkSMS";
-        $jsonPayload = json_encode([
-            'SenderId'          => $senderId,
-            'IsUnicode'         => $isUnicode,
-            'IsFlash'           => false,
-            'MessageParameters' => [['Number' => $phone, 'Text' => $message]],
-            'ApiKey'            => $apiKey,
-            'ClientId'          => $clientId,
-            'AccessKey'         => $accessKey,
-        ]);
-
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $jsonPayload,
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 30,
-            CURLOPT_RESOLVE        => [
-                "api.onfonmedia.co.ke:443:104.20.9.168",
-                "api.onfonmedia.co.ke:443:104.20.8.168",
-            ],
-        ]);
-
-        $response  = curl_exec($ch);
-        $curlError = curl_error($ch);
-        $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($response === false) {
-            return ['success' => false, 'error' => "CURL Error: $curlError"];
-        }
-
-        $result  = json_decode($response, true);
-        $logPath = __DIR__ . '/onfon_debug.log';
-        @file_put_contents($logPath, "[" . date('Y-m-d H:i:s') . "] SENDER: $senderId | TO: $phone | HTTP: $httpCode | RESP: $response" . PHP_EOL, FILE_APPEND);
-
-        if ($httpCode === 200 && isset($result['ErrorCode']) && $result['ErrorCode'] === 0) {
-            $msgData = $result['Data'][0] ?? null;
-            if ($msgData && isset($msgData['MessageErrorCode']) && $msgData['MessageErrorCode'] !== 0) {
-                $errCode = (int)$msgData['MessageErrorCode'];
-                $desc    = !empty($msgData['MessageErrorDescription']) ? $msgData['MessageErrorDescription'] : self::describeErrorCode($errCode);
-                return ['success' => false, 'error' => $desc];
-            }
-            return ['success' => true, 'id' => $msgData['MessageId'] ?? uniqid()];
-        }
-
-        $errMsg = $result['Description'] ?? ($result['Message'] ?? "HTTP Error $httpCode");
-        return ['success' => false, 'error' => "Onfon Error: $errMsg"];
+        $error = $r['reasons'][0] ?? 'Provider connection failed';
+        return ['success' => false, 'error' => $error];
     }
 
     /**
@@ -204,7 +157,6 @@ class Onfon {
                 $curlError = curl_error($ch);
                 $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 curl_multi_remove_handle($mh, $ch);
-                curl_close($ch);
 
                 $batch  = $batches[$i];
                 $allIdx = range(0, count($batch) - 1);
@@ -292,9 +244,7 @@ class Onfon {
         ]);
 
         $response = curl_exec($ch);
-        curl_close($ch);
-
-        $result = json_decode($response, true);
+        $result   = json_decode($response, true);
         if (isset($result['Data'][0]['Credits'])) {
             return (float)$result['Data'][0]['Credits'];
         }

@@ -5,6 +5,7 @@ require_role('reseller');
 $pageTitle = $pageTitle ?? 'Dashboard';
 $breadcrumb = $breadcrumb ?? [];
 $user = current_user();
+$_popupNotifs = get_dashboard_popups($user['id']);
 
 $navItems = [
   ['type'=>'section','label'=>'MAIN'],
@@ -80,9 +81,21 @@ $navItems = [
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($pageTitle) ?> — <?= htmlspecialchars(Branding::get('system_name')) ?></title>
   <meta name="view-transition" content="same-origin">
-  <link rel="stylesheet" href="/assets/css/style.css?v=1.1">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <!-- DNS prefetch & preconnect for external resources -->
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Google Fonts — non-blocking (replaced CSS @import) -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="/assets/css/style.css?v=1.2">
+  <!-- Font Awesome — preload so the browser starts the download early -->
+  <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"></noscript>
+  <!-- SweetAlert2 deferred — only called in user-triggered handlers, never at parse time -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
   <?php Branding::renderStyles(); ?>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script>
@@ -190,6 +203,39 @@ $navItems = [
         }
     };
   </script>
+<?php if (!empty($_popupNotifs)): ?>
+<script>
+(function() {
+  var popups = <?= json_encode(array_values($_popupNotifs)) ?>;
+  var token  = <?= json_encode(csrf_token()) ?>;
+  var icons  = { info:'info', success:'success', warning:'warning', danger:'error' };
+  document.addEventListener('DOMContentLoaded', function() {
+    if (!popups.length || typeof Swal === 'undefined') return;
+    function showNext(i) {
+      if (i >= popups.length) return;
+      var p = popups[i];
+      var opts = {
+        title: p.title,
+        html: String(p.message).replace(/\n/g, '<br>'),
+        icon: icons[p.type] || 'info',
+        confirmButtonText: 'Got it',
+        confirmButtonColor: 'var(--primary)',
+        allowOutsideClick: false
+      };
+      if (p.image_url) { opts.imageUrl = p.image_url; opts.imageMaxHeight = 200; opts.imageAlt = p.title; }
+      Swal.fire(opts).then(function() {
+        var fd = new FormData();
+        fd.append('id', p.id);
+        fd.append('csrf_token', token);
+        fetch('/reseller/actions/dismiss-popup.php', { method:'POST', body:fd }).catch(function(){});
+        showNext(i + 1);
+      });
+    }
+    showNext(0);
+  });
+})();
+</script>
+<?php endif; ?>
 </head>
 <body>
 <div id="page-loader"></div>

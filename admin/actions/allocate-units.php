@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 if (!csrf_verify()) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid security token.'];
+    flash_set('danger', 'Invalid security token.');
     redirect('/admin/units.php');
 }
 
@@ -23,7 +23,7 @@ $action    = ($_POST['action'] ?? '') === 'remove' ? 'remove' : 'add';
 $note      = sanitize($_POST['note'] ?? 'Manual adjustment');
 
 if (!$toUser || $units <= 0) {
-    $_SESSION['flash'] = ['type' => 'warning', 'message' => 'Invalid unit amount or target user.'];
+    flash_set('warning', 'Invalid unit amount or target user.');
     redirect(safe_referer('/admin/units.php'));
 }
 
@@ -37,7 +37,7 @@ if ($action === 'add') {
         );
         if (!$deducted) {
             DB::rollback();
-            $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Insufficient units in your Admin account to allocate.'];
+            flash_set('danger', 'Insufficient units in your Admin account to allocate.');
             redirect(safe_referer('/admin/units.php'));
         }
 
@@ -49,10 +49,10 @@ if ($action === 'add') {
         DB::commit();
 
         notify($toUser, 'Units Allocated', "Admin has credited " . number_format($units) . " units to your account.", 'success');
-        $_SESSION['flash'] = ['type' => 'success', 'message' => "Successfully added " . number_format($units) . " units."];
+        flash_set('success', "Successfully added " . number_format($units) . " units.");
     } catch (Exception $e) {
         DB::rollback();
-        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Failed to add units.'];
+        flash_set('danger', 'Failed to add units.');
     }
 } else {
     DB::beginTransaction();
@@ -64,7 +64,7 @@ if ($action === 'add') {
         );
         if (!$deducted) {
             DB::rollback();
-            $_SESSION['flash'] = ['type' => 'danger', 'message' => 'User does not have enough units to remove that amount.'];
+            flash_set('danger', 'User does not have enough units to remove that amount.');
             redirect(safe_referer('/admin/units.php'));
         }
 
@@ -76,10 +76,10 @@ if ($action === 'add') {
         DB::commit();
 
         notify($toUser, 'Units Adjusted', "Admin has debited " . number_format($units) . " units from your account.", 'warning');
-        $_SESSION['flash'] = ['type' => 'success', 'message' => "Successfully removed " . number_format($units) . " units."];
+        flash_set('success', "Successfully removed " . number_format($units) . " units.");
     } catch (Exception $e) {
         DB::rollback();
-        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Failed to remove units.'];
+        flash_set('danger', 'Failed to remove units.');
     }
 }
 

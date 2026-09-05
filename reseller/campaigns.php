@@ -29,6 +29,26 @@ $totalPages= ceil($total / $perPage);
 // Sender IDs for the create modal
 $senderIds = DB::query("SELECT sender_id FROM sender_ids WHERE user_id=? AND status='approved'", [$uid]);
 $groups    = DB::query("SELECT id, name FROM contact_groups WHERE user_id=?", [$uid]);
+
+// Campaign detail view
+$detailCampaign = null;
+$detailId = (int)($_GET['view_details'] ?? 0);
+if ($detailId) {
+    $detailCampaign = DB::queryOne(
+        "SELECT * FROM campaigns WHERE id = ? AND user_id = ?",
+        [$detailId, $uid]
+    );
+}
+
+// Draft campaign edit
+$editDraftCampaign = null;
+$editDraftId = (int)($_GET['edit'] ?? 0);
+if ($editDraftId) {
+    $editDraftCampaign = DB::queryOne(
+        "SELECT * FROM campaigns WHERE id = ? AND user_id = ? AND status = 'draft'",
+        [$editDraftId, $uid]
+    );
+}
 ?>
 
 <div class="page-header">
@@ -120,6 +140,14 @@ $groups    = DB::query("SELECT id, name FROM contact_groups WHERE user_id=?", [$
                     <?php if ($c['status']==='draft'): ?>
                       <a href="/reseller/campaigns.php?view=campaigns&edit=<?=$c['id']?>" class="btn btn-outline btn-sm btn-icon" title="Edit"><i class="fa-solid fa-pen"></i></a>
                     <?php endif; ?>
+                    <?php if (in_array($c['status'], ['queued', 'scheduled', 'sending', 'running'])): ?>
+                      <form method="POST" action="/reseller/actions/cancel-campaign.php" style="display:inline"
+                            onsubmit="return confirm('Stop this campaign? Messages already sent will NOT be recalled.')">
+                        <input type="hidden" name="id" value="<?=$c['id']?>">
+                        <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
+                        <button type="submit" class="btn btn-warning btn-sm btn-icon" title="Cancel Campaign"><i class="fa-solid fa-stop"></i></button>
+                      </form>
+                    <?php endif; ?>
                   </div>
                 </td>
               </tr>
@@ -153,32 +181,119 @@ $groups    = DB::query("SELECT id, name FROM contact_groups WHERE user_id=?", [$
   <?php if ($totalPages > 1): ?>
     <div class="card-footer">
       <div class="pagination">
-        <?php for ($p = 1; $p <= $totalPages; $p++): ?>
-          <a href="?page=<?=$p?>&view=<?=$view?>&status=<?=$status?>&q=<?=urlencode($search)?>" class="page-btn <?=$p===$page?'active':''?>"><?=$p?></a>
-        <?php endfor; ?>
+        <?php render_pagination($page, (int)$totalPages, array_filter(['view' => $view, 'status' => $status, 'q' => $search])); ?>
       </div>
     </div>
   <?php endif; ?>
 </div>
 
+<!-- Campaign Detail Modal -->
+<?php if ($detailCampaign): ?>
+<?php
+$dc  = $detailCampaign;
+$dsc = ['completed'=>'success','sending'=>'info','queued'=>'warning','running'=>'info','failed'=>'danger','draft'=>'muted','cancelled'=>'secondary'][$dc['status']] ?? 'muted';
+$ddlv = $dc['total_count'] > 0 ? round($dc['sent_count'] / max($dc['total_count'],1) * 100) : 0;
+?>
+<div class="modal-overlay active" id="campaignDetailModal">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <h3 class="modal-title"><i class="fa-solid fa-chart-bar" style="color:var(--primary)"></i> Campaign Details</h3>
+      <a href="/reseller/campaigns.php?view=campaigns" class="modal-close">×</a>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px">
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px">Campaign Name</div>
+          <div style="font-weight:600"><?= htmlspecialchars($dc['name']) ?></div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px">Status</div>
+          <span class="badge badge-<?= $dsc ?>"><?= ucfirst($dc['status']) ?></span>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px">Sender ID</div>
+          <code><?= htmlspecialchars($dc['sender_id']) ?></code>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px">Units Used</div>
+          <div><?= number_format($dc['units_used'], 2) ?></div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px">Created</div>
+          <div style="font-size:13px"><?= date('d M Y H:i', strtotime($dc['created_at'])) ?></div>
+        </div>
+        <?php if ($dc['scheduled_at']): ?>
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px">Scheduled For</div>
+          <div style="font-size:13px"><?= date('d M Y H:i', strtotime($dc['scheduled_at'])) ?></div>
+        </div>
+        <?php endif; ?>
+        <?php if ($dc['sent_at']): ?>
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px">Completed At</div>
+          <div style="font-size:13px"><?= date('d M Y H:i', strtotime($dc['sent_at'])) ?></div>
+        </div>
+        <?php endif; ?>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
+        <div style="background:var(--bg-dark);border-radius:var(--radius-md);padding:14px;text-align:center">
+          <div style="font-size:22px;font-weight:700"><?= number_format($dc['total_count']) ?></div>
+          <div style="font-size:11px;color:var(--text-secondary)">Total</div>
+        </div>
+        <div style="background:var(--bg-dark);border-radius:var(--radius-md);padding:14px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--success)"><?= number_format($dc['sent_count']) ?></div>
+          <div style="font-size:11px;color:var(--text-secondary)">Sent</div>
+        </div>
+        <div style="background:var(--bg-dark);border-radius:var(--radius-md);padding:14px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--danger)"><?= number_format($dc['failed_count']) ?></div>
+          <div style="font-size:11px;color:var(--text-secondary)">Failed</div>
+        </div>
+        <div style="background:var(--bg-dark);border-radius:var(--radius-md);padding:14px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--primary)"><?= $ddlv ?>%</div>
+          <div style="font-size:11px;color:var(--text-secondary)">Delivery</div>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:6px">Message</div>
+        <div style="background:var(--bg-dark);border-radius:var(--radius-md);padding:14px;font-size:13px;white-space:pre-wrap;line-height:1.6"><?= htmlspecialchars($dc['message'] ?? '') ?></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <?php if (in_array($dc['status'], ['queued','scheduled','sending','running'])): ?>
+        <form method="POST" action="/reseller/actions/cancel-campaign.php" style="margin-right:auto"
+              onsubmit="return confirm('Stop this campaign? Messages already sent will NOT be recalled.')">
+          <input type="hidden" name="id" value="<?= $dc['id'] ?>">
+          <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+          <button type="submit" class="btn btn-warning"><i class="fa-solid fa-stop"></i> Cancel Campaign</button>
+        </form>
+      <?php endif; ?>
+      <a href="/reseller/campaigns.php?view=campaigns" class="btn btn-secondary">Close</a>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
 <!-- Create Campaign Modal -->
 <div class="modal-overlay" id="campaignModal">
   <div class="modal" style="max-width:620px">
     <div class="modal-header">
-      <h3 class="modal-title"><i class="fa-solid fa-bullhorn" style="color:var(--primary)"></i> Create New Campaign</h3>
+      <h3 class="modal-title" id="rCampaignModalTitle"><i class="fa-solid fa-bullhorn" style="color:var(--primary)"></i> Create New Campaign</h3>
       <button class="modal-close" onclick="closeModal('campaignModal')">×</button>
     </div>
     <form method="POST" action="/reseller/actions/create-campaign.php" enctype="multipart/form-data">
       <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+      <input type="hidden" name="id" id="rCampaignId" value="">
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label">Campaign Name <span class="required">*</span></label>
-          <input type="text" name="name" class="form-control" placeholder="e.g. July Promo" required>
+          <input type="text" name="name" id="rCampaignName" class="form-control" placeholder="e.g. July Promo" required>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Sender ID <span class="required">*</span></label>
-            <select name="sender_id" class="form-control" required>
+            <select name="sender_id" id="rCampaignSenderId" class="form-control" required>
               <option value="">-- Select --</option>
               <?php foreach ($senderIds as $s): ?>
                 <option value="<?= htmlspecialchars($s['sender_id']) ?>"><?= htmlspecialchars($s['sender_id']) ?></option>
@@ -190,7 +305,7 @@ $groups    = DB::query("SELECT id, name FROM contact_groups WHERE user_id=?", [$
           </div>
           <div class="form-group">
             <label class="form-label">Schedule (optional)</label>
-            <input type="datetime-local" name="scheduled_at" class="form-control">
+            <input type="datetime-local" name="scheduled_at" id="rCampaignScheduledAt" class="form-control">
             <div class="form-hint">Leave blank to send immediately after saving</div>
           </div>
         </div>
@@ -202,7 +317,7 @@ $groups    = DB::query("SELECT id, name FROM contact_groups WHERE user_id=?", [$
             <button type="button" class="tab-btn" onclick="switchTab(this,'tab-upload')">Upload CSV</button>
           </div>
           <div class="tab-panel active" id="tab-group">
-            <select name="group_id" class="form-control">
+            <select name="group_id" id="rCampaignGroupId" class="form-control">
               <option value="">-- Select Group --</option>
               <?php foreach ($groups as $g): ?>
                 <option value="<?= $g['id'] ?>"><?= htmlspecialchars($g['name']) ?></option>
@@ -210,7 +325,7 @@ $groups    = DB::query("SELECT id, name FROM contact_groups WHERE user_id=?", [$
             </select>
           </div>
           <div class="tab-panel" id="tab-numbers">
-            <textarea name="numbers" class="form-control" placeholder="Enter phone numbers separated by commas or new lines&#10;+254712345678, +254798765432" rows="4"></textarea>
+            <textarea name="numbers" id="rCampaignNumbers" class="form-control" placeholder="Enter phone numbers separated by commas or new lines&#10;+254712345678, +254798765432" rows="4"></textarea>
           </div>
           <div class="tab-panel" id="tab-upload">
             <div class="upload-zone" id="uploadZone" onclick="document.getElementById('csvFile').click()">
@@ -238,6 +353,9 @@ $groups    = DB::query("SELECT id, name FROM contact_groups WHERE user_id=?", [$
 
 <?php
 $openModalJs = !empty($_GET['new']) ? "openModal('campaignModal');" : "";
+if ($editDraftCampaign) {
+    $openModalJs = 'editDraftCampaign(' . json_encode($editDraftCampaign) . ');';
+}
 $extraScript = <<<JS
 <script>
 (function() {
@@ -251,6 +369,31 @@ $extraScript = <<<JS
       document.getElementById('cmpCost').textContent = s;
     });
   }
+
+  function editDraftCampaign(c) {
+    document.getElementById('rCampaignModalTitle').innerHTML = '<i class="fa-solid fa-pen" style="color:var(--primary)"></i> Edit Draft Campaign';
+    document.getElementById('rCampaignId').value          = c.id;
+    document.getElementById('rCampaignName').value        = c.name;
+    document.getElementById('rCampaignSenderId').value    = c.sender_id;
+    document.getElementById('rCampaignScheduledAt').value = c.scheduled_at ? c.scheduled_at.replace(' ','T').substring(0,16) : '';
+    document.getElementById('campMsg').value              = c.message || '';
+    if (c.group_id) {
+      document.getElementById('rCampaignGroupId').value = c.group_id;
+      // switch to group tab
+      document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+      document.getElementById('tab-group').classList.add('active');
+    } else if (c.recipients) {
+      document.getElementById('rCampaignNumbers').value = c.recipients.replace(/,/g,'\\n');
+      document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+      document.getElementById('tab-numbers').classList.add('active');
+    }
+    const charEvt = campMsg && new Event('input');
+    if (charEvt) campMsg.dispatchEvent(charEvt);
+    openModal('campaignModal');
+  }
+
+  window.editDraftCampaign = editDraftCampaign;
+
   $openModalJs
 })();
 </script>

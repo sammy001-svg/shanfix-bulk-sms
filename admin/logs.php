@@ -12,7 +12,17 @@ $where='WHERE 1=1';$params=[];
 if ($status){$where.=' AND m.status=?';$params[]=$status;}
 if ($search){$where.=' AND (m.recipient LIKE ? OR m.sender_id LIKE ?)';$params[]="%$search%";$params[]="%$search%";}
 
-$total   = DB::queryOne("SELECT COUNT(*) as c FROM messages m $where",$params)['c']??0;
+// Unfiltered COUNT(*) is a full index scan on InnoDB — cache it for 60 s so
+// paging through the log doesn't rescan the messages table on every click.
+if (!$status && !$search) {
+    if (!isset($_SESSION['_logs_total_ts']) || (time() - $_SESSION['_logs_total_ts']) > 60) {
+        $_SESSION['_logs_total']    = (int)(DB::queryOne("SELECT COUNT(*) as c FROM messages m")['c'] ?? 0);
+        $_SESSION['_logs_total_ts'] = time();
+    }
+    $total = $_SESSION['_logs_total'];
+} else {
+    $total = DB::queryOne("SELECT COUNT(*) as c FROM messages m $where",$params)['c']??0;
+}
 $messages= DB::query("SELECT m.*, u.name as user_name FROM messages m LEFT JOIN users u ON m.user_id=u.id $where ORDER BY m.created_at DESC LIMIT $perPage OFFSET $offset",$params);
 $totalPages=ceil($total/$perPage);
 ?>
@@ -66,7 +76,7 @@ $totalPages=ceil($total/$perPage);
   </div>
   <?php if ($totalPages>1): ?>
     <div class="card-footer"><div class="pagination">
-      <?php for($p=1;$p<=$totalPages;$p++): ?><a href="?page=<?=$p?>&q=<?=urlencode($search)?>&status=<?=$status?>" class="page-btn <?=$p===$page?'active':''?>"><?=$p?></a><?php endfor; ?>
+      <?php render_pagination($page, (int)$totalPages, array_filter(['q' => $search, 'status' => $status])); ?>
     </div></div>
   <?php endif; ?>
 </div>

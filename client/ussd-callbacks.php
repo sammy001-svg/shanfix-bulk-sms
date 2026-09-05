@@ -119,6 +119,5 @@ function editCallback(id, code, url) {
     openModal('callbackModal');
 }
 </script>
-</script>
 
 <?php include __DIR__ . '/../includes/layout-footer.php'; ?>

@@ -85,12 +85,24 @@ $s = fn(string $key, string $default='') => htmlspecialchars($settings[$key] ?? 
             <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Sent to Kopo Kopo with every STK push. If your Kopo Kopo account whitelists callback URLs, register this one. It must stay at the site root &mdash; <code>/includes/</code> is blocked by .htaccess.</div>
           </div>
           <div class="form-group">
-            <label class="form-label">Webhook Signing Secret <span style="font-size:11px;color:var(--text-muted)">(optional)</span></label>
+            <label class="form-label">
+              Webhook Signing Secret
+              <?php if (!($settings['kk_webhook_secret'] ?? '') && !($settings['kk_webhook_token'] ?? '')): ?>
+                <span class="badge badge-danger" style="font-size:10px;vertical-align:middle">Not Set &mdash; Webhook Open</span>
+              <?php elseif ($settings['kk_webhook_secret'] ?? ''): ?>
+                <span class="badge badge-success" style="font-size:10px;vertical-align:middle">Configured</span>
+              <?php endif; ?>
+            </label>
             <input type="password" name="kk_webhook_secret" class="form-control" placeholder="Leave blank to keep current">
             <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Set only if your Kopo Kopo webhook subscription signs requests. The callback then rejects anything whose <code>X-KopoKopo-Signature</code> does not verify.</div>
           </div>
           <div class="form-group">
-            <label class="form-label">Webhook URL Token <span style="font-size:11px;color:var(--text-muted)">(optional)</span></label>
+            <label class="form-label">
+              Webhook URL Token
+              <?php if ($settings['kk_webhook_token'] ?? ''): ?>
+                <span class="badge badge-success" style="font-size:10px;vertical-align:middle">Configured</span>
+              <?php endif; ?>
+            </label>
             <input type="password" name="kk_webhook_token" class="form-control" placeholder="Leave blank to keep current">
             <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Shared secret appended to the callback URL as <code>?token=</code>. Use this when the till does not sign webhooks. With neither guard set, the endpoint is open and only the reference prefix keeps foreign payments out.</div>
           </div>
@@ -115,11 +127,28 @@ $s = fn(string $key, string $default='') => htmlspecialchars($settings[$key] ?? 
           <hr style="margin:24px 0;border-color:var(--border)">
           <div class="form-group">
             <label class="form-label">SMS Delivery Report (DLR) Webhook URL</label>
+            <?php
+            $dlrBase  = rtrim($settings['site_url'] ?? '', '/') . '/webhooks/sms-dlr.php';
+            $dlrToken = $settings['dlr_webhook_token'] ?? '';
+            $dlrUrl   = $dlrToken ? $dlrBase . '?token=' . urlencode($dlrToken) : $dlrBase;
+            ?>
             <div class="input-group">
-              <input type="text" class="form-control" value="<?= htmlspecialchars(rtrim($settings['site_url']??'', '/') . '/webhooks/sms-dlr.php') ?>" readonly onclick="this.select()">
-              <div class="input-group-text" style="cursor:pointer" onclick="navigator.clipboard.writeText(this.previousElementSibling.value)" title="Copy"><i class="fa-regular fa-copy"></i></div>
+              <input type="text" class="form-control" value="<?= htmlspecialchars($dlrUrl) ?>" readonly onclick="this.select()" id="dlrUrlField">
+              <div class="input-group-text" style="cursor:pointer" onclick="navigator.clipboard.writeText(document.getElementById('dlrUrlField').value)" title="Copy"><i class="fa-regular fa-copy"></i></div>
             </div>
             <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Paste this URL into Onfon Media → Account → SMS Settings → Delivery Report URL to receive real-time delivery confirmations.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">
+              DLR Webhook Security Token
+              <?php if (!($settings['dlr_webhook_token'] ?? '')): ?>
+                <span class="badge badge-warning" style="font-size:10px;vertical-align:middle">Not Set</span>
+              <?php else: ?>
+                <span class="badge badge-success" style="font-size:10px;vertical-align:middle">Configured</span>
+              <?php endif; ?>
+            </label>
+            <input type="password" name="dlr_webhook_token" class="form-control" placeholder="Leave blank to keep current">
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">When set, the DLR webhook URL becomes <code>.../webhooks/sms-dlr.php?token=&lt;value&gt;</code>. Requests without the matching token are rejected.</div>
           </div>
         <?php elseif ($activeTab==='security'): ?>
           <div class="form-group"><label class="form-label">Session Timeout (seconds)</label><input type="number" name="session_timeout" class="form-control" value="<?=$s('session_timeout','3600')?>"></div>
@@ -131,6 +160,12 @@ $s = fn(string $key, string $default='') => htmlspecialchars($settings[$key] ?? 
           </div>
           <div class="form-group"><label class="form-label">Registration</label><select name="allow_registration" class="form-control"><option value="1" <?=$s('allow_registration','0')==='1'?'selected':''?>>Open</option><option value="0" <?=$s('allow_registration','0')==='0'?'selected':''?>>Invite Only</option></select></div>
           <div class="form-group"><label class="form-label">Maintenance Mode</label><select name="maintenance_mode" class="form-control"><option value="0">Off</option><option value="1" <?=$s('maintenance_mode')==='1'?'selected':''?>>On</option></select></div>
+          <hr style="margin:24px 0;border-color:var(--border)">
+          <div class="form-group">
+            <label class="form-label">API CORS Allowed Origins</label>
+            <input type="text" name="api_cors_origins" class="form-control" value="<?=$s('api_cors_origins')?>" placeholder="https://yourapp.com, https://app2.com">
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Comma-separated list of origins allowed to call the API from a browser. Leave blank to allow any origin (<code>*</code>). Example: <code>https://yourapp.com</code></div>
+          </div>
         <?php endif; ?>
       </div>
       <div class="card-footer" style="padding:16px 20px">

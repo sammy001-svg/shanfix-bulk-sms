@@ -10,8 +10,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     redirect('/admin/clients.php');
 }
 
-if (!validate_csrf($_POST['csrf_token'] ?? '')) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid security token.'];
+if (!csrf_verify()) {
+    flash_set('danger', 'Invalid security token.');
     redirect('/admin/clients.php');
 }
 
@@ -23,46 +23,42 @@ $units    = (float)($_POST['initial_units'] ?? 0);
 
 // Required field check
 if (!$name || !$email || !$password) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Name, email, and password are required.'];
+    flash_set('danger', 'Name, email, and password are required.');
     redirect(safe_referer('/admin/clients.php'));
 }
 
-// Whitelist role — prevents privilege escalation via crafted POST
-if (!in_array($role, ['admin', 'reseller', 'client'], true)) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid role selected.'];
+// Whitelist role — admin accounts may only be created directly in the DB
+if (!in_array($role, ['reseller', 'client'], true)) {
+    flash_set('danger', 'Invalid role selected.');
     redirect(safe_referer('/admin/clients.php'));
 }
 
 // Basic email format check
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid email address format.'];
+    flash_set('danger', 'Invalid email address format.');
     redirect(safe_referer('/admin/clients.php'));
 }
 
 // Units must not be negative
 if ($units < 0) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Initial units cannot be negative.'];
+    flash_set('danger', 'Initial units cannot be negative.');
     redirect(safe_referer('/admin/clients.php'));
 }
 
 $existing = DB::queryOne("SELECT id FROM users WHERE email = ?", [$email]);
 if ($existing) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Email already registered.'];
+    flash_set('danger', 'Email already registered.');
     redirect(safe_referer('/admin/clients.php'));
 }
 
 $hash    = password_hash($password, PASSWORD_BCRYPT);
-$success = DB::execute(
+DB::execute(
     "INSERT INTO users (name, email, password_hash, role, sms_units, status, created_at)
      VALUES (?, ?, ?, ?, ?, 'active', NOW())",
     [$name, $email, $hash, $role, $units]
 );
 
-if ($success) {
-    $_SESSION['flash'] = ['type' => 'success', 'message' => ucfirst($role) . ' account created successfully.'];
-} else {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Failed to create user. Please try again.'];
-}
+flash_set('success', ucfirst($role) . ' account created successfully.');
 
 $target = ($role === 'reseller') ? '/admin/clients.php?role=reseller' : '/admin/clients.php';
 redirect($target);

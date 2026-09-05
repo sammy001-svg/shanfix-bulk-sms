@@ -7,15 +7,44 @@ $uid  = $user['id'];
 $from = sanitize($_GET['from'] ?? date('Y-m-01'));
 $to   = sanitize($_GET['to']   ?? date('Y-m-d'));
 
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) $from = date('Y-m-01');
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to))   $to   = date('Y-m-d');
+
 $allowedPerPage = [10, 50, 100, 1000, 10000];
 $perPage = in_array((int)($_GET['per_page'] ?? 50), $allowedPerPage, true) ? (int)$_GET['per_page'] : 50;
 
 $validStatuses = ['sent', 'delivered', 'failed', 'queued', 'undelivered'];
 $statusFilter  = in_array($_GET['status'] ?? '', $validStatuses, true) ? $_GET['status'] : '';
 
-// Sargable date range — lets MySQL use the idx_user_created index
-$baseWhere  = "m.user_id = ? AND m.created_at >= ? AND m.created_at < DATE_ADD(?, INTERVAL 1 DAY)";
-$baseParams = [$uid, $from, $to];
+// ── Build the set of user IDs in this reseller's network ────────────────────
+// Reseller's own account + all their clients
+$clientRows   = DB::query("SELECT id, name FROM users WHERE role='client' AND parent_id=? ORDER BY name", [$uid]);
+$clients      = [];   // id => name map for dropdown + JOIN display
+foreach ($clientRows as $c) {
+    $clients[(int)$c['id']] = $c['name'];
+}
+
+$clientFilter = (int)($_GET['client_id'] ?? 0);
+$showSelf     = ($clientFilter === -1);          // -1 = reseller's own messages only
+
+if ($showSelf) {
+    $networkIds = [$uid];
+} elseif ($clientFilter > 0 && isset($clients[$clientFilter])) {
+    $networkIds = [$clientFilter];
+} else {
+    // Everyone: reseller + all clients
+    $networkIds = array_merge([$uid], array_keys($clients));
+}
+
+if (empty($networkIds)) {
+    $networkIds = [0]; // fallback — prevents SQL syntax error, returns 0 rows
+}
+
+$inPlaceholders = implode(',', array_fill(0, count($networkIds), '?'));
+
+// ── Date-range base WHERE (reused across all queries) ────────────────────────
+$baseWhere  = "m.user_id IN ($inPlaceholders) AND m.created_at >= ? AND m.created_at < DATE_ADD(?, INTERVAL 1 DAY)";
+$baseParams = array_merge($networkIds, [$from, $to]);
 
 $logWhere  = $baseWhere;
 $logParams = $baseParams;
@@ -24,6 +53,7 @@ if ($statusFilter) {
     $logParams[] = $statusFilter;
 }
 
+// ── Aggregates ───────────────────────────────────────────────────────────────
 $summary = DB::queryOne(
     "SELECT COUNT(*) as total,
             SUM(status='sent') as sent,
@@ -34,46 +64,78 @@ $summary = DB::queryOne(
     $baseParams
 );
 
-// Daily trend for the selected date range
+// ── Daily trend ──────────────────────────────────────────────────────────────
 $trend   = DB::query(
     "SELECT DATE(created_at) as day, COUNT(*) as total
-     FROM messages
-     WHERE user_id = ? AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY)
+     FROM messages m WHERE $baseWhere
      GROUP BY day ORDER BY day",
-    [$uid, $from, $to]
+    $baseParams
 );
 $tLabels = json_encode(array_column($trend, 'day'));
 $tValues = json_encode(array_column($trend, 'total'));
 
+// ── Paginated message log ────────────────────────────────────────────────────
 $page       = max(1, (int)($_GET['page'] ?? 1));
 $total      = (int)(DB::queryOne("SELECT COUNT(*) as c FROM messages m WHERE $logWhere", $logParams)['c'] ?? 0);
 $totalPages = $total > 0 ? (int)ceil($total / $perPage) : 1;
 $page       = min($page, $totalPages);
 $offset     = ($page - 1) * $perPage;
 
-$messages   = DB::query(
-    "SELECT m.* FROM messages m WHERE $logWhere ORDER BY m.created_at DESC LIMIT $perPage OFFSET $offset",
+// Join users so we can show the sender name in the table
+$messages = DB::query(
+    "SELECT m.*, u.name as sender_name
+     FROM messages m
+     JOIN users u ON m.user_id = u.id
+     WHERE $logWhere
+     ORDER BY m.created_at DESC
+     LIMIT $perPage OFFSET $offset",
     $logParams
 );
 
 $rangeStart = $total > 0 ? $offset + 1 : 0;
 $rangeEnd   = min($offset + $perPage, $total);
 
-$defaults = ['from' => date('Y-m-01'), 'to' => date('Y-m-d'), 'status' => '', 'per_page' => 50];
-$changed  = ($from !== $defaults['from'] || $to !== $defaults['to']
-          || $statusFilter !== $defaults['status'] || $perPage !== $defaults['per_page']);
+// ── Filter change detection (for "Clear" button) ─────────────────────────────
+$defaults = ['from' => date('Y-m-01'), 'to' => date('Y-m-d'), 'status' => '', 'per_page' => 50, 'client_id' => 0];
+$changed  = $from !== $defaults['from'] || $to !== $defaults['to']
+          || $statusFilter !== $defaults['status'] || $perPage !== $defaults['per_page']
+          || ($clientFilter !== 0 && $clientFilter !== $defaults['client_id']);
 
+// ── Query-string helper ───────────────────────────────────────────────────────
 function resellerRptQs(array $overrides = []): string {
-    global $from, $to, $statusFilter, $perPage;
+    global $from, $to, $statusFilter, $perPage, $clientFilter;
     $base = ['from' => $from, 'to' => $to];
-    if ($statusFilter)  $base['status']   = $statusFilter;
-    if ($perPage !== 50) $base['per_page'] = $perPage;
+    if ($statusFilter)        $base['status']    = $statusFilter;
+    if ($perPage !== 50)      $base['per_page']  = $perPage;
+    if ($clientFilter !== 0)  $base['client_id'] = $clientFilter;
     return http_build_query(array_filter(array_merge($base, $overrides), fn($v) => $v !== null && $v !== ''));
 }
 ?>
+<?php
+$csvQs = http_build_query(array_filter([
+    'from'      => $from,
+    'to'        => $to,
+    'status'    => $statusFilter ?: null,
+    'client_id' => $clientFilter ?: null,
+]));
+?>
 <div class="page-header">
-  <div><h1>Reports</h1><div class="subtitle">Your message delivery reports</div></div>
-  <button onclick="downloadPDF(event)" class="btn btn-secondary"><i class="fa-solid fa-file-pdf"></i> Download PDF</button>
+  <div>
+    <h1>Reports</h1>
+    <div class="subtitle">
+      <?php if ($showSelf): ?>
+        Your own messages
+      <?php elseif ($clientFilter > 0 && isset($clients[$clientFilter])): ?>
+        Messages by <strong><?= htmlspecialchars($clients[$clientFilter]) ?></strong>
+      <?php else: ?>
+        All messages across your account &amp; clients
+      <?php endif; ?>
+    </div>
+  </div>
+  <div class="btn-group">
+    <a href="/reseller/actions/download-report.php?<?= $csvQs ?>" class="btn btn-secondary"><i class="fa-solid fa-file-csv"></i> Export CSV</a>
+    <button onclick="downloadPDF(event)" class="btn btn-secondary"><i class="fa-solid fa-file-pdf"></i> Download PDF</button>
+  </div>
 </div>
 <div id="report-content">
 
@@ -92,6 +154,18 @@ function resellerRptQs(array $overrides = []): string {
           <?php endforeach; ?>
         </select>
       </div>
+      <?php if (!empty($clients)): ?>
+      <div class="form-group" style="margin:0">
+        <label class="form-label" style="font-size:11px">Account</label>
+        <select name="client_id" class="form-control" style="width:180px">
+          <option value="0" <?=$clientFilter===0?'selected':''?>>All (me + clients)</option>
+          <option value="-1" <?=$showSelf?'selected':''?>>My own messages</option>
+          <?php foreach ($clients as $cid => $cname): ?>
+            <option value="<?=$cid?>" <?=$clientFilter===$cid?'selected':''?>><?=htmlspecialchars($cname)?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <?php endif; ?>
       <button type="submit" class="btn btn-primary" style="align-self:flex-end"><i class="fa-solid fa-filter"></i> Filter</button>
       <?php if ($changed): ?><a href="?" class="btn btn-secondary" style="align-self:flex-end">Clear</a><?php endif; ?>
     </form>
@@ -131,23 +205,36 @@ function resellerRptQs(array $overrides = []): string {
       <thead>
         <tr>
           <th style="width:36px">#</th>
+          <?php if (!$showSelf && !($clientFilter > 0)): ?><th>Account</th><?php endif; ?>
           <th>Sender ID</th>
           <th>Recipient</th>
           <th>Message</th>
           <th>Units</th>
           <th>Status</th>
+          <th>Failure Reason</th>
+          <th>Delivered At</th>
           <th>Date</th>
         </tr>
       </thead>
       <tbody>
         <?php if (empty($messages)): ?>
-          <tr><td colspan="7" class="text-center text-muted" style="padding:30px">No messages in selected date range</td></tr>
+          <tr><td colspan="<?= (!$showSelf && !($clientFilter > 0)) ? 10 : 9 ?>" class="text-center text-muted" style="padding:30px">No messages in selected date range</td></tr>
         <?php else: ?>
           <?php foreach ($messages as $i => $m):
             $sc = ['sent'=>'success','delivered'=>'success','failed'=>'danger','queued'=>'warning','undelivered'=>'warning'][$m['status']] ?? 'muted';
+            $isReseller = ((int)$m['user_id'] === $uid);
           ?>
             <tr>
               <td style="font-size:11px;color:var(--text-secondary)"><?=$rangeStart + $i?></td>
+              <?php if (!$showSelf && !($clientFilter > 0)): ?>
+              <td style="font-size:12px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                <?php if ($isReseller): ?>
+                  <span style="color:var(--primary);font-weight:600">Me</span>
+                <?php else: ?>
+                  <?=htmlspecialchars($m['sender_name'])?>
+                <?php endif; ?>
+              </td>
+              <?php endif; ?>
               <td><code><?=htmlspecialchars($m['sender_id'])?></code></td>
               <td><?=htmlspecialchars($m['recipient'])?></td>
               <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text-secondary)" title="<?=htmlspecialchars($m['message'])?>">
@@ -155,6 +242,13 @@ function resellerRptQs(array $overrides = []): string {
               </td>
               <td><?=$m['units_charged']?></td>
               <td><span class="badge badge-<?=$sc?>"><?=ucfirst($m['status'])?></span></td>
+              <td style="font-size:11px;color:var(--danger);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                  title="<?=htmlspecialchars($m['failed_reason']??'')?>">
+                <?=htmlspecialchars($m['failed_reason']??'')?>&nbsp;
+              </td>
+              <td style="font-size:11px;white-space:nowrap;color:var(--text-secondary)">
+                <?=$m['delivered_at'] ? date('d M Y H:i', strtotime($m['delivered_at'])) : '—'?>
+              </td>
               <td style="font-size:11px"><?=$m['created_at'] ? date('d M Y H:i', strtotime($m['created_at'])) : '—'?></td>
             </tr>
           <?php endforeach; ?>

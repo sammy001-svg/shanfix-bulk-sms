@@ -46,6 +46,46 @@ if (random_int(1, 60) === 1) {
     $c1 = (int)DB::execute("DELETE FROM api_rate_counters WHERE window_start < NOW() - INTERVAL 2 HOUR");
     $c2 = (int)DB::execute("DELETE FROM rate_limits WHERE hit_at < NOW() - INTERVAL 48 HOUR");
     if ($c1 + $c2 > 0) $log("Pruned {$c1} rate-counter row(s) and {$c2} rate-limit row(s).");
+
+    // Rotate gateway debug logs — they grow unbounded (one line per gateway
+    // call / DLR).  When a log passes 10 MB keep only the newest ~2 MB.
+    foreach (['onfon_debug.log', 'dlr_debug.log'] as $logFile) {
+        $path = __DIR__ . '/../includes/gateways/' . $logFile;
+        if (is_file($path) && filesize($path) > 10 * 1024 * 1024) {
+            $fh = fopen($path, 'rb');
+            fseek($fh, -2 * 1024 * 1024, SEEK_END);
+            $tail = stream_get_contents($fh);
+            fclose($fh);
+            // Drop the partial first line, then atomically replace
+            $tail = substr($tail, (int)strpos($tail, "\n") + 1);
+            file_put_contents($path, $tail, LOCK_EX);
+            $log("Rotated {$logFile} (kept newest 2 MB).");
+        }
+    }
+}
+
+// ------------------------------------------------------------------
+// Housekeeping: mark stale 'queued' standalone messages as 'failed'.
+//
+// When a PHP-FPM worker is killed mid-request (request_terminate_timeout,
+// OOM, server restart) while waiting for Onfon's response, the message
+// row stays in 'queued' status permanently — the gateway may have
+// already accepted and delivered the message, but our record is orphaned.
+//
+// After 5 minutes with no update, it is safe to assume the request
+// died.  We mark these 'failed' so they surface in reports and
+// the customer can investigate or retry.  campaign_id IS NULL because
+// campaign messages are tracked by a separate heartbeat mechanism.
+// ------------------------------------------------------------------
+$stale = (int)DB::execute(
+    "UPDATE messages
+     SET status = 'failed', failed_reason = 'Request timed out before gateway responded — check if the message was delivered, then retry if needed.'
+     WHERE status = 'queued'
+       AND campaign_id IS NULL
+       AND created_at < NOW() - INTERVAL 5 MINUTE"
+);
+if ($stale > 0) {
+    $log("Marked {$stale} stale standalone queued message(s) as failed.");
 }
 
 // ------------------------------------------------------------------

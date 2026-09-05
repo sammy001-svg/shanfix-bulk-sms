@@ -5,14 +5,15 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/_cors.php';
 
-// Support both POST and JSON body, though GET is also supported for this endpoint
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
-$params = array_merge($_GET, $_POST, $input);
+// Credentials must come from HTTP headers or request body — never URL query string
+// (GET params end up in server access logs and browser history).
+$authParams = array_merge($_POST, $input);
 
-// Authentication
-$clientId = $_SERVER['HTTP_X_CLIENT_ID'] ?? ($params['client_id'] ?? '');
-$apiKey = $_SERVER['HTTP_X_API_KEY'] ?? ($params['api_key'] ?? '');
+$clientId = $_SERVER['HTTP_X_CLIENT_ID'] ?? ($authParams['client_id'] ?? '');
+$apiKey   = $_SERVER['HTTP_X_API_KEY']   ?? ($authParams['api_key']   ?? '');
 
 if (!$clientId || !$apiKey) {
     http_response_code(401);
@@ -27,10 +28,10 @@ if (!$user) {
     exit;
 }
 
-// Return Balance
+$freshUnits = (float)DB::queryValue("SELECT sms_units FROM users WHERE id = ?", [$user['id']]);
 echo json_encode([
-    'success' => true,
+    'success'     => true,
     'client_name' => $user['name'],
-    'sms_units' => (float)$user['sms_units'],
-    'currency' => 'KES'
+    'sms_units'   => $freshUnits,
+    'currency'    => 'KES',
 ]);

@@ -10,8 +10,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     redirect('/admin/units.php');
 }
 
-if (!validate_csrf($_POST['csrf_token'] ?? '')) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid security token.'];
+if (!csrf_verify()) {
+    flash_set('danger', 'Invalid security token.');
     redirect('/admin/units.php');
 }
 
@@ -21,7 +21,7 @@ $unitsPerUser = (float)($_POST['units'] ?? 0);
 $note         = sanitize($_POST['note'] ?? 'Bulk allocation by Admin');
 
 if ($unitsPerUser <= 0) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid unit amount.'];
+    flash_set('danger', 'Invalid unit amount.');
     redirect('/admin/units.php');
 }
 
@@ -33,7 +33,7 @@ $roleClause = match ($targetGroup) {
 };
 
 if (!$roleClause) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid target group.'];
+    flash_set('danger', 'Invalid target group.');
     redirect('/admin/units.php');
 }
 
@@ -41,7 +41,7 @@ $targetUsers = DB::query("SELECT id FROM users WHERE $roleClause AND status = 'a
 $userCount   = count($targetUsers);
 
 if ($userCount === 0) {
-    $_SESSION['flash'] = ['type' => 'warning', 'message' => 'No active users found in the selected group.'];
+    flash_set('warning', 'No active users found in the selected group.');
     redirect('/admin/units.php');
 }
 
@@ -50,10 +50,7 @@ $totalNeeded = $userCount * $unitsPerUser;
 // Quick pre-check for better UX (fast fail before opening a transaction)
 $adminBalance = (float)DB::queryValue("SELECT sms_units FROM users WHERE id = ?", [$adminUser['id']]);
 if ($adminBalance < $totalNeeded) {
-    $_SESSION['flash'] = [
-        'type'    => 'danger',
-        'message' => "Insufficient units. Need " . number_format($totalNeeded, 2) . ", have " . number_format($adminBalance, 2) . ".",
-    ];
+    flash_set('danger', "Insufficient units. Need " . number_format($totalNeeded, 2) . ", have " . number_format($adminBalance, 2) . ".");
     redirect('/admin/units.php');
 }
 
@@ -70,10 +67,7 @@ try {
     if (!$deducted) {
         DB::rollback();
         $actual = (float)DB::queryValue("SELECT sms_units FROM users WHERE id = ?", [$adminUser['id']]);
-        $_SESSION['flash'] = [
-            'type'    => 'danger',
-            'message' => "Insufficient units. Need " . number_format($totalNeeded, 2) . ", have " . number_format($actual, 2) . ".",
-        ];
+        flash_set('danger', "Insufficient units. Need " . number_format($totalNeeded, 2) . ", have " . number_format($actual, 2) . ".");
         redirect('/admin/units.php');
     }
 
@@ -108,15 +102,12 @@ try {
         'success'
     );
 
-    $_SESSION['flash'] = [
-        'type'    => 'success',
-        'message' => "Allocated " . number_format($unitsPerUser) . " units to each of $userCount users (total: " . number_format($totalNeeded) . ").",
-    ];
+    flash_set('success', "Allocated " . number_format($unitsPerUser) . " units to each of $userCount users (total: " . number_format($totalNeeded) . ").");
 
 } catch (Exception $e) {
     DB::rollback();
     error_log("Bulk allocate failed: " . $e->getMessage());
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Allocation failed — no units were transferred.'];
+    flash_set('danger', 'Allocation failed — no units were transferred.');
 }
 
 redirect('/admin/units.php');

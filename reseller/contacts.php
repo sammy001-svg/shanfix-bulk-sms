@@ -93,7 +93,8 @@ $totalPages = ceil($total/$perPage);
                   <td style="color:var(--text-secondary)"><?= htmlspecialchars($c['email'] ?? '—') ?></td>
                   <td><?= $c['group_name'] ? '<span class="badge badge-info">'.htmlspecialchars($c['group_name']).'</span>' : '<span class="text-muted">—</span>' ?></td>
                   <td style="font-size:12px"><?= date('d M Y',strtotime($c['created_at'])) ?></td>
-                  <td>
+                  <td style="display:flex;gap:6px">
+                    <button class="btn btn-secondary btn-sm btn-icon" title="Edit" onclick='openEditContact(<?= htmlspecialchars(json_encode(['id'=>$c['id'],'name'=>$c['name']??'','phone'=>$c['phone'],'email'=>$c['email']??'','group_id'=>$c['group_id']]), ENT_QUOTES, 'UTF-8') ?>)'><i class="fa-solid fa-edit"></i></button>
                     <form method="POST" action="/reseller/actions/delete-contact.php" style="display:inline">
                       <input type="hidden" name="id" value="<?=$c['id']?>">
                       <input type="hidden" name="csrf_token" value="<?=csrf_token()?>">
@@ -109,9 +110,7 @@ $totalPages = ceil($total/$perPage);
       <?php if ($totalPages > 1): ?>
         <div class="card-footer">
           <div class="pagination">
-            <?php for ($p=1;$p<=$totalPages;$p++): ?>
-              <a href="?page=<?=$p?>&group=<?=$grpId?>&q=<?=urlencode($search)?>" class="page-btn <?=$p===$page?'active':''?>"><?=$p?></a>
-            <?php endfor; ?>
+            <?php render_pagination($page, (int)$totalPages, array_filter(['group' => $grpId, 'q' => $search])); ?>
           </div>
         </div>
       <?php endif; ?>
@@ -208,9 +207,53 @@ $totalPages = ceil($total/$perPage);
   </div>
 </div>
 
+<!-- Edit Contact Modal -->
+<div class="modal-overlay" id="editContactModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title"><i class="fa-solid fa-edit" style="color:var(--primary)"></i> Edit Contact</h3>
+      <button class="modal-close" onclick="closeModal('editContactModal')">×</button>
+    </div>
+    <form method="POST" action="/reseller/actions/edit-contact.php">
+      <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+      <input type="hidden" name="id" id="editContactId">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Name</label><input type="text" name="name" id="editContactName" class="form-control" placeholder="John Doe"></div>
+          <div class="form-group"><label class="form-label">Phone <span class="required">*</span></label><input type="text" name="phone" id="editContactPhone" class="form-control" required></div>
+        </div>
+        <div class="form-group"><label class="form-label">Email</label><input type="email" name="email" id="editContactEmail" class="form-control" placeholder="john@example.com"></div>
+        <div class="form-group">
+          <label class="form-label">Group</label>
+          <select name="group_id" id="editContactGroup" class="form-control">
+            <option value="">No Group</option>
+            <?php foreach ($groups as $g): ?>
+              <option value="<?=$g['id']?>"><?=htmlspecialchars($g['name'])?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('editContactModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 document.getElementById('checkAll')?.addEventListener('change', function(){
   document.querySelectorAll('input[name="ids[]"]').forEach(cb=>cb.checked=this.checked);
 });
+
+function openEditContact(c) {
+  document.getElementById('editContactId').value    = c.id;
+  document.getElementById('editContactName').value  = c.name;
+  document.getElementById('editContactPhone').value = c.phone;
+  document.getElementById('editContactEmail').value = c.email;
+  var sel = document.getElementById('editContactGroup');
+  sel.value = c.group_id ?? '';
+  openModal('editContactModal');
+}
 </script>
 <?php include __DIR__ . '/../includes/layout-footer.php'; ?>

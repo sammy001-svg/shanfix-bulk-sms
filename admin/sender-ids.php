@@ -3,9 +3,11 @@ $pageTitle = 'Sender ID Requests';
 $breadcrumb = [['label'=>'Admin'],['label'=>'Sender IDs']];
 require_once __DIR__ . '/layout.php';
 
-$filter = sanitize($_GET['status'] ?? '');
-$where  = $filter ? "WHERE s.status = '$filter'" : '';
-$senderIds = DB::query("SELECT s.*, u.name, u.email, u.role FROM sender_ids s JOIN users u ON s.user_id=u.id $where ORDER BY s.created_at DESC");
+$validStatuses = ['pending', 'approved', 'rejected'];
+$filter = in_array($_GET['status'] ?? '', $validStatuses, true) ? $_GET['status'] : '';
+$where  = $filter ? "WHERE s.status = ?" : '';
+$params = $filter ? [$filter] : [];
+$senderIds = DB::query("SELECT s.*, u.name, u.email, u.role FROM sender_ids s JOIN users u ON s.user_id=u.id $where ORDER BY s.created_at DESC", $params);
 ?>
 
 <div class="page-header">

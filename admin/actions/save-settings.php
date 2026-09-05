@@ -10,8 +10,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     redirect('/admin/settings.php');
 }
 
-if (!validate_csrf($_POST['csrf_token'] ?? '')) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid security token.'];
+if (!csrf_verify()) {
+    flash_set('danger', 'Invalid security token.');
     redirect('/admin/settings.php');
 }
 
@@ -26,6 +26,8 @@ const ALLOWED_SETTING_KEYS = [
     // Payments (Kopo Kopo)
     'kk_client_id', 'kk_client_secret', 'kk_till_number', 'kk_base_url',
     'kk_webhook_secret', 'kk_webhook_token',
+    // Delivery receipts
+    'dlr_webhook_token',
     // Pricing
     'unit_price',
     // SMTP + notifications
@@ -33,6 +35,7 @@ const ALLOWED_SETTING_KEYS = [
     'low_balance_threshold',
     // Security & access
     'session_timeout', 'max_login_attempts', 'allow_registration', 'maintenance_mode',
+    'api_cors_origins',
     // Performance
     'max_concurrent_campaigns',
 ];
@@ -42,6 +45,7 @@ const ALLOWED_SETTING_KEYS = [
 const PRESERVE_IF_EMPTY = [
     'sms_api_secret', 'smtp_pass',
     'kk_client_secret', 'kk_webhook_secret', 'kk_webhook_token',
+    'dlr_webhook_token',
 ];
 
 $errors = 0;
@@ -59,17 +63,21 @@ foreach ($_POST as $key => $value) {
 
     $value = sanitize($value);
 
-    $res = DB::execute(
-        "INSERT INTO system_settings (`key`, `value`) VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
-        [$key, $value]
-    );
-
-    if ($res === false) $errors++;
+    try {
+        DB::execute(
+            "INSERT INTO system_settings (`key`, `value`) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
+            [$key, $value]
+        );
+    } catch (Exception $e) {
+        error_log('save-settings: failed to save ' . $key . ': ' . $e->getMessage());
+        $errors++;
+    }
 }
 
-$_SESSION['flash'] = $errors === 0
-    ? ['type' => 'success', 'message' => 'System settings updated successfully.']
-    : ['type' => 'warning', 'message' => 'Settings saved with some errors. Check server logs.'];
+flash_set(
+    $errors === 0 ? 'success' : 'warning',
+    $errors === 0 ? 'System settings updated successfully.' : 'Settings saved with some errors. Check server logs.'
+);
 
 redirect('/admin/settings.php');
