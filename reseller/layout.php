@@ -36,7 +36,14 @@ $navItems = [
   ['icon'=>'<i class="fa-solid fa-receipt"></i>',     'label'=>'Purchase Requests','url'=>'/reseller/purchase-requests.php'],
   ['icon'=>'<i class="fa-solid fa-brush"></i>',        'label'=>'Site Branding',  'url'=>'/reseller/branding.php'],
   ['type'=>'section','label'=>'REPORTS'],
-  ['icon'=>'<i class="fa-solid fa-chart-bar"></i>',   'label'=>'Reports',        'url'=>'/reseller/reports.php'],
+  [
+    'id'=>'reports','icon'=>'<i class="fa-solid fa-chart-bar"></i>','label'=>'Reports',
+    'active'=> (strpos($_SERVER['PHP_SELF'], 'reports.php') !== false),
+    'children'=>[
+      ['icon'=>'<i class="fa-solid fa-chart-bar"></i>',   'label'=>'Summary Reports',  'url'=>'/reseller/reports.php'],
+      ['icon'=>'<i class="fa-solid fa-truck-fast"></i>',  'label'=>'Delivery Reports', 'url'=>'/reseller/delivery-reports.php'],
+    ]
+  ],
   [
     'id'=>'ussd','icon'=>'<i class="fa-solid fa-hashtag"></i>','label'=>'USSD',
     'active'=> (strpos($_SERVER['PHP_SELF'], '/ussd') !== false),

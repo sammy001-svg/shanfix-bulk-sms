@@ -138,6 +138,7 @@ CREATE TABLE IF NOT EXISTS `messages` (
   `sent_at`       DATETIME        DEFAULT NULL,
   `delivered_at`  DATETIME        DEFAULT NULL,
   `failed_reason` VARCHAR(500)    DEFAULT NULL COMMENT 'Gateway error or validation failure description',
+  `dlr_status`    VARCHAR(60)     DEFAULT NULL COMMENT 'Raw carrier delivery status from the DLR webhook (DELIVRD, AbsentSubscriber, ...)',
   `created_at`    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_campaign` (`campaign_id`),
@@ -145,6 +146,7 @@ CREATE TABLE IF NOT EXISTS `messages` (
   KEY `idx_status` (`status`),
   KEY `idx_campaign_status` (`campaign_id`, `status`),
   KEY `idx_user_created`    (`user_id`, `created_at`),
+  KEY `idx_user_created_dlr` (`user_id`, `created_at`, `dlr_status`),
   CONSTRAINT `fk_msg_campaign` FOREIGN KEY (`campaign_id`) REFERENCES `campaigns`(`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_msg_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -293,10 +295,13 @@ INSERT INTO `system_settings` (`key`, `value`) VALUES
   ('sms_cost_per_unit', '1'),
   ('support_email',     'support@shanfixtechnology.com'),
   ('support_phone',     '+254712345678'),
-  -- Payhero Kenya
-  ('payhero_api_username',   ''),
-  ('payhero_api_password',   ''),
-  ('payhero_channel_id',     '3197'),
+  -- Kopo Kopo (M-Pesa STK Push)
+  ('kk_client_id',      ''),
+  ('kk_client_secret',  ''),
+  ('kk_till_number',    ''),
+  ('kk_base_url',       'https://api.kopokopo.com'),
+  ('kk_webhook_secret', ''),
+  ('kk_webhook_token',  ''),
   -- Onfon Media
   ('onfon_api_key',     ''),
   ('onfon_user_id',     ''),

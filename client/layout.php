@@ -35,7 +35,14 @@ $navItems = [
   ['icon'=>'<i class="fa-solid fa-id-badge"></i>',       'label'=>'Sender IDs',       'url'=>'/client/sender-ids.php'],
   ['icon'=>'<i class="fa-solid fa-cart-shopping"></i>',  'label'=>'Buy Units',         'url'=>'/client/purchases.php'],
   ['icon'=>'<i class="fa-solid fa-receipt"></i>',        'label'=>'Purchase History',  'url'=>'/client/purchase-history.php'],
-  ['icon'=>'<i class="fa-solid fa-chart-bar"></i>',      'label'=>'Reports',           'url'=>'/client/reports.php'],
+  [
+    'id'=>'reports','icon'=>'<i class="fa-solid fa-chart-bar"></i>','label'=>'Reports',
+    'active'=> (strpos($_SERVER['PHP_SELF'], 'reports.php') !== false),
+    'children'=>[
+      ['icon'=>'<i class="fa-solid fa-chart-bar"></i>',   'label'=>'Summary Reports',  'url'=>'/client/reports.php'],
+      ['icon'=>'<i class="fa-solid fa-truck-fast"></i>',  'label'=>'Delivery Reports', 'url'=>'/client/delivery-reports.php'],
+    ]
+  ],
   [
     'id'=>'ussd','icon'=>'<i class="fa-solid fa-hashtag"></i>','label'=>'USSD',
     'active'=> (strpos($_SERVER['PHP_SELF'], '/ussd') !== false),

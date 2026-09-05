@@ -79,7 +79,7 @@ $initials = implode('', array_map(fn($w) => strtoupper($w[0]),
             </div>
           <?php else: ?>
             <a href="<?= $section['url'] ?>"
-               class="nav-link <?= rtrim($_SERVER['PHP_SELF'], '/') === rtrim($section['url'] ?? '', '/') ? 'active' : '' ?>">
+               class="nav-link <?= ($section['active'] ?? (rtrim($_SERVER['PHP_SELF'], '/') === rtrim($section['url'] ?? '', '/'))) ? 'active' : '' ?>">
               <span class="nav-icon"><?= $section['icon'] ?></span>
               <span class="nav-text"><?= $section['label'] ?></span>
               <?php if (!empty($section['badge'])): ?>

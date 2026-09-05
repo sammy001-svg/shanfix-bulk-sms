@@ -204,7 +204,7 @@ $pageTitle  = 'Profile: ' . htmlspecialchars($u['name']);
             $cs = ['draft'=>'muted','scheduled'=>'warning','queued'=>'warning','sending'=>'info','running'=>'info','completed'=>'success','failed'=>'danger'][$c['status']]??'muted';
           ?>
             <tr>
-              <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><strong><?= htmlspecialchars($c['name']) ?></strong></td>
+              <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="/admin/campaign-detail.php?id=<?= $c['id'] ?>"><strong><?= htmlspecialchars($c['name']) ?></strong></a></td>
               <td><code style="font-size:11px"><?= htmlspecialchars($c['sender_id']) ?></code></td>
               <td style="color:var(--success)"><?= number_format($c['sent_count']) ?></td>
               <td style="color:var(--danger)"><?= number_format($c['failed_count']) ?></td>

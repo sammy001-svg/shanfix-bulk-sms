@@ -198,7 +198,7 @@ require_once __DIR__ . '/layout.php';
           ?>
           <tr data-campaign-id="<?= $c['id'] ?>" data-status="<?= htmlspecialchars($c['status']) ?>">
             <td style="max-width:240px">
-              <strong><?= htmlspecialchars($c['name']) ?></strong>
+              <a href="/admin/campaign-detail.php?id=<?= $c['id'] ?>"><strong><?= htmlspecialchars($c['name']) ?></strong></a>
               <div style="font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<?= htmlspecialchars($c['message']) ?>">
                 <?= htmlspecialchars(mb_strimwidth($c['message'], 0, 70, '…')) ?>
               </div>
@@ -241,8 +241,8 @@ require_once __DIR__ . '/layout.php';
             </td>
             <td>
               <div class="btn-group">
-                <a href="/admin/reports.php?user_id=<?= $c['user_id'] ?>&from=<?= date('Y-m-d', strtotime($c['created_at'])) ?>&to=<?= date('Y-m-d', strtotime($c['created_at'] . ' +1 day')) ?>"
-                   class="btn btn-outline btn-sm btn-icon" title="View Messages"><i class="fa-solid fa-file-lines"></i></a>
+                <a href="/admin/campaign-detail.php?id=<?= $c['id'] ?>"
+                   class="btn btn-outline btn-sm btn-icon" title="View Campaign"><i class="fa-solid fa-magnifying-glass-chart"></i></a>
                 <?php if ($canCancel): ?>
                   <form method="POST" action="/admin/actions/cancel-campaign.php" style="display:inline"
                         onsubmit="return confirm('Cancel campaign \'<?= htmlspecialchars(addslashes($c['name'])) ?>\'?')">
@@ -303,7 +303,7 @@ function doPoll() {
     if (document.hidden) return;
     const ids = allCampaignIds();
     if (!ids.length) { scheduleNextPoll(); return; }
-    fetch('/client/api/campaign-status.php?ids=' + ids.join(','))
+    fetch('/admin/api/campaign-status.php?ids=' + ids.join(','))
         .then(r => r.ok ? r.json() : null)
         .then(data => { if (data) data.campaigns.forEach(applyUpdate); })
         .catch(() => {})

@@ -3,7 +3,7 @@
  * Action: USSD Wallet Top Up (Client) - Shanfix Technology
  */
 require_once __DIR__ . '/../../includes/auth.php';
-require_once __DIR__ . '/../../includes/gateways/payhero.php';
+require_once __DIR__ . '/../../includes/gateways/kopokopo.php';
 require_role('client');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($transId) {
         // 2. Initiate STK Push
         $externalRef = "USD" . $transId;
-        $res = Payhero::initiateSTKPush($phone, $amount, $externalRef);
+        $res = KopoKopo::initiateSTKPush($phone, $amount, $externalRef);
 
         if ($res['success']) {
             if (isset($_POST['ajax'])) {

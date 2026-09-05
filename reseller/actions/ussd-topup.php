@@ -4,7 +4,7 @@
  * Handles STK Push initiation for USSD balance.
  */
 require_once __DIR__ . '/../../includes/auth.php';
-require_once __DIR__ . '/../../includes/gateways/payhero.php';
+require_once __DIR__ . '/../../includes/gateways/kopokopo.php';
 require_role('reseller');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // 2. Initiate STK Push
         // We use 'USD' prefix to distinguish USSD payments from SMS payments
         $externalRef = "USD" . $transId;
-        $res = Payhero::initiateSTKPush($phone, $amount, $externalRef);
+        $res = KopoKopo::initiateSTKPush($phone, $amount, $externalRef);
 
         if ($res['success']) {
             flash_set('success', 'STK Push initiated! Please enter your PIN on your phone.');

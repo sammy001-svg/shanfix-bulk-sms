@@ -29,13 +29,22 @@ $navItems = [
   ],
   ['icon'=>'<i class="fa-solid fa-coins"></i>',     'label'=>'Units',          'url'=>'/admin/units.php'],
   ['icon'=>'<i class="fa-solid fa-tags"></i>',      'label'=>'Pricing Plans',  'url'=>'/admin/pricing.php'],
-  ['icon'=>'<i class="fa-solid fa-bullhorn"></i>',  'label'=>'Campaigns',      'url'=>'/admin/campaigns.php'],
+  ['icon'=>'<i class="fa-solid fa-bullhorn"></i>',  'label'=>'Campaigns',      'url'=>'/admin/campaigns.php',
+   'active'=> (strpos($_SERVER['PHP_SELF'], '/campaign') !== false)
+  ],
   ['icon'=>'<i class="fa-solid fa-receipt"></i>',   'label'=>'Finances',       'url'=>'/admin/finances.php',
    'badge'=> ($pendingPurchases ?? 0) > 0 ? ($pendingPurchases ?? 0) : null
   ],
   ['type'=>'section','label'=>'REPORTS'],
   ['icon'=>'<i class="fa-solid fa-chart-line"></i>','label'=>'Analytics',      'url'=>'/admin/analytics.php'],
-  ['icon'=>'<i class="fa-solid fa-file-lines"></i>','label'=>'Reports',        'url'=>'/admin/reports.php'],
+  [
+    'id'=>'reports','icon'=>'<i class="fa-solid fa-file-lines"></i>','label'=>'Reports',
+    'active'=> (strpos($_SERVER['PHP_SELF'], 'reports.php') !== false),
+    'children'=>[
+      ['icon'=>'<i class="fa-solid fa-file-lines"></i>',      'label'=>'Summary Reports',  'url'=>'/admin/reports.php'],
+      ['icon'=>'<i class="fa-solid fa-truck-fast"></i>',      'label'=>'Delivery Reports', 'url'=>'/admin/delivery-reports.php'],
+    ]
+  ],
   ['icon'=>'<i class="fa-solid fa-envelope-open-text"></i>','label'=>'Message Logs', 'url'=>'/admin/logs.php'],
   [
     'id'=>'ussd','icon'=>'<i class="fa-solid fa-hashtag"></i>','label'=>'USSD',

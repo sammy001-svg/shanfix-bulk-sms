@@ -23,9 +23,9 @@ const ALLOWED_SETTING_KEYS = [
     // SMS gateway
     'sms_gateway', 'onfon_api_key', 'onfon_user_id', 'onfon_access_key', 'onfon_batch_delay_ms',
     'sms_api_key', 'sms_api_secret', 'sms_shortcode',
-    // Payments
-    'payhero_api_username', 'payhero_api_password', 'payhero_channel_id', 'payhero_webhook_token',
-    'kk_client_id', 'kk_client_secret', 'kk_till_number', 'kk_base_url', 'kk_webhook_secret',
+    // Payments (Kopo Kopo)
+    'kk_client_id', 'kk_client_secret', 'kk_till_number', 'kk_base_url',
+    'kk_webhook_secret', 'kk_webhook_token',
     // Pricing
     'unit_price',
     // SMTP + notifications
@@ -40,8 +40,8 @@ const ALLOWED_SETTING_KEYS = [
 // Secrets that must not be blanked out if the field is submitted empty
 // (the form renders these as password inputs with placeholder "Leave blank to keep current")
 const PRESERVE_IF_EMPTY = [
-    'sms_api_secret', 'payhero_api_password', 'payhero_webhook_token', 'smtp_pass',
-    'kk_client_secret', 'kk_webhook_secret',
+    'sms_api_secret', 'smtp_pass',
+    'kk_client_secret', 'kk_webhook_secret', 'kk_webhook_token',
 ];
 
 $errors = 0;

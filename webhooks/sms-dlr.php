@@ -9,14 +9,59 @@
  *
  * Onfon POST fields (form-encoded):
  *   MessageId     — matches messages.gateway_msg_id
- *   Status        — 1=Delivered, 2=Failed, 0=Pending
+ *   Status        — 1=Delivered, 2=Failed, 0=Pending, or a carrier status string
  *   MobileNumber  — recipient number
  *   NetworkCode   — carrier code (optional)
  *   Timestamp     — delivery time string (optional)
  *
  * Onfon may also send JSON; both formats are handled below.
+ *
+ * TWO STATUSES ARE RECORDED PER MESSAGE
+ * -------------------------------------
+ * messages.status     — the 5-value ENUM the rest of the app reasons about.
+ * messages.dlr_status — the raw carrier state as sent (DELIVRD, Submitted,
+ *                       AbsentSubscriber, DeliveryImpossible, REJECTD, ...).
+ * The Delivery Reports pages pivot on dlr_status, so a non-terminal state such
+ * as "Submitted" is still recorded even though it leaves the ENUM untouched.
  */
 header('Content-Type: application/json');
+
+/**
+ * Classify a raw carrier status into ['enum' => ?string, 'label' => string].
+ *
+ * enum === null means the state is not terminal: record the label for
+ * reporting but leave messages.status alone.
+ */
+function dlr_classify($raw): array {
+    $trimmed = trim((string)$raw);
+
+    // Numeric Onfon codes — the documented default.
+    if ($trimmed !== '' && is_numeric($trimmed)) {
+        switch ((int)$trimmed) {
+            case 1:  return ['enum' => 'delivered', 'label' => 'DELIVRD'];
+            case 2:  return ['enum' => 'failed',    'label' => 'REJECTD'];
+            default: return ['enum' => null,        'label' => 'Submitted'];
+        }
+    }
+
+    // Carrier status strings, matched case-insensitively and space-insensitively.
+    $key = strtolower(preg_replace('/[^a-z]/i', '', $trimmed));
+
+    $delivered = ['delivrd', 'delivered', 'delivredtoterminal', 'deliveredtoterminal', 'success'];
+    $failed    = [
+        'rejectd', 'rejected', 'failed', 'undeliv', 'undelivered', 'undeliverable',
+        'absentsubscriber', 'deliveryimpossible', 'expired', 'deleted',
+        'sendernameblacklisted', 'blacklisted', 'unknownsubscriber', 'invalidnumber',
+    ];
+    $pending   = ['submitted', 'acceptd', 'accepted', 'enroute', 'buffered', 'pending', 'queued'];
+
+    if (in_array($key, $delivered, true)) return ['enum' => 'delivered',   'label' => $trimmed];
+    if (in_array($key, $failed, true))    return ['enum' => 'undelivered', 'label' => $trimmed];
+    if (in_array($key, $pending, true))   return ['enum' => null,          'label' => $trimmed];
+
+    // Unrecognised but non-empty — keep it for the report, don't guess the ENUM.
+    return ['enum' => null, 'label' => $trimmed !== '' ? $trimmed : 'Unknown'];
+}
 
 try {
     require_once __DIR__ . '/../includes/db.php';
@@ -45,41 +90,64 @@ try {
     $mobile   = $data['MobileNumber'] ?? ($data['mobileNumber'] ?? ($data['mobile']  ?? ''));
     $tsRaw    = $data['Timestamp']    ?? ($data['timestamp']    ?? null);
 
+    // A descriptive status, when present, is richer than the numeric code and
+    // is what the Onfon portal reports on — prefer it for dlr_status.
+    $descriptive = $data['StatusDescription'] ?? ($data['statusDescription']
+                ?? ($data['DeliveryStatus']   ?? ($data['deliveryStatus']
+                ?? ($data['StatusText']       ?? ($data['ErrorCode'] ?? null)))));
+
     if (!$msgId) {
         @file_put_contents($logFile, '[' . date('Y-m-d H:i:s') . "] SKIP: no MessageId\n", FILE_APPEND);
         echo json_encode(['status' => 'ignored', 'reason' => 'no MessageId']);
         exit;
     }
 
-    // Map Onfon status codes → our ENUM
-    // 1 = Delivered, anything else = failed (0=Pending treated as unknown, 2=Failed)
-    $statusInt = (int)$status;
-    if ($statusInt === 1) {
-        $newStatus   = 'delivered';
-        $ts          = $tsRaw ? @strtotime($tsRaw) : false;
-        $deliveredAt = ($ts !== false) ? date('Y-m-d H:i:s', $ts) : date('Y-m-d H:i:s');
+    // Classify on the descriptive value when it is usable, else the code.
+    $source     = ($descriptive !== null && trim((string)$descriptive) !== '') ? $descriptive : $status;
+    $classified = dlr_classify($source);
+    $dlrLabel   = substr($classified['label'], 0, 60);
+    $newStatus  = $classified['enum'];
+
+    if ($newStatus === 'delivered') {
+        $ts           = $tsRaw ? @strtotime($tsRaw) : false;
+        $deliveredAt  = ($ts !== false) ? date('Y-m-d H:i:s', $ts) : date('Y-m-d H:i:s');
         $failedReason = null;
-    } elseif ($statusInt === 2) {
-        $newStatus    = 'failed';
+    } elseif ($newStatus !== null) {
         $deliveredAt  = null;
-        $failedReason = 'Undelivered (carrier rejection)';
+        $failedReason = 'Undelivered: ' . $dlrLabel;
     } else {
-        // 0 or unknown — not actionable yet
-        @file_put_contents($logFile, '[' . date('Y-m-d H:i:s') . "] SKIP: status=$status not terminal\n", FILE_APPEND);
-        echo json_encode(['status' => 'ignored', 'reason' => 'non-terminal status']);
+        // Non-terminal: record the carrier state for reporting, leave status as is.
+        $affected = DB::execute(
+            "UPDATE messages SET dlr_status = ? WHERE gateway_msg_id = ?",
+            [$dlrLabel, $msgId]
+        );
+        @file_put_contents($logFile,
+            '[' . date('Y-m-d H:i:s') . "] NON_TERMINAL: msgId=$msgId dlr=$dlrLabel updated=$affected\n",
+            FILE_APPEND
+        );
+        echo json_encode(['status' => 'ok', 'terminal' => false, 'updated' => $affected]);
         exit;
     }
 
     // Update the message row — only if currently 'sent' to avoid overwriting 'failed' set at send time
     $affected = DB::execute(
         "UPDATE messages
-         SET status = ?, delivered_at = ?, failed_reason = COALESCE(?, failed_reason)
+         SET status = ?, delivered_at = ?, failed_reason = COALESCE(?, failed_reason), dlr_status = ?
          WHERE gateway_msg_id = ? AND status = 'sent'",
-        [$newStatus, $deliveredAt, $failedReason, $msgId]
+        [$newStatus, $deliveredAt, $failedReason, $dlrLabel, $msgId]
     );
 
+    // The message had already left 'sent' (e.g. a duplicate DLR). Still keep the
+    // carrier status current so the report reflects the latest carrier state.
+    if (!$affected) {
+        DB::execute(
+            "UPDATE messages SET dlr_status = ? WHERE gateway_msg_id = ?",
+            [$dlrLabel, $msgId]
+        );
+    }
+
     @file_put_contents($logFile,
-        '[' . date('Y-m-d H:i:s') . "] msgId=$msgId status=$newStatus updated=$affected mobile=$mobile\n",
+        '[' . date('Y-m-d H:i:s') . "] msgId=$msgId status=$newStatus dlr=$dlrLabel updated=$affected mobile=$mobile\n",
         FILE_APPEND
     );
 

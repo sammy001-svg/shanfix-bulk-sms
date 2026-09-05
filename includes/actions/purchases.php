@@ -5,7 +5,7 @@
  */
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../auth.php';
-require_once __DIR__ . '/../gateways/payhero.php';
+require_once __DIR__ . '/../gateways/kopokopo.php';
 
 class Purchase {
     public static function create($userId, $data) {
@@ -79,7 +79,7 @@ class Purchase {
             // AUTOMATED STK PUSH FLOW (For direct platform clients)
             $sitePrefix = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', SITE_NAME), 0, 3));
             $prefixedId = "{$sitePrefix}{$id}";
-            $res = Payhero::initiateSTKPush($ref, $amount, $prefixedId);
+            $res = KopoKopo::initiateSTKPush($ref, $amount, $prefixedId);
             
             if ($res['success']) {
                 return ['success' => true, 'id' => $id, 'manual' => false];

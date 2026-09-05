@@ -66,10 +66,34 @@ $s = fn(string $key, string $default='') => htmlspecialchars($settings[$key] ?? 
           </div>
           <div class="form-group"><label class="form-label">Short Code / Sender ID</label><input type="text" name="sms_shortcode" class="form-control" value="<?=$s('sms_shortcode')?>"></div>
         <?php elseif ($activeTab==='billing'): ?>
-          <div class="alert alert-info"><i class="fa-solid fa-credit-card"></i> Configure your Payhero Kenya M-Pesa STK Push credentials.</div>
-          <div class="form-group"><label class="form-label">Payhero API Username</label><input type="text" name="payhero_api_username" class="form-control" value="<?=$s('payhero_api_username')?>" placeholder="Found in Payhero Developer section"></div>
-          <div class="form-group"><label class="form-label">Payhero API Password</label><input type="password" name="payhero_api_password" class="form-control" placeholder="Leave blank to keep current"></div>
-          <div class="form-group"><label class="form-label">Payhero Channel ID</label><input type="text" name="payhero_channel_id" class="form-control" value="<?=$s('payhero_channel_id')?>" placeholder="Found under Payment Channels"></div>
+          <div class="alert alert-info"><i class="fa-solid fa-credit-card"></i> Configure your Kopo Kopo M-Pesa STK Push credentials. Find these under <strong>Kopo Kopo Dashboard &rarr; Settings &rarr; API Keys</strong>.</div>
+          <div class="form-group"><label class="form-label">Kopo Kopo Client ID</label><input type="text" name="kk_client_id" class="form-control" value="<?=$s('kk_client_id')?>" placeholder="From your Kopo Kopo API app"></div>
+          <div class="form-group"><label class="form-label">Kopo Kopo Client Secret</label><input type="password" name="kk_client_secret" class="form-control" placeholder="Leave blank to keep current"></div>
+          <div class="form-group"><label class="form-label">Till Number</label><input type="text" name="kk_till_number" class="form-control" value="<?=$s('kk_till_number')?>" placeholder="e.g. K000000"></div>
+          <div class="form-group">
+            <label class="form-label">API Base URL</label>
+            <input type="text" name="kk_base_url" class="form-control" value="<?=$s('kk_base_url','https://api.kopokopo.com')?>">
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Live: <code>https://api.kopokopo.com</code> &middot; Sandbox: <code>https://sandbox.kopokopo.com</code></div>
+          </div>
+          <hr style="margin:24px 0;border-color:var(--border)">
+          <div class="form-group">
+            <label class="form-label">Payment Callback URL</label>
+            <div class="input-group">
+              <input type="text" class="form-control" value="<?= htmlspecialchars(rtrim($settings['site_url']??'', '/') . '/kopokopo_webhook.php') ?>" readonly onclick="this.select()">
+              <div class="input-group-text" style="cursor:pointer" onclick="navigator.clipboard.writeText(this.previousElementSibling.value)" title="Copy"><i class="fa-regular fa-copy"></i></div>
+            </div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Sent to Kopo Kopo with every STK push. If your Kopo Kopo account whitelists callback URLs, register this one. It must stay at the site root &mdash; <code>/includes/</code> is blocked by .htaccess.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Webhook Signing Secret <span style="font-size:11px;color:var(--text-muted)">(optional)</span></label>
+            <input type="password" name="kk_webhook_secret" class="form-control" placeholder="Leave blank to keep current">
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Set only if your Kopo Kopo webhook subscription signs requests. The callback then rejects anything whose <code>X-KopoKopo-Signature</code> does not verify.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Webhook URL Token <span style="font-size:11px;color:var(--text-muted)">(optional)</span></label>
+            <input type="password" name="kk_webhook_token" class="form-control" placeholder="Leave blank to keep current">
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Shared secret appended to the callback URL as <code>?token=</code>. Use this when the till does not sign webhooks. With neither guard set, the endpoint is open and only the reference prefix keeps foreign payments out.</div>
+          </div>
           <hr style="margin:24px 0;border-color:var(--border)">
           <div class="form-group"><label class="form-label">Default Unit Price (KES)</label><input type="number" step="0.0001" name="unit_price" class="form-control" value="<?=$s('unit_price','0.50')?>"></div>
         <?php elseif ($activeTab==='email'): ?>
