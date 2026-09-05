@@ -23,30 +23,11 @@ function kk_log(string $msg): void {
     @file_put_contents($logFile, '[' . date('Y-m-d H:i:s') . '] ' . $msg . PHP_EOL, FILE_APPEND);
 }
 
-/**
- * Pull the first non-empty value found at any of the given dot-paths.
- * Kopo Kopo nests the result differently for per-request callbacks and for
- * subscription webhooks, so every field is looked up in both shapes.
- */
-function kk_pick(array $data, array $paths) {
-    foreach ($paths as $path) {
-        $node = $data;
-        foreach (explode('.', $path) as $segment) {
-            if (!is_array($node) || !isset($node[$segment])) {
-                $node = null;
-                break;
-            }
-            $node = $node[$segment];
-        }
-        if ($node !== null && $node !== '' && !is_array($node)) return $node;
-    }
-    return null;
-}
-
 try {
     require_once __DIR__ . '/includes/db.php';
     require_once __DIR__ . '/includes/actions/purchases.php';
     require_once __DIR__ . '/includes/actions/ussd-wallet.php';
+    require_once __DIR__ . '/includes/gateways/kopokopo.php';
 
     if (!is_dir(__DIR__ . '/tmp')) @mkdir(__DIR__ . '/tmp', 0777, true);
 
@@ -57,12 +38,12 @@ try {
     // set the endpoint is open (legacy behaviour) and the reference prefix
     // check below is the only thing keeping foreign payments out.
 
-    // 1. HMAC-SHA256 over the raw body, when Kopo Kopo signs the request.
-    $secret = get_setting('kk_webhook_secret', '');
+    // 1. HMAC-SHA256 over the raw body using the Kopo Kopo API Key.
+    $secret = KopoKopo::apiKey();
     if ($secret !== '') {
         $receivedSig = $_SERVER['HTTP_X_KOPOKOPO_SIGNATURE'] ?? '';
         if ($receivedSig === '') {
-            kk_log('AUTH_FAIL: kk_webhook_secret is set but no X-KopoKopo-Signature header was sent');
+            kk_log('AUTH_FAIL: an API Key is configured but no X-KopoKopo-Signature header was sent');
             http_response_code(403);
             echo json_encode(['status' => 'error', 'message' => 'Forbidden']);
             exit;
@@ -97,36 +78,13 @@ try {
 
     kk_log('RAW: ' . $input);
 
-    // ── Extract status ────────────────────────────────────────────────────────
-    // attributes.status is the request outcome ("Success"/"Failed"); the nested
-    // event resource carries the money-movement status ("Received").
-    $status = kk_pick($data, [
-        'data.attributes.status',
-        'attributes.status',
-        'data.attributes.event.resource.status',
-        'attributes.event.resource.status',
-        'status',
-    ]);
-
-    $resourceStatus = kk_pick($data, [
-        'data.attributes.event.resource.status',
-        'attributes.event.resource.status',
-    ]);
-
-    // ── Extract the routing reference ─────────────────────────────────────────
-    $rawRef = kk_pick($data, [
-        'data.attributes.metadata.reference',
-        'attributes.metadata.reference',
-        'metadata.reference',
-        'data.attributes.event.resource.reference',
-    ]);
-
-    // ── Extract the M-Pesa receipt number ─────────────────────────────────────
-    $mpesaCode = kk_pick($data, [
-        'data.attributes.event.resource.reference',
-        'attributes.event.resource.reference',
-        'data.attributes.event.resource.receipt_number',
-    ]);
+    // ── Interpret the payload ─────────────────────────────────────────────────
+    // Shared with the reconciler so both agree on what "paid" means.
+    $parsed         = KopoKopo::extract($data);
+    $status         = $parsed['status'];
+    $resourceStatus = $parsed['resource_status'];
+    $rawRef         = $parsed['reference'];
+    $mpesaCode      = $parsed['mpesa_ref'];
 
     // ── Route by prefix ───────────────────────────────────────────────────────
     $sitePrefix = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', SITE_NAME), 0, 3));
@@ -147,8 +105,7 @@ try {
         kk_log("FOREIGN_PAYMENT: reference '$rawRef' ignored (prefix mismatch, expected '$sitePrefix')");
     }
 
-    $isSuccessful = in_array(strtoupper((string)$status), ['SUCCESS', 'SUCCESSFUL', 'RECEIVED'], true)
-                 || in_array(strtoupper((string)$resourceStatus), ['SUCCESS', 'RECEIVED'], true);
+    $isSuccessful = $parsed['successful'];
 
     kk_log(sprintf(
         'PARSED: status=%s resource=%s ref=%s id=%s ussd=%s mpesa=%s success=%s',

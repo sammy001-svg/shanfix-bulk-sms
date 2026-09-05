@@ -38,6 +38,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $res = KopoKopo::initiateSTKPush($phone, $amount, $externalRef);
 
         if ($res['success']) {
+            // Stored so the outcome can be confirmed with Kopo Kopo directly
+            // if the webhook never lands.
+            if (!empty($res['location'])) {
+                DB::execute("UPDATE ussd_transactions SET gateway_ref = ? WHERE id = ?", [$res['location'], $transId]);
+            }
             if (isset($_POST['ajax'])) {
                 header('Content-Type: application/json');
                 echo json_encode(['success' => true, 'id' => $transId]);

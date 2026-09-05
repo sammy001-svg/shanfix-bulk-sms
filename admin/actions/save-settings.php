@@ -24,7 +24,7 @@ const ALLOWED_SETTING_KEYS = [
     'sms_gateway', 'onfon_api_key', 'onfon_user_id', 'onfon_access_key', 'onfon_batch_delay_ms',
     'sms_api_key', 'sms_api_secret', 'sms_shortcode',
     // Payments (Kopo Kopo)
-    'kk_client_id', 'kk_client_secret', 'kk_till_number', 'kk_base_url',
+    'kk_client_id', 'kk_client_secret', 'kk_api_key', 'kk_till_number', 'kk_base_url',
     'kk_webhook_secret', 'kk_webhook_token',
     // Delivery receipts
     'dlr_webhook_token',
@@ -44,7 +44,7 @@ const ALLOWED_SETTING_KEYS = [
 // (the form renders these as password inputs with placeholder "Leave blank to keep current")
 const PRESERVE_IF_EMPTY = [
     'sms_api_secret', 'smtp_pass',
-    'kk_client_secret', 'kk_webhook_secret', 'kk_webhook_token',
+    'kk_client_secret', 'kk_api_key', 'kk_webhook_secret', 'kk_webhook_token',
     'dlr_webhook_token',
 ];
 

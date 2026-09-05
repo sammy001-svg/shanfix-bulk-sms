@@ -7,8 +7,10 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/white-label.php';
 
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
+// Start session if not already started.
+// Skipped under CLI: cron scripts pull this in for notify()/DB helpers only and
+// never touch $_SESSION, so starting one would just leak a session file per run.
+if (PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params([
         'lifetime' => SESSION_TIMEOUT,
         'path'     => '/',

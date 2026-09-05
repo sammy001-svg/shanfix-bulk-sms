@@ -31,6 +31,17 @@ class KopoKopo {
         return rtrim(self::setting('base_url', 'https://api.kopokopo.com'), '/');
     }
 
+    /**
+     * The API Key from the Kopo Kopo dashboard. Kopo Kopo signs webhook bodies
+     * with it, so it is what verifies X-KopoKopo-Signature.
+     *
+     * kk_webhook_secret is the legacy name for the same value and is still
+     * honoured so existing installations keep working.
+     */
+    public static function apiKey(): string {
+        return self::setting('api_key') ?: self::setting('webhook_secret');
+    }
+
     /** True when the admin has filled in enough of Settings → Payments to transact. */
     public static function isConfigured(): bool {
         return self::setting('client_id') !== ''
@@ -237,5 +248,137 @@ class KopoKopo {
                  ?? 'Failed to initiate STK push.';
 
         return ['success' => false, 'error' => "Kopo Kopo: $errorMsg (HTTP $httpCode)"];
+    }
+
+    /**
+     * Pull the first usable value from a list of dot-paths in a decoded payload.
+     * Kopo Kopo nests results differently between webhook callbacks and direct
+     * resource reads, so every field is looked for in both shapes.
+     */
+    private static function pick(array $data, array $paths) {
+        foreach ($paths as $path) {
+            $node = $data;
+            foreach (explode('.', $path) as $segment) {
+                if (!is_array($node) || !isset($node[$segment])) { $node = null; break; }
+                $node = $node[$segment];
+            }
+            if ($node !== null && $node !== '' && !is_array($node)) return $node;
+        }
+        return null;
+    }
+
+    /**
+     * Normalise a Kopo Kopo payment payload — webhook body or resource read —
+     * into one shape. Single parser so the webhook and the reconciler can never
+     * disagree about whether a payment succeeded.
+     *
+     * @return array{status:?string, resource_status:?string, reference:string,
+     *               mpesa_ref:?string, successful:bool, failed:bool}
+     */
+    public static function extract(array $payload): array {
+        $status = self::pick($payload, [
+            'data.attributes.status',
+            'attributes.status',
+            'data.attributes.event.resource.status',
+            'attributes.event.resource.status',
+            'status',
+        ]);
+
+        $resourceStatus = self::pick($payload, [
+            'data.attributes.event.resource.status',
+            'attributes.event.resource.status',
+        ]);
+
+        $reference = (string)(self::pick($payload, [
+            'data.attributes.metadata.reference',
+            'attributes.metadata.reference',
+            'metadata.reference',
+        ]) ?? '');
+
+        $mpesaRef = self::pick($payload, [
+            'data.attributes.event.resource.reference',
+            'attributes.event.resource.reference',
+            'data.attributes.event.resource.receipt_number',
+        ]);
+
+        $s  = strtoupper((string)$status);
+        $rs = strtoupper((string)$resourceStatus);
+
+        $successful = in_array($s,  ['SUCCESS', 'SUCCESSFUL', 'RECEIVED'], true)
+                   || in_array($rs, ['SUCCESS', 'RECEIVED'], true);
+
+        // Only a terminal failure counts — "Pending"/"Processing" must not
+        // cause the reconciler to give up on a payment still in flight.
+        $failed = !$successful && in_array($s, ['FAILED', 'CANCELLED', 'CANCELED', 'REJECTED'], true);
+
+        return [
+            'status'          => $status !== null ? (string)$status : null,
+            'resource_status' => $resourceStatus !== null ? (string)$resourceStatus : null,
+            'reference'       => trim($reference),
+            'mpesa_ref'       => $mpesaRef !== null ? (string)$mpesaRef : null,
+            'successful'      => $successful,
+            'failed'          => $failed,
+        ];
+    }
+
+    /**
+     * Read a payment resource back from Kopo Kopo.
+     *
+     * This is what makes crediting independent of the webhook: if the callback
+     * is delayed, blocked or misconfigured, the outcome can still be pulled on
+     * demand and the account credited straight away.
+     *
+     * @param string $resourceUrl The Location URL captured from the STK push.
+     * @return array{ok:bool, error?:string, ...extract() fields}
+     */
+    public static function getPaymentStatus(string $resourceUrl): array {
+        $resourceUrl = trim($resourceUrl);
+        if ($resourceUrl === '') {
+            return ['ok' => false, 'error' => 'No gateway reference stored for this payment.'];
+        }
+
+        // Only ever call the configured Kopo Kopo host — the URL comes from the
+        // database and must not be able to point this request anywhere else.
+        if (strpos($resourceUrl, self::baseUrl() . '/') !== 0) {
+            return ['ok' => false, 'error' => 'Gateway reference does not belong to the configured Kopo Kopo host.'];
+        }
+
+        $token = self::getToken();
+        if (!$token) {
+            return ['ok' => false, 'error' => 'Kopo Kopo authentication failed.'];
+        }
+
+        $ch = curl_init($resourceUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => [
+                "Authorization: Bearer $token",
+                'Accept: application/json',
+                'User-Agent: ShanfixBulkSMS/1.0',
+            ],
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_CONNECTTIMEOUT => 8,
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr  = curl_error($ch);
+        curl_close($ch);
+
+        if ($response === false) {
+            return ['ok' => false, 'error' => "Could not reach Kopo Kopo: $curlErr"];
+        }
+        if ($httpCode < 200 || $httpCode >= 300) {
+            return ['ok' => false, 'error' => "Kopo Kopo returned HTTP $httpCode"];
+        }
+
+        $data = json_decode($response, true);
+        if (!is_array($data)) {
+            return ['ok' => false, 'error' => 'Kopo Kopo returned a non-JSON response.'];
+        }
+
+        return array_merge(['ok' => true], self::extract($data));
     }
 }

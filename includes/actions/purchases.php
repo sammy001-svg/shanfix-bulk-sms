@@ -80,8 +80,14 @@ class Purchase {
             $sitePrefix = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', SITE_NAME), 0, 3));
             $prefixedId = "{$sitePrefix}{$id}";
             $res = KopoKopo::initiateSTKPush($ref, $amount, $prefixedId);
-            
+
             if ($res['success']) {
+                // Keep the payment resource URL: it lets us confirm the outcome
+                // directly with Kopo Kopo if the webhook is delayed or blocked,
+                // so units are still credited automatically.
+                if (!empty($res['location'])) {
+                    DB::execute("UPDATE purchases SET gateway_ref = ? WHERE id = ?", [$res['location'], $id]);
+                }
                 return ['success' => true, 'id' => $id, 'manual' => false];
             } else {
                 error_log("STK Push Initiation Failed for Purchase #$id: " . $res['error']);

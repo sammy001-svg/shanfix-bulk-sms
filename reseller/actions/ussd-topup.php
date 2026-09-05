@@ -40,6 +40,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $res = KopoKopo::initiateSTKPush($phone, $amount, $externalRef);
 
         if ($res['success']) {
+            // Stored so the outcome can be confirmed with Kopo Kopo directly
+            // if the webhook never lands.
+            if (!empty($res['location'])) {
+                DB::execute("UPDATE ussd_transactions SET gateway_ref = ? WHERE id = ?", [$res['location'], $transId]);
+            }
             flash_set('success', 'STK Push initiated! Please enter your PIN on your phone.');
         } else {
             DB::execute("UPDATE ussd_transactions SET status = 'failed' WHERE id = ?", [$transId]);

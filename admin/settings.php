@@ -69,6 +69,18 @@ $s = fn(string $key, string $default='') => htmlspecialchars($settings[$key] ?? 
           <div class="alert alert-info"><i class="fa-solid fa-credit-card"></i> Configure your Kopo Kopo M-Pesa STK Push credentials. Find these under <strong>Kopo Kopo Dashboard &rarr; Settings &rarr; API Keys</strong>.</div>
           <div class="form-group"><label class="form-label">Kopo Kopo Client ID</label><input type="text" name="kk_client_id" class="form-control" value="<?=$s('kk_client_id')?>" placeholder="From your Kopo Kopo API app"></div>
           <div class="form-group"><label class="form-label">Kopo Kopo Client Secret</label><input type="password" name="kk_client_secret" class="form-control" placeholder="Leave blank to keep current"></div>
+          <div class="form-group">
+            <label class="form-label">
+              Kopo Kopo API Key <span class="required">*</span>
+              <?php if ($settings['kk_api_key'] ?? ''): ?>
+                <span class="badge badge-success" style="font-size:10px;vertical-align:middle">Configured</span>
+              <?php else: ?>
+                <span class="badge badge-danger" style="font-size:10px;vertical-align:middle">Not Set</span>
+              <?php endif; ?>
+            </label>
+            <input type="password" name="kk_api_key" class="form-control" placeholder="Leave blank to keep current">
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">From <strong>Kopo Kopo Dashboard &rarr; Settings &rarr; API Keys</strong>, shown next to the Client ID and Secret. Kopo Kopo signs every webhook with it, so this is what verifies <code>X-KopoKopo-Signature</code>.</div>
+          </div>
           <div class="form-group"><label class="form-label">Till Number</label><input type="text" name="kk_till_number" class="form-control" value="<?=$s('kk_till_number')?>" placeholder="e.g. K000000"></div>
           <div class="form-group">
             <label class="form-label">API Base URL</label>
@@ -86,15 +98,13 @@ $s = fn(string $key, string $default='') => htmlspecialchars($settings[$key] ?? 
           </div>
           <div class="form-group">
             <label class="form-label">
-              Webhook Signing Secret
-              <?php if (!($settings['kk_webhook_secret'] ?? '') && !($settings['kk_webhook_token'] ?? '')): ?>
-                <span class="badge badge-danger" style="font-size:10px;vertical-align:middle">Not Set &mdash; Webhook Open</span>
-              <?php elseif ($settings['kk_webhook_secret'] ?? ''): ?>
-                <span class="badge badge-success" style="font-size:10px;vertical-align:middle">Configured</span>
+              Webhook Signing Secret <span style="font-size:11px;color:var(--text-muted)">(legacy &mdash; optional)</span>
+              <?php if (!($settings['kk_api_key'] ?? '') && !($settings['kk_webhook_secret'] ?? '') && !($settings['kk_webhook_token'] ?? '')): ?>
+                <span class="badge badge-danger" style="font-size:10px;vertical-align:middle">Webhook Open</span>
               <?php endif; ?>
             </label>
             <input type="password" name="kk_webhook_secret" class="form-control" placeholder="Leave blank to keep current">
-            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Set only if your Kopo Kopo webhook subscription signs requests. The callback then rejects anything whose <code>X-KopoKopo-Signature</code> does not verify.</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Older name for the same signing value. Leave empty &mdash; the API Key above is used when both are set.</div>
           </div>
           <div class="form-group">
             <label class="form-label">

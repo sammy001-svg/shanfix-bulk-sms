@@ -180,10 +180,12 @@ CREATE TABLE IF NOT EXISTS `purchases` (
   `currency`      VARCHAR(5)    NOT NULL DEFAULT 'KES',
   `payment_method` VARCHAR(40)  NOT NULL DEFAULT 'mpesa',
   `transaction_ref` VARCHAR(100) DEFAULT NULL,
+  `gateway_ref`   VARCHAR(255)  DEFAULT NULL COMMENT 'Kopo Kopo payment resource URL returned by the STK push',
   `status`        ENUM('pending','completed','failed','refunded') NOT NULL DEFAULT 'pending',
   `created_at`    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_user` (`user_id`),
+  KEY `idx_status_created` (`status`, `created_at`),
   CONSTRAINT `fk_purch_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_purch_plan` FOREIGN KEY (`plan_id`) REFERENCES `pricing_plans`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -301,6 +303,7 @@ INSERT INTO `system_settings` (`key`, `value`) VALUES
   ('kk_client_secret',  ''),
   ('kk_till_number',    ''),
   ('kk_base_url',       'https://api.kopokopo.com'),
+  ('kk_api_key',       ''),
   ('kk_webhook_secret', ''),
   ('kk_webhook_token',  ''),
   -- Onfon Media
