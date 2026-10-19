@@ -24,7 +24,7 @@ if (!csrf_verify()) {
 $name        = sanitize($_POST['name'] ?? '');
 $senderId    = sanitize($_POST['sender_id'] ?? 'SHANFIX');
 $message     = sanitize($_POST['message'] ?? '');
-$scheduledAt = $_POST['scheduled_at'] ?? null;
+$scheduledRaw = trim((string)($_POST['scheduled_at'] ?? ''));
 $groupId     = (int)($_POST['group_id'] ?? 0);
 $rawNumbers  = sanitize($_POST['numbers'] ?? '');
 
@@ -32,6 +32,24 @@ $rawNumbers  = sanitize($_POST['numbers'] ?? '');
 if ($name === '' || $message === '') {
     $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Campaign name and message are required.'];
     redirect(safe_referer('/'));
+}
+
+// --- Schedule: normalize datetime-local ("2026-10-19T21:30") to MySQL format ---
+$scheduledAt = null;
+if ($scheduledRaw !== '') {
+    $dt = DateTime::createFromFormat('Y-m-d\TH:i', $scheduledRaw)
+       ?: DateTime::createFromFormat('Y-m-d\TH:i:s', $scheduledRaw)
+       ?: DateTime::createFromFormat('Y-m-d H:i:s', $scheduledRaw);
+    if (!$dt) {
+        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid schedule date/time.'];
+        redirect(safe_referer('/'));
+    }
+    if ($dt->getTimestamp() <= time() + 60) {
+        // Past or within a minute — just send now instead of parking it
+        $scheduledAt = null;
+    } else {
+        $scheduledAt = $dt->format('Y-m-d H:i:s');
+    }
 }
 
 // Validate sender ID belongs to this user and is approved — catch bad IDs before

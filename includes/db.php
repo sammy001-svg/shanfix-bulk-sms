@@ -19,6 +19,11 @@ if (!defined('SITE_NAME'))       define('SITE_NAME',       'Shanfix Technology')
 if (!defined('SITE_URL'))        define('SITE_URL',        'http://localhost:8080');
 if (!defined('SITE_VERSION'))    define('SITE_VERSION',    '1.0.0');
 if (!defined('SESSION_TIMEOUT')) define('SESSION_TIMEOUT', 3600);
+if (!defined('APP_TIMEZONE'))    define('APP_TIMEZONE',    getenv('APP_TIMEZONE') ?: 'Africa/Nairobi');
+
+// Single source of truth for time: PHP and MySQL must agree, otherwise
+// scheduled campaigns (scheduled_at vs date()/NOW()) fire at the wrong time.
+date_default_timezone_set(APP_TIMEZONE);
 
 class DB {
     private static $instance = null;
@@ -32,11 +37,13 @@ class DB {
 
     private static function connect(): void {
         $dsn = sprintf('mysql:host=%s;dbname=%s;charset=%s', DB_HOST, DB_NAME, DB_CHARSET);
+        // Numeric offset (e.g. +03:00) works even when MySQL tz tables aren't loaded
+        $tzOffset = (new DateTime('now', new DateTimeZone(APP_TIMEZONE)))->format('P');
         $options = [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES   => false,
-            PDO::MYSQL_ATTR_INIT_COMMAND => "SET SESSION wait_timeout=28800, SESSION interactive_timeout=28800",
+            PDO::MYSQL_ATTR_INIT_COMMAND => "SET SESSION wait_timeout=28800, SESSION interactive_timeout=28800, time_zone='{$tzOffset}'",
         ];
         try {
             self::$instance = new PDO($dsn, DB_USER, DB_PASS, $options);
